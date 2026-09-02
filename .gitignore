@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# LaTeX build artifacts
+*.aux
+*.log
+*.bbl
+*.bcf
+*.blg
+*.out
+*.toc
+*.lot
+*.lof
+*.fls
+*.fdb_latexmk
+*.run.xml
+*.synctex.gz
+*.nav
+*.snm
+*.vrb
+*.xdv
+
+# Editor
+.vscode/
