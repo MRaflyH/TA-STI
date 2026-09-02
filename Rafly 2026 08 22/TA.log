@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.8.22)  22 AUG 2026 18:27
+This is XeTeX, Version 3.141592653-2.6-0.999998 (TeX Live 2026) (preloaded format=xelatex 2026.8.22)  22 AUG 2026 18:32
 entering extended mode
  restricted \write18 enabled.
  file:line:error style messages enabled.
@@ -1322,11 +1322,11 @@ l.168 \input tables/longtable1.tex
 
  
 Here is how much of TeX's memory you used:
- 32877 strings out of 468168
- 642449 string characters out of 5432815
+ 32880 strings out of 468168
+ 642586 string characters out of 5432815
  2040612 words of memory out of 5000000
- 61182 multiletter control sequences out of 15000+600000
- 634657 words of font info for 96 fonts, out of 8000000 for 9000
+ 61184 multiletter control sequences out of 15000+600000
+ 634665 words of font info for 97 fonts, out of 8000000 for 9000
  1348 hyphenation exceptions out of 8191
  73i,12n,95p,1251b,1876s stack positions out of 10000i,1000n,20000p,200000b,200000s
 Output written on TA.pdf (36 pages).
