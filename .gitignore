@@ -22,3 +22,6 @@
 
 # Editor
 .vscode/
+*.loa
+*.lol
+*.bbl-SAVE-ERROR
