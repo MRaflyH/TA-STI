@@ -1,0 +1,11 @@
+# Core data pipeline
+pandas>=2.2
+numpy>=1.26
+openpyxl>=3.1          # PLN .xlsx reader
+requests>=2.31         # NASA POWER HTTP API
+pyarrow>=15.0          # parquet output (optional but recommended)
+
+# ERA5 only
+cdsapi>=0.7.4          # Copernicus Climate Data Store client
+xarray>=2024.3
+netcdf4>=1.6
