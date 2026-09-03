@@ -184,9 +184,51 @@ def full_cell_index(domain: cfg.Domain, grid_deg: float = cfg.GRID_DEG) -> pd.Da
     return grid.to_frame(index=False)
 
 
-def observed_months(
-    strikes: pd.DataFrame, domain: cfg.Domain
-) -> pd.DataFrame:
+def _bin_timestamps(ts: pd.Series, domain: cfg.Domain) -> pd.Series:
+    """Convert tz-aware strike timestamps to the naive calendar used for binning.
+
+    At monthly resolution the calendar was always the domain's *local* one: a
+    "January" of West Java lightning should be January in Jakarta time, not a
+    UTC window shifted seven hours back. Seven hours moves almost no strikes
+    across a month boundary, so the choice was nearly free.
+
+    At hourly resolution the choice stops being about which storms land in
+    which bin -- an hour is the same hour on either clock -- and becomes about
+    how the bin is *labelled*. Every source has to agree on the label or the
+    join produces nothing at all, silently. NASA POWER's hourly endpoint offers
+    local solar time, but LST is derived from longitude and is not
+    Asia/Jakarta, so UTC is the only convention all four sources can honour.
+    cfg.TZ_MODE is therefore forced to "utc" at hourly resolution.
+
+    The diurnal cycle is not lost by this. build.py emits `hour_of_day_local`,
+    which is the form a model can use anyway -- and a cyclical feature is a
+    better representation of "3 p.m. local" than a shifted bin label is.
+    """
+    if cfg.TIME_FREQ == "h" or cfg.TZ_MODE == "utc":
+        return ts.dt.tz_convert("UTC").dt.tz_localize(None)
+    return ts.dt.tz_convert(domain.tz).dt.tz_localize(None)
+
+
+def _time_index(coverage: pd.DataFrame) -> pd.DataFrame:
+    """Every time period the skeleton should contain, at cfg.TIME_FREQ.
+
+    Built from the months that survived the coverage filter, so a month with no
+    data contributes no rows at all -- neither one monthly row, nor thirty
+    daily ones, nor seven hundred hourly ones.
+    """
+    months = pd.PeriodIndex(coverage["month"])
+    if cfg.TIME_FREQ == "M":
+        return pd.DataFrame({cfg.TIME_COL: months})
+
+    periods = [
+        p
+        for m in months
+        for p in pd.period_range(m.start_time, m.end_time, freq=cfg.TIME_FREQ)
+    ]
+    return pd.DataFrame({cfg.TIME_COL: pd.PeriodIndex(periods, freq=cfg.TIME_FREQ)})
+
+
+def observed_months(strikes: pd.DataFrame, domain: cfg.Domain) -> pd.DataFrame:
     """Distinct calendar days present in the raw data, per month.
 
     Absence of a strike record is ambiguous: it can mean "the detector was
@@ -200,8 +242,11 @@ def observed_months(
     That slightly under-counts coverage in the dry season, which biases GFD
     upward a little; the alternative -- treating six missing years as six years
     of zero lightning -- is far worse.
+
+    This stays MONTHLY regardless of cfg.TIME_FREQ, on purpose. See
+    aggregate_gfd.
     """
-    local_day = strikes["timestamp"].dt.tz_convert(domain.tz).dt.tz_localize(None)
+    local_day = _bin_timestamps(strikes["timestamp"], domain)
     per_month = (
         pd.DataFrame({"month": local_day.dt.to_period("M"), "day": local_day.dt.normalize()})
         .groupby("month")["day"]
@@ -219,32 +264,54 @@ def aggregate_gfd(
     domain: cfg.Domain,
     grid_deg: float = cfg.GRID_DEG,
     fill_empty_cells: bool = True,
-    min_coverage: float = 0.0,
+    min_coverage: float | None = None,
 ) -> pd.DataFrame:
-    """Aggregate strike records into one row per (cell, month).
+    """Aggregate strike records into one row per (cell, period).
+
+    The period is a clock hour, a calendar day or a calendar month, per
+    cfg.TIME_FREQ.
 
     ``fill_empty_cells`` inserts explicit zero-flash rows -- but only for
-    months the raw data actually covers. Filling the whole configured year
-    range instead would invent zeros for periods with no data at all, which is
-    not a quiet inaccuracy: it hands the model thousands of rows whose target
-    is zero for reasons that have nothing to do with meteorology.
+    periods the raw data actually covers. Filling the whole configured year
+    range instead would invent zeros for stretches with no data at all, which
+    is not a quiet inaccuracy: it hands the model rows whose target is zero for
+    reasons that have nothing to do with meteorology.
 
-    ``min_coverage`` drops months observed for less than this fraction of their
-    days. A month with two days of data yields a GFD estimate built on two
-    days; it is normalised correctly by ``observed_days``, but it is still a
-    far noisier estimate than a full month. Raising this to e.g. 0.9 keeps only
-    near-complete months.
+    WHY COVERAGE IS STILL JUDGED MONTHLY
+    ------------------------------------
+    The observation proxy above -- "a day with at least one strike somewhere in
+    the domain is a day the network was up" -- is sound over a month and
+    useless over anything shorter, because at sub-monthly resolution the thing
+    it cannot distinguish is exactly the thing being predicted. A quiet
+    3 a.m. hour and an hour the detector was offline look identical, and
+    calling the quiet hour "unobserved" would delete most of the zero class
+    from the training set -- which at hourly resolution is almost the entire
+    dataset.
+
+    So the gate stays monthly: a month passes or fails on its day-coverage, and
+    every period inside a passing month becomes a row, zero-flash periods
+    included. The cost is the inverse error -- an offline stretch inside an
+    otherwise well-covered month becomes a run of false zeros. cfg.MIN_COVERAGE
+    (0.9 below monthly) is what bounds that error, and the printed coverage
+    report is what lets you see it. Read the report; do not assume.
+
+    This is a weaker guarantee at hourly than at daily, and the weakness is
+    worth stating in the thesis: the daily gate can only certify that the
+    network was up on 90% of a month's *days*, never that it was up for all 24
+    hours of any one of them.
+
+    ``min_coverage`` defaults to cfg.MIN_COVERAGE.
     """
+    if min_coverage is None:
+        min_coverage = cfg.MIN_COVERAGE
+
     df = assign_grid(strikes, grid_deg)
-    df = df[
-        df["lat_bin"].between(*domain.snapped_bbox()[:2])
-        & df["lon_bin"].between(*domain.snapped_bbox()[2:])
-    ]
-    # Bin by *local* calendar month. A "January" of West Java lightning should
-    # be January in Jakarta time, not a UTC window shifted seven hours back.
-    df["month"] = (
-        df["timestamp"].dt.tz_convert(domain.tz).dt.tz_localize(None).dt.to_period("M")
-    )
+    lat_lo, lat_hi, lon_lo, lon_hi = domain.snapped_bbox()
+    df = df[df["lat_bin"].between(lat_lo, lat_hi) & df["lon_bin"].between(lon_lo, lon_hi)]
+
+    naive = _bin_timestamps(df["timestamp"], domain)
+    df[cfg.TIME_COL] = naive.dt.to_period(cfg.TIME_FREQ)
+    df["month"] = naive.dt.to_period("M")
 
     coverage = observed_months(strikes, domain)
     configured = pd.period_range(
@@ -269,10 +336,17 @@ def aggregate_gfd(
             )
         coverage = coverage[coverage["coverage"] >= min_coverage]
 
+    if coverage.empty:
+        raise ValueError(
+            f"[{domain.name}] no month reaches {min_coverage:.0%} day-coverage. "
+            f"Either the raw data is thinner than you think, or "
+            f"cfg.MIN_COVERAGE is too strict for this source."
+        )
+
     df = df[df["month"].isin(set(coverage["month"]))]
 
     agg = (
-        df.groupby(["lat_bin", "lon_bin", "month"], observed=True)
+        df.groupby(["lat_bin", "lon_bin", cfg.TIME_COL], observed=True)
         .agg(
             flash_count=("lat", "size"),
             mean_peak_current_ka=("peak_current_ka", "mean"),
@@ -283,18 +357,45 @@ def aggregate_gfd(
 
     if fill_empty_cells:
         cells = full_cell_index(domain, grid_deg)
-        skeleton = cells.merge(coverage[["month"]], how="cross")
-        agg = skeleton.merge(agg, on=["lat_bin", "lon_bin", "month"], how="left")
+        times = _time_index(coverage)
+        n_rows = len(cells) * len(times)
+        if n_rows > 2_000_000:
+            print(
+                f"[{domain.name}] building a {len(cells)} x {len(times):,} "
+                f"skeleton = {n_rows:,} rows -- this is the memory high-water "
+                f"mark of the build"
+            )
+        skeleton = cells.merge(times, how="cross")
+        agg = skeleton.merge(agg, on=["lat_bin", "lon_bin", cfg.TIME_COL], how="left")
         agg["flash_count"] = agg["flash_count"].fillna(0).astype("int64")
 
+    agg["month"] = agg[cfg.TIME_COL].dt.asfreq("M")
     agg = agg.merge(coverage, on="month", how="left")
     agg["area_km2"] = agg["lat_bin"].map(lambda la: _cell_area_km2(la, grid_deg))
 
-    # Normalise by days actually observed, not by calendar length. A month with
-    # one day of data must not be read as a month with one day of lightning.
-    agg["gfd_per_km2_per_day"] = agg["flash_count"] / agg["area_km2"] / agg["observed_days"]
+    # Normalise by the length of the period this row actually represents.
+    #   monthly: days actually observed, so a month with one day of data is not
+    #            read as a month with one day of lightning;
+    #   daily  : exactly one day;
+    #   hourly : one twenty-fourth of a day.
+    fixed = cfg.period_fraction_of_day()
+    agg["period_days"] = agg["observed_days"] if fixed is None else fixed
+
+    agg["gfd_per_km2_per_day"] = agg["flash_count"] / agg["area_km2"] / agg["period_days"]
     agg["gfd_per_km2_per_year"] = agg["gfd_per_km2_per_day"] * 365.25
 
     agg = agg.rename(columns={"lat_bin": "lat", "lon_bin": "lon"})
     agg["domain"] = domain.name
-    return agg.sort_values(["month", "lat", "lon"]).reset_index(drop=True)
+
+    if cfg.TIME_FREQ != "M":
+        zero_share = float((agg["flash_count"] == 0).mean())
+        noun = cfg.freq_noun()
+        print(
+            f"[{domain.name}] {zero_share:.2%} of cell-{noun}s have zero "
+            f"flashes. Predicting zero everywhere already explains most of "
+            f"this target's variance -- report the zero share beside any R^2, "
+            f"and beat a trivial baseline before claiming the model learned "
+            f"anything."
+        )
+
+    return agg.sort_values([cfg.TIME_COL, "lat", "lon"]).reset_index(drop=True)
