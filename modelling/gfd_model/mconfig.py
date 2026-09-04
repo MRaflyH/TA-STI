@@ -12,11 +12,9 @@ the model hyperparameters rather than underneath them.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
-# --------------------------------------------------------------------------
-# Paths -- mirrors gfd_data.config so both packages agree on where data lives
-# --------------------------------------------------------------------------
 PROJECT_ROOT = Path(__file__).resolve().parents[1]          # modelling/
 # The pipeline writes here and this package only reads. Override with
 # GFD_DATA_DIR to point at synthetic tables during development without
@@ -24,7 +22,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]          # modelling/
 DATA_DIR = Path(os.environ.get(
     "GFD_DATA_DIR", PROJECT_ROOT.parent / "dataset-pipeline" / "data"))
 PROCESSED_DIR = DATA_DIR / "processed"
-RESULTS_DIR = PROJECT_ROOT / "results"RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+RESULTS_DIR = PROJECT_ROOT / "results"
+RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # --------------------------------------------------------------------------
 # Reproducibility (NF-02)
