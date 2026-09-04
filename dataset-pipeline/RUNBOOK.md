@@ -270,8 +270,19 @@ Request count depends on resolution and chunking:
 | mode | requests | notes |
 |---|---|---|
 | `"M"`, year-chunked | 14 (7 per domain) | `fetch_year_monthly`; minutes each |
-| `"h"`, month-chunked | **168** (84 per domain) | current default |
-| `"h"`, `ERA5_HOURLY_CHUNK = "Y"` | 14 (7 per domain) | try one by hand first |
+| `"h"`, month-chunked | **168** (84 per domain) | current default, and the only tested hourly path |
+| `"h"`, `ERA5_HOURLY_CHUNK = "Y"` | 14 (7 per domain) | **rejected — exceeds the CDS cost limit** |
+
+`"Y"` was tested by hand (`era5.fetch_chunk_hourly(cfg.TROPIS, 2018)`) and
+refused: a year is ~53.000 fields and the CDS gives very large requests very low
+priority or declines them outright. Leave `ERA5_HOURLY_CHUNK = "M"`.
+
+A **quarterly** chunk is the untested middle ground — ~13.000 fields against a
+month's ~4.500 — and would cut 168 requests to 56. The cost threshold is
+somewhere between those two numbers and only the ends have been probed. Adding
+it means a `"Q"` branch in `fetch_chunk_hourly` *and* a matching glob in
+`_files`; the filename pattern has to stay consistent or `load_era5` picks up
+the wrong set.
 
 **Budget this honestly — the cost is queue time, not bandwidth.** Each hourly
 month is only ~1,3 MB over a box this small, and the CDS takes a consistent
@@ -287,21 +298,31 @@ month is only ~1,3 MB over a box this small, and the CDS takes a consistent
 | 58 | 41 min | 47 min |
 | 59 | 53 min | 59 min |
 
-That is CDS fair-share scheduling demoting you for sustained recent usage, and it
-had not levelled off. Extrapolated over 168 sequential requests it is a
-**multi-day** run, not an overnight one. Two consequences:
+**Two explanations fit that, and they are not equivalent.** The CDS schedules on
+the user profile, the request type and the expected request cost, and caps
+simultaneous requests per user — so this could be fair-share demotion for
+sustained usage. But the degradation began at 13:20 WIB, which is 06:20 UTC, and
+that is when European working hours start. General CDS load fits the data at
+least as well as a personal penalty, and it predicts the queue recovers on its
+own after about 18:00 UTC each day.
 
-1. Prefer `ERA5_HOURLY_CHUNK = "Y"` if a year-sized request is accepted. Twelve
-   times the data per request, one twelfth the queue penalties. Verify by hand
-   first: a year of hourly single-level data is 8 760 timesteps × 6 variables ≈
-   53 000 fields, which should sit inside the CDS per-request field cap, but
-   confirm rather than assume. Two years in one request will not.
-2. Files cache by name and the domains are fetched in sequence, so killing the
-   run costs you nothing already on disk. If you decide mid-run to switch to
-   year chunking, do it at a domain boundary.
+Under the load model the useful window is roughly **01:00–13:00 WIB**: ~100
+requests in the fast half of the day against ~12 in the slow half, so 168
+requests is about a day and a half rather than four days. Check the queue waits
+at 02:00 WIB before assuming the worst.
 
-Transient `502 Bad Gateway` responses are normal; `cdsapi` retries them
-automatically after 120 s and they do not need intervention.
+Three practical notes:
+
+1. **Restarting the client does nothing.** The scheduling is server-side and
+   per-account; killing the process and resuming puts the next request in the
+   same queue position. Files cache by name, so an interrupt costs nothing
+   already on disk, but it buys nothing either.
+2. **Check your account's concurrent-request limit** on the CDS profile page. The
+   cap is per user, not per process, but it is not necessarily 1 — if it allows
+   two or three, running the two domains in separate processes overlaps the
+   queue waits instead of serialising them.
+3. Transient `502 Bad Gateway` responses are normal and `cdsapi` retries them
+   automatically after 120 s. They are not the problem.
 
 **4d. The instantaneous-versus-interval caveat.** ERA5 hourly fields are
 instantaneous values at the top of the hour; a target row counts every flash
