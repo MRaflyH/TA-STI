@@ -119,7 +119,7 @@ def build_domain(
                if c in table.columns and c not in ("lat", "lon")]
     ordered = (
         ["domain", cfg.TIME_COL] + time_cols
-        + present
+        + ["lat", "lon"] + present
         + ["flash_count", "area_km2", "days_in_month", "observed_days",
            "coverage", "period_days", "gfd_per_km2_per_day", cfg.TARGET_COLUMN]
     )
