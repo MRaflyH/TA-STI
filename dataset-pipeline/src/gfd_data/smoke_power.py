@@ -22,6 +22,7 @@ from __future__ import annotations
 from . import config as cfg
 from .power import (
     ENDPOINT,
+    _windows,
     fetch_point,
     fetch_regional,
     native_points,
@@ -95,6 +96,42 @@ def probe_coarse(domain: cfg.Domain) -> list[str]:
     return failures
 
 
+def _budget() -> None:
+    """What the full fetch will actually cost, per domain and in total.
+
+    Counted the same way `power.fetch_domain` issues them, rather than by the
+    point count alone: with POWER_HOURLY_CHUNK = "Y" every point is requested
+    once per year, so the point count is a seventh of the real figure. The old
+    version of this function printed the point count and was misleading by
+    exactly that factor.
+    """
+    print("\nFull POWER fetch budget "
+          f"(TIME_FREQ={cfg.TIME_FREQ!r}, "
+          f"POWER_HOURLY_CHUNK={cfg.POWER_HOURLY_CHUNK!r}):")
+
+    grand = 0
+    for dom in cfg.DOMAINS.values():
+        hourly_params = [p for p in cfg.POWER_PARAMS
+                         if cfg.power_native_freq(p) == "h"]
+        n_hourly = 0
+        if hourly_params:
+            n_hourly = len(native_points(dom)) * len(_windows(dom, "h"))
+
+        n_coarse = sum(
+            len(_windows(dom, cfg.power_native_freq(p)))
+            for p in cfg.POWER_PARAMS
+            if cfg.power_native_freq(p) != "h"
+        )
+
+        total = n_hourly + n_coarse
+        grand += total
+        print(f"  {dom.name:<10s} {n_hourly:>4d} point + {n_coarse:>2d} regional "
+              f"= {total:>4d} requests")
+
+    print(f"  {'TOTAL':<10s} {grand:>4d} requests, paced 2 s apart")
+    print("  Cached files are skipped, so an interrupted run resumes for free.")
+
+
 def main() -> None:
     domain = cfg.TROPIS
     print(f"POWER smoke test at {cfg.freq_slug()} resolution "
@@ -113,12 +150,7 @@ def main() -> None:
         print("\nAll configured parameters returned data at their configured "
               "resolution.")
 
-    if cfg.TIME_FREQ == "h":
-        n = len(native_points(domain))
-        w = len(cfg.DOMAINS)
-        print(f"\nFull hourly fetch will be ~{n} requests for {domain.name} "
-              f"(and similar for the other domain), one per grid point, "
-              f"with cfg.POWER_HOURLY_CHUNK = {cfg.POWER_HOURLY_CHUNK!r}.")
+    _budget()
 
 
 if __name__ == "__main__":

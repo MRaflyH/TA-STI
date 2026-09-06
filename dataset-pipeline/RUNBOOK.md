@@ -7,34 +7,52 @@ Only one needs an account.
 |---|---|---|---|---|
 | PLN Puslitbang LDS | Given to you as `.xlsx` | no | point strikes | one sheet or file per year |
 | NASA MERLIN | Manual export from the KSC web archive | no | point strikes | 30-day cap per export → many files |
-| NASA POWER | HTTP API, synchronous | **no** | 0.5° × 0.625° | 1 parameter per regional request |
+| NASA POWER | HTTP API, synchronous | **no** | 0.5° × 0.625° | hourly is **point-only**; regional is daily/monthly and one parameter per request |
 | ERA5 | Copernicus CDS API, queued | **yes** | 0.25° × 0.25° | licence accepted **per dataset**, in the browser |
 
 Everything lands in `data/raw/<source>/`, and `python -m gfd_data.build` turns
 it into `data/processed/gfd_<domain>_<resolution>.*`.
 
-Both domains cover **2018–2024**. That is final.
+Both domains cover **2018–2024**, and both are now complete on disk:
+
+| Domain | Source | Status |
+|---|---|---|
+| tropis | PLN Puslitbang LDS | **complete.** 2.242.100 CG strikes, 2018-01-01 .. 2024-12-31 |
+| subtropis | NASA MERLIN | **complete.** 89 exports, ~4,3 juta strikes, ~557 MB |
+
+The tropis figure is CG-only and post-filter — it is what `load_pln()` returns,
+not the raw row count. Re-derive it rather than quoting it if a workbook is ever
+added or replaced (step 1).
 
 ---
 
-## Resolution switch — read this before any step
+## Resolution — read this before any step
 
-`config.TIME_FREQ` controls the whole pipeline.
+`config.TIME_FREQ` controls the whole pipeline, and it is **`"h"`**.
 
 ```python
-TIME_FREQ = "h"   # clock hour     (current)
+TIME_FREQ = "h"   # clock hour — CURRENT AND INTENDED
 TIME_FREQ = "D"   # calendar day
-TIME_FREQ = "M"   # calendar month (original; the predecessor-comparable one)
+TIME_FREQ = "M"   # calendar month
 ```
 
-It changes which POWER endpoint is called, which ERA5 product is downloaded and
-whether it is collapsed, how strikes are binned, and how the target is
-normalised. Raw files are named by resolution and processed tables go to
-`gfd_<domain>_<hourly|daily|monthly>.*`, so all three can live on disk at once.
+Hourly is the project's decision, not a leftover. The `"D"` and `"M"` code paths
+still work, but **nothing is currently built at either**, and neither should be
+described as the project's resolution.
 
-**Keep the monthly build.** It is the only resolution comparable with the
-predecessor study, which aggregated monthly. Any claim that this TA improves on
-it has to be made at matched resolution.
+`"M"` exists for one purpose: the predecessor study aggregated monthly, so a
+monthly build is the only artifact that could ever be set beside its numbers. If
+that comparison is wanted, build it deliberately — do not assume it is there.
+
+**Do not confuse `TIME_FREQ` with the `"M"` in `POWER_PARAM_FREQ`.** The latter
+says NASA POWER publishes `AOD_55_ADJ` monthly and nothing finer. It is a fact
+about the source, not a resolution setting, and it is the reason AOD is
+broadcast rather than fetched hourly.
+
+Changing `TIME_FREQ` changes which POWER endpoint is called, which ERA5 product
+is downloaded and whether it is collapsed, how strikes are binned, and how the
+target is normalised. Raw files are named by resolution and processed tables go
+to `gfd_<domain>_<hourly|daily|monthly>.*`, so all three can coexist on disk.
 
 The hourly and daily builds share their ERA5 downloads, so switching between
 those two costs nothing once the fetch is done. Switching to or from monthly
@@ -49,7 +67,7 @@ Two settings only matter below monthly:
   longitude-derived and is not Asia/Jakarta, so UTC is the only convention all
   four sources can honour. The diurnal cycle is carried by the
   `hour_of_day_local` column instead.
-- `MIN_COVERAGE` — `0.9` below monthly, was `0.0`. See "Decisions".
+- `MIN_COVERAGE` — **`0.0`. The coverage gate is OFF.** See "Decisions".
 
 ---
 
@@ -61,23 +79,18 @@ pip install -r requirements.txt truststore
 ```
 
 `xarray`, `netcdf4` and `cdsapi` are only needed for ERA5. Steps 1–3 work
-without them. `pyarrow` is no longer optional — parquet is the primary output
-below monthly resolution.
+without them. **`pyarrow` is required, not optional** — parquet is the primary
+output at hourly resolution and the CSV mirror is skipped above 500 000 rows.
 
 Every command below runs from `dataset-pipeline/src/`, with the venv active.
+Running them from the repo root gives `ModuleNotFoundError: No module named
+'gfd_data'`.
 
 ---
 
 ## Step 1 — PLN Puslitbang (tropical lightning)
 
-Drop every workbook into `data/raw/pln/`:
-
-```
-data/raw/pln/
-    Data_Petir_Jabar_20182024_Repaired.xlsx     # 2024 only as of writing
-    Data_Petir_Jabar_2018.xlsx                  # ...add the rest as they arrive
-    ...
-```
+**Status: complete.** All workbooks are in `data/raw/pln/`.
 
 The loader reads **every sheet of every workbook** and concatenates, so it does
 not matter whether the years arrive as separate sheets in one file or as
@@ -85,27 +98,55 @@ separate files. It keeps rows whose `Discrimination` starts with `CG` and
 derives polarity from the `+`/`-` suffix.
 
 ```bash
+cd dataset-pipeline/src
 python -c "from gfd_data.lightning import load_pln; d=load_pln(); print(d.shape, d.timestamp.min(), d.timestamp.max())"
 ```
 
-Run that after every new workbook arrives and check the max timestamp actually
-moved. The filename says `20182024`; the contents are what the loader reports.
+Current output:
 
-**One thing to confirm with PLN before you write this up.** The loader assumes
-`Date and time` is local Jakarta time (`Domain.tz = "Asia/Jakarta"` in
-`config.py`). If the LDS actually writes UTC, change that field to `"UTC"`.
+```
+(2242100, 6) 2018-01-01 08:49:31.517000+00:00 2024-12-31 16:44:59.251000+00:00
+```
 
-At monthly resolution this shifts a handful of strikes across month boundaries —
-small, but the kind of thing an examiner asks about. **At hourly resolution it is
-no longer small.** A seven-hour error puts every strike in the wrong bin and
-moves the entire diurnal cycle, which is one of the strongest signals in the
-hourly target. `TZ_MODE` being forced to UTC does not rescue you here: it fixes
-the *label*, and this is about whether the source timestamps were correctly
-interpreted before labelling. Get a definite answer from PLN, not an assumption.
+Timestamps print in UTC because the loader localises the source clock and
+converts. Re-run this after any change to `data/raw/pln/` and check the shape
+and the span; the filename says `20182024`, the contents are what the loader
+reports.
+
+**The one thing still unconfirmed with PLN.** The loader assumes `Date and time`
+is local Jakarta time (`Domain.tz = "Asia/Jakarta"` in `config.py`). Nothing in
+the export states its clock. If the LDS actually writes UTC, change that field
+to `"UTC"`.
+
+At monthly resolution this shifted a handful of strikes across month boundaries.
+**At hourly resolution it is not small.** A seven-hour error puts every tropis
+strike in the wrong bin and moves the entire diurnal cycle, which is one of the
+strongest signals in the hourly target. `TZ_MODE` being forced to UTC does not
+rescue you: that fixes the *label*, and this is about whether the source
+timestamps were correctly interpreted before labelling.
+
+The check is physical, and it costs nothing:
+
+```bash
+python3 -m gfd_data.smoke_lightning --domain tropis
+```
+
+Convection over West Java peaks in the local mid-to-late afternoon, so the flash
+count by local hour should show a clear afternoon maximum. Florida is the
+control: same physics, and MERLIN really is UTC, so its local-hour peak should
+land in the afternoon too. A tropis peak in the small hours means the timezone
+is wrong. Run it before building anything hourly; get a definite answer from PLN
+rather than trusting the smoke test alone.
 
 ---
 
 ## Step 2 — NASA MERLIN (subtropical lightning)
+
+**Status: complete.** 89 CSV exports in `data/raw/merlin/`.
+
+```bash
+ls dataset-pipeline/data/raw/merlin/*.csv | wc -l    # 89
+```
 
 Export from <https://kscweather.ksc.nasa.gov/wxarchive/MerlinCloudToGround> and
 drop every CSV into `data/raw/merlin/` unchanged. The loader globs the folder,
@@ -119,11 +160,11 @@ data/raw/merlin/
     ...
 ```
 
-The archive caps each export at **30 days**, so 2018–2024 is **89 exports**
-(~4,3 million strikes, ~557 MB). This is done. Do not rename the files: the
-archive's own filenames are your provenance record, and the loader does not care
-what they are called. Never merge them by hand — concatenation in code is
-reproducible and a manual merge is not.
+The archive caps each export at **30 days**, so 2018–2024 took **89 exports**
+(~4,3 juta strikes, ~557 MB). Do not rename the files: the archive's own
+filenames are your provenance record, and the loader does not care what they are
+called. Never merge them by hand — concatenation in code is reproducible and a
+manual merge is not.
 
 Access requires a device-level VPN with a US exit; the archive is geo-restricted.
 
@@ -131,6 +172,11 @@ Access requires a device-level VPN with a US exit; the archive is geo-restricted
 python3 -m gfd_data.merlin_download --self-test     # check the URL codec
 python3 -m gfd_data.merlin_download ... --dry-run   # list windows, fetch nothing
 ```
+
+`--dry-run` over 2018–2024 lists 86 windows at the default 30-day step, against
+89 files on disk. The difference is manual re-pulls and boundary retries, not a
+gap — the loader globs the folder and de-duplicates, so it does not matter. Do
+not "fix" it by deleting files.
 
 **Two schema facts that bite, and are not optional reading:**
 
@@ -176,23 +222,40 @@ seriously consider dropping it — and either way, say which in Bab IV.
 python3 -m gfd_data.power
 ```
 
-Two constraints from the POWER docs are already handled in the code, but know
-they exist because they explain the loop:
+**The hourly endpoint is point-only.** `/api/temporal/hourly/regional` does not
+exist and returns a bare 404. So the hourly fetch loops over NASA POWER's own
+native grid points — MERRA-2 geometry, latitudes on multiples of 0.5 and
+longitudes on multiples of 0.625 — and issues one request per point, carrying
+every hourly parameter at once (the point endpoint takes up to 15). Requesting
+POWER's points rather than the project's 0.5° cell centres is deliberate:
+several project cells share one POWER longitude cell, and the docs warn that
+repeatedly requesting the same underlying location can get you blocked.
 
-- a **regional** request may ask for only **one parameter**, so the code issues
-  one request per parameter and joins afterwards;
-- a regional request is capped at a **4.5° × 4.5° box (100 grid points)**. Both
-  domains fit. If you ever widen West Java or Florida past that, the request has
-  to be tiled.
+The two domains hold **84 native POWER points**: 6 lat × 5 lon = 30 for tropis,
+9 lat × 6 lon = 54 for subtropis. That count is the multiplier, not the number
+of parameters.
 
-At hourly with the default monthly chunking this is 5 parameters × 84 months +
-1 monthly AOD request = **421 requests per domain**. They are synchronous,
-small, and paced 2 s apart; budget an hour or two. Anything already on disk is
-skipped, so an interrupted run resumes for free. If a year-sized request works
-by hand, set `POWER_HOURLY_CHUNK = "Y"` and cut this to 36.
+| setting | hourly point requests | + AOD regional | total |
+|---|---|---|---|
+| `POWER_HOURLY_CHUNK = "ALL"` | 84 (one per point, whole span) | 2 | **86** |
+| `POWER_HOURLY_CHUNK = "Y"` | 588 (one per point per year) | 2 | **590** ← current |
 
-New in hourly mode: `time-standard=UTC` is sent explicitly, and `start`/`end`
-are `YYYYMMDD` (the monthly endpoint takes bare `YYYY`).
+`"Y"` is set. It is slower, but a failure costs one year of one point rather
+than seven, and the cache is finer grained so an interrupted run resumes closer
+to where it stopped. Requests are synchronous, small, and paced 2 s apart;
+budget several hours. Anything already on disk is skipped.
+
+`AOD_55_ADJ` is the exception in every sense: monthly, and therefore fetched
+through the **regional** endpoint, one request per domain for the whole span.
+Two regional constraints apply to it and to nothing else in the current config:
+one parameter per request, and a 4.5° × 4.5° box cap. Both domains fit; widening
+West Java or Florida past that would need the request tiled.
+
+Also hourly-specific: `time-standard=UTC` is sent explicitly, `start`/`end` are
+`YYYYMMDD` (the monthly endpoint takes bare `YYYY`), and hourly `PRECTOTCORR` is
+mm/hour where the monthly product is mm/day — **the units are not comparable
+across resolutions.** Say so in Bab IV if an hourly and a monthly build are ever
+put side by side.
 
 ---
 
@@ -225,14 +288,20 @@ This is the only source with real setup friction. Do it in this order.
    Open its *Download* tab and accept. This is the step everyone skips; without
    it every request returns `403 … required licences not accepted`, regardless of
    how correct your token is. Accepting the monthly licence does **not** cover
-   the hourly dataset. If you expect to run both resolutions, accept both now.
+   the hourly dataset. `"h"` is what this project runs, so that is the one that
+   must be accepted; accept the monthly one too only if you intend to build the
+   predecessor-comparable table.
 
 Verify:
 
 ```bash
 python3 -c "import cdsapi; cdsapi.Client(); print('CDS client OK')"
-python3 -m gfd_data.smoke_era5          # --clean removes the scratch folder
+python3 -m gfd_data.smoke_era5          # --clean removes whatever the test wrote
 ```
+
+By default `smoke_era5` writes into `data/raw/era5/` under the normal filename,
+so the real fetch reuses it rather than re-requesting. `--scratch` isolates it in
+`data/interim/` instead.
 
 **4b. Confirm the two flux-divergence variable names before the first run.**
 
@@ -269,13 +338,14 @@ Request count depends on resolution and chunking:
 
 | mode | requests | notes |
 |---|---|---|
-| `"M"`, year-chunked | 14 (7 per domain) | `fetch_year_monthly`; minutes each |
 | `"h"`, month-chunked | **168** (84 per domain) | current default, and the only tested hourly path |
 | `"h"`, `ERA5_HOURLY_CHUNK = "Y"` | 14 (7 per domain) | **rejected — exceeds the CDS cost limit** |
+| `"M"`, year-chunked | 14 (7 per domain) | `fetch_year_monthly`; only if you build the monthly table |
 
 `"Y"` was tested by hand (`era5.fetch_chunk_hourly(cfg.TROPIS, 2018)`) and
 refused: a year is ~53.000 fields and the CDS gives very large requests very low
-priority or declines them outright. Leave `ERA5_HOURLY_CHUNK = "M"`.
+priority or declines them outright. This is a settled negative result. Leave
+`ERA5_HOURLY_CHUNK = "M"`.
 
 A **quarterly** chunk is the untested middle ground — ~13.000 fields against a
 month's ~4.500 — and would cut 168 requests to 56. The cost threshold is
@@ -304,7 +374,8 @@ simultaneous requests per user — so this could be fair-share demotion for
 sustained usage. But the degradation began at 13:20 WIB, which is 06:20 UTC, and
 that is when European working hours start. General CDS load fits the data at
 least as well as a personal penalty, and it predicts the queue recovers on its
-own after about 18:00 UTC each day.
+own after about 18:00 UTC each day. **Neither has been established; do not assert
+either one in the thesis.**
 
 Under the load model the useful window is roughly **01:00–13:00 WIB**: ~100
 requests in the fast half of the day against ~12 in the slow half, so 168
@@ -332,7 +403,8 @@ happens during it. That belongs in Bab III. Daily and monthly aggregation used
 to hide the question; hourly does not.
 
 One thing hourly makes *simpler*: there is no daily statistic to choose, so the
-daily-max-CAPE-versus-mean argument disappears from the thesis entirely.
+daily-max-CAPE-versus-mean argument (`ERA5_DAILY_STATS`, live only at
+`TIME_FREQ = "D"`) does not belong in this thesis at all.
 
 ---
 
@@ -354,15 +426,30 @@ data/processed/gfd_subtropis_hourly.meta.json
 Use `--no-power --no-era5` to build the lightning half alone while you are still
 waiting on downloads.
 
-**Parquet is now the primary output.** The CSV mirror is skipped above 500 000
-rows; pass `--force-csv` if you really want it.
+**Parquet is the primary output.** The CSV mirror is skipped above 500 000 rows;
+pass `--force-csv` if you really want it.
 
 **The time key column is `time`, not `month`** — `2024-07-15 14:00` at hourly.
-Any notebook reading `df["month"]` needs updating. `year`, `month_of_year`,
-`day_of_year`, `hour_of_day_utc` and `hour_of_day_local` are provided separately.
-The remaining columns are `domain, lat, lon,` the six POWER features, the six
-ERA5 features, then `flash_count, area_km2, period_days, gfd_per_km2_per_day,
-gfd_per_km2_per_year`.
+Any notebook reading `df["month"]` needs updating.
+
+Full column list, in order:
+
+```
+domain, time,
+year, month_of_year, day_of_year, hour_of_day_utc, hour_of_day_local,
+lat, lon,
+PS, PRECTOTCORR, T2M, RH2M, WS2M, AOD_55_ADJ,        # NASA POWER
+CAPE, KX, TCIW, TCLW, VIIWD, VILWD,                  # ERA5
+flash_count, area_km2, days_in_month, observed_days, coverage, period_days,
+gfd_per_km2_per_day, gfd_per_km2_per_year
+```
+
+Note what that means downstream: **`year` and `days_in_month` are numeric
+columns that are not predictors.** Anything selecting features as "every numeric
+column that is not the target" will pick both up. `days_in_month` is pure
+bookkeeping. `year` is worse than useless under a chronological train/test
+split, because every test row carries a `year` value the model never saw in
+training. Exclude both explicitly in the modelling config.
 
 **`hour_of_day_local` is the feature that matters most here.** Bins are UTC, so
 without it a model has to learn the offset separately per domain — exactly the
@@ -375,14 +462,35 @@ modelling code and record the choice.
 The join is a **left join onto the lightning grid**, so a cell-period the
 meteorological sources do not cover appears as a NaN row rather than vanishing.
 
+**Before the full build, run the one-month end-to-end test:**
+
+```bash
+python3 -m gfd_data.smoke_build                  # tropis, most recent January
+python3 -m gfd_data.smoke_build --no-fetch       # use only what is on disk
+```
+
+It exists to catch the failure a left join will not raise on: zero key overlap
+between the lightning skeleton and a predictor frame, which returns a full table
+with every predictor column NaN and looks like a successful build. Three causes,
+all invisible in the per-source smoke tests — a dtype mismatch on the time key,
+a clock-convention offset, and ERA5 longitudes on 0..360 against lightning
+longitudes on -180..180 (which fails silently for Florida only, since West Java
+is positive either way).
+
+With `--fetch` it pulls one month for one domain: 30 POWER point requests for
+tropis (54 for subtropis), 1 regional AOD request, and 1 ERA5 request — so
+roughly 32, not the ~590 a full POWER fetch costs.
+
 Read the build report every time, not just the file list:
 
 - `zero-target share` — printed to two decimals, because it will be well above
   99% at hourly.
 - the `!! at hourly resolution the target is a COUNT process` warning.
-- `NO DATA for N months` / `dropping N months below 90% coverage` — periods
-  excluded rather than filled with false zeros.
-- `months covered` — day-coverage per month; low values mean detector gaps.
+- `NO DATA for N months` — months with no records at all, excluded rather than
+  zero-filled. **There is no "dropping N months below coverage" line**, because
+  `MIN_COVERAGE = 0.0` switches that filter off entirely. See "Decisions".
+- `months covered` — day-coverage per month; low values mean detector gaps, and
+  with the gate off they are kept.
 - `N native points -> M cells` — regridding; `0% still empty` is what you want.
 - `!! N of M cells have ZERO flashes` — usually sea or beyond detector range.
 - `missing-value share by feature` — read before modelling.
@@ -395,9 +503,10 @@ Read the build report every time, not just the file list:
 dataset-pipeline/data/
 ├── raw/            source files, never edited
 │   ├── pln/        PLN Puslitbang .xlsx (obtained via supervisors — not public)
-│   ├── merlin/     KSC archive .csv exports
+│   ├── merlin/     KSC archive .csv exports (89 files)
 │   ├── power/      NASA POWER .json responses
 │   └── era5/       Copernicus CDS .nc downloads
+├── interim/        smoke-test scratch (--scratch)
 └── processed/      gfd_<domain>_<resolution>.parquet + .meta.json
 ```
 
@@ -412,19 +521,39 @@ re-running skips whatever already succeeded.
 **Hourly, not monthly.** Every row is one cell-hour. This *departs from the
 proposal*, which committed to temporal aggregation as the mitigation for
 satellite sparsity — so it needs a sentence in Bab III and a conversation with
-the pembimbing, not a silent config change. Set `TIME_FREQ` back to `"M"` to
-reproduce the original behaviour exactly.
+the pembimbing, not a silent config change. `TIME_FREQ = "M"` reproduces the
+original behaviour exactly if the predecessor comparison is ever wanted.
 
-**Coverage is still judged monthly, and the guarantee is weaker than it was.**
-The observation proxy — "a day with at least one strike somewhere in the domain
-is a day the network was up" — is sound over a month and useless over anything
-shorter, because at sub-monthly resolution the thing it cannot distinguish is
-exactly the thing being predicted. A quiet 3 a.m. hour and an offline detector
-look identical, and calling the quiet hour *unobserved* would delete nearly the
-entire dataset. So the gate stays monthly: a month passes on its day-coverage,
-and every hour inside it becomes a row. State the residual weakness in the
-thesis: the gate can certify the network was up on 90% of a month's *days*, never
-that it was up for all 24 hours of any one of them.
+**The coverage gate is OFF, and this is the pipeline's largest open exposure.**
+`MIN_COVERAGE = 0.0`, so `aggregate_gfd` skips the filter and every month
+holding at least one strike record contributes rows, however thin.
+
+The underlying observation proxy — "a day with at least one strike somewhere in
+the domain is a day the network was up" — is sound over a month and useless over
+anything shorter, because at sub-monthly resolution the thing it cannot
+distinguish is exactly the thing being predicted. A quiet 3 a.m. hour and an
+offline detector look identical, and calling the quiet hour *unobserved* would
+delete nearly the entire dataset. So the gate could only ever have been monthly:
+a month passes on its day-coverage, and every hour inside it becomes a row.
+
+With the gate at 0.0 it does not even do that. A month observed on 6 of 31 days
+still emits 744 hourly rows, and the ~600 hours inside the 25 unobserved days
+become rows asserting "no lightning here" — absences of observation wearing a
+zero, against a target that is already >99% zeros.
+
+Two things follow, and neither is optional:
+
+1. `coverage` and `observed_days` are on **every row** of the processed table.
+   Filter or weight on `coverage` at modelling time and record the threshold in
+   the experiment config (F-05).
+2. Report the distribution of `coverage` over the rows actually trained on, in
+   Bab IV, beside the zero share.
+
+Raising the gate to 0.9 would move the error rather than remove it: a 90% gate
+preferentially deletes quiet months, and quiet months are the low-target
+examples the model most needs. There is no setting that avoids both. Run
+`python3 -m gfd_data.smoke_lightning` to see the per-month coverage table and
+which trade you would actually be making.
 
 **Empty cells are kept as zeros.** `aggregate_gfd(fill_empty_cells=True)` inserts
 explicit `flash_count = 0` rows. Dropping them would quietly train the model on
@@ -480,3 +609,24 @@ because the unit is small enough that a single missed flash flips a row from
 non-zero to zero. This is exactly the kind of thing that shows up as an
 unexplained cross-domain generalization gap. Decide deliberately whether to apply
 a land mask, and record the decision.
+
+---
+
+## Still unverified — carry these into the thesis, not into a footnote
+
+1. **The PLN source clock.** `Domain.tz = "Asia/Jakarta"` is an assumption. See
+   step 1. This is the single most consequential unverified item in the build.
+2. **CG/IC in MERLIN.** No discrimination column. If the KSC export includes
+   intracloud strokes, the subtropis target is not ground flash density.
+3. **Flash versus stroke.** PLN groups strokes into flashes via `Multi.`; MERLIN
+   does not. Comparing raw MERLIN rows against flash-grouped PLN rows compares
+   stroke density to flash density. Harmonise on one side or the other and record
+   which.
+4. **The two ERA5 flux-divergence variable names.** Step 4b.
+5. **Detection efficiency.** MERLIN is ~10 sensors around the Cape, not a
+   Florida-wide network. An uncorrected GFD field will show a spurious radial
+   gradient centred on KSC. The two domains come from different networks, so a
+   cross-domain generalization gap may be measuring instrument rather than
+   climate — the biggest threat to the validity of the core experiment.
+6. **The CDS queue explanation.** Fair-share demotion or European daytime load.
+   Both fit; neither is established.

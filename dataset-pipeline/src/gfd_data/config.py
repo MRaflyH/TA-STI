@@ -4,6 +4,10 @@ Everything that a reviewer might want to change -- bounding boxes, grid size,
 date ranges, feature lists, temporal resolution -- lives here and nowhere else.
 The loaders and fetchers import from this module so that a single edit
 propagates.
+
+THIS FILE IS THE SOURCE OF TRUTH FOR PIPELINE PARAMETERS. Where RUNBOOK.md, the
+project instructions, or a chat transcript disagrees with a value here, this
+file wins and the prose is what needs fixing.
 """
 
 from __future__ import annotations
@@ -46,10 +50,21 @@ GRID_DEG = 0.5
 # Temporal grid  <-- THE SWITCH
 # --------------------------------------------------------------------------
 # Temporal unit of one training row.
-#   "h" = clock hour     (current setting)
+#   "h" = clock hour     (CURRENT AND INTENDED SETTING)
 #   "D" = calendar day
-#   "M" = calendar month (the original setting; the only resolution comparable
-#         with the predecessor study, so keep it buildable)
+#   "M" = calendar month
+#
+# Hourly is the project's decision, not a placeholder. The "D" and "M" paths
+# are kept working, but nothing is currently built at either.
+#
+# "M" is retained for one specific reason: the predecessor study aggregated
+# monthly, so a monthly build is the only artifact that could ever be set
+# beside its numbers. If that comparison is wanted, build it deliberately --
+# do not assume it exists.
+#
+# DO NOT CONFUSE THIS WITH POWER_PARAM_FREQ BELOW. A "M" there is a statement
+# about what NASA POWER publishes for one parameter (AOD_55_ADJ is monthly-only
+# at source) and has nothing to do with the resolution of a training row.
 #
 # Changing this one value changes: which POWER endpoint is called, which ERA5
 # product is downloaded and whether it is collapsed, how strikes are binned,
@@ -81,13 +96,42 @@ TIME_COL = "time"
 #
 # The diurnal cycle is not lost by this: `hour_of_day_local` is emitted as a
 # column, which is the form a model can use anyway.
+#
+# This does NOT rescue a wrong source timezone. TZ_MODE fixes the label; the
+# `tz` field on each Domain decides how the raw timestamps were *interpreted*
+# before labelling. See TROPIS below.
 TZ_MODE = "utc"
 
 # Minimum fraction of a month's days that must carry data before that month is
-# used. At monthly resolution a thin month is merely a noisy estimate, so 0.0
-# was tolerable. At sub-monthly resolution a thin month manufactures *false
-# zeros*: every unobserved period inside it becomes a row asserting "no
-# lightning here". Hence the much stricter default below.
+# used.
+#
+# CURRENT VALUE: 0.0 -- THE GATE IS OFF. Every month that contains at least one
+# strike record contributes rows, however thin it is. `aggregate_gfd` skips the
+# filter entirely when this is 0, so no "dropping N months" line is printed and
+# no month is excluded on coverage grounds. (Months with no records at all are
+# still excluded, by a separate mechanism, and reported as "NO DATA for N
+# months".)
+#
+# UNDERSTAND WHAT THAT COSTS AT HOURLY RESOLUTION, because it is not neutral.
+# A month observed on 6 of 31 days still emits 744 hourly rows, and the ~600
+# hours inside the 25 unobserved days become rows asserting "no lightning
+# here". They are not observations of zero; they are absences of observation
+# wearing a zero. Against a target that is already >99% zeros, these are
+# invisible in aggregate and impossible to distinguish downstream.
+#
+# The gate is off deliberately for now, so the two mitigations below are not
+# optional -- one of them has to happen before any result is reported:
+#   1. `coverage` and `observed_days` are carried on EVERY row of the processed
+#      table. Filter or weight on `coverage` at modelling time and record the
+#      threshold in the experiment config (F-05).
+#   2. Report the distribution of `coverage` across the rows actually trained
+#      on, in Bab IV, next to the zero share.
+#
+# Raising this to 0.9 moves the problem rather than removing it: a 90% gate
+# preferentially deletes quiet months, and quiet months are the low-target
+# examples the model most needs. There is no setting that avoids both errors.
+# `python -m gfd_data.smoke_lightning` prints the per-month coverage table that
+# lets you see which trade you are actually making.
 MIN_COVERAGE = 0.0
 
 
@@ -137,6 +181,18 @@ TROPIS = Domain(
     lat_min=-8.0, lat_max=-5.5,
     lon_min=106.0, lon_max=109.0,
     year_start=2018, year_end=2024,
+    # THE OPEN QUESTION IN THIS FILE. The loader localises `Date and time` as
+    # Asia/Jakarta and converts to UTC. Nothing in the export states its clock;
+    # this is an assumption, and it has never been confirmed with PLN.
+    #
+    # At monthly resolution a seven-hour error moved a handful of strikes
+    # across month boundaries. At hourly it displaces EVERY tropis row by seven
+    # hours in exactly the dimension hourly resolution exists to capture, and
+    # produces a plausible cross-domain gap that is pure artefact.
+    #
+    # `python -m gfd_data.smoke_lightning` checks this physically: convection
+    # over West Java peaks in the local mid-to-late afternoon. A local-hour peak
+    # in the small hours means this field is wrong. Run it; do not assume.
     tz="Asia/Jakarta",   # VERIFY with PLN Puslitbang -- see RUNBOOK step 1.
 )
 
@@ -167,12 +223,17 @@ DOMAINS = {d.name: d for d in (TROPIS, SUBTROPIS)}
 # resolution and broadcast across the finer periods -- i.e. held constant
 # within its native period.
 #
-# That is a real limitation, not a neutral implementation detail: a feature
-# that cannot vary hour to hour cannot explain hour-to-hour variance in the
-# target, and it will look artificially unimportant in any feature-importance
-# analysis. At hourly resolution AOD_55_ADJ is constant across ~730 consecutive
-# rows. Consider dropping it rather than carrying a near-constant column
-# against a very scarce qubit budget -- and either way say which, in Bab IV.
+# THIS IS A PER-PARAMETER FACT ABOUT NASA POWER, NOT A PROJECT SETTING. The
+# "M" on AOD_55_ADJ means POWER publishes it monthly and nothing finer; it says
+# nothing about TIME_FREQ.
+#
+# The broadcast is a real limitation, not a neutral implementation detail: a
+# feature that cannot vary hour to hour cannot explain hour-to-hour variance in
+# the target, and it will look artificially unimportant in any
+# feature-importance analysis. At hourly resolution AOD_55_ADJ is constant
+# across ~730 consecutive rows. Consider dropping it rather than carrying a
+# near-constant column against a very scarce qubit budget -- and either way say
+# which, in Bab IV.
 #
 # VERIFY THIS TABLE with `python -m gfd_data.smoke_power` before the full
 # download. It probes each parameter at the resolution TIME_FREQ asks for and
@@ -205,9 +266,27 @@ POWER_TIME_STANDARD = "UTC"
 POWER_GRID_LAT = 0.5
 POWER_GRID_LON = 0.625
 
-# "ALL" = one request per point for the whole span (84 requests total; each
-# returns ~61 000 hours x 5 parameters, a few MB of JSON). "Y" = one per point
-# per year (588 requests), slower but each retry is cheaper.
+# Size of one hourly POWER request, in TIME, per grid point.
+#
+# The two domains hold 84 native POWER points between them: 6 lat x 5 lon = 30
+# for tropis, 9 lat x 6 lon = 54 for subtropis. Every hourly parameter travels
+# in the same request, so the point count is the multiplier, not the parameter
+# count.
+#
+#   "ALL" -- one request per point for the whole 2018-2024 span.
+#            84 requests. Each returns ~61 000 hours x 5 parameters, a few MB
+#            of JSON. Fewest requests, most expensive single retry.
+#   "Y"   -- one request per point per year.  <-- CURRENT SETTING
+#            84 x 7 = 588 requests. Slower overall, but a failure costs one
+#            year of one point instead of seven, and the cache is finer
+#            grained so an interrupted run resumes closer to where it stopped.
+#
+# Anything that is not the literal string "ALL" takes the per-year branch in
+# power._windows.
+#
+# AOD_55_ADJ is separate and unaffected: one regional monthly request per
+# domain, 2 in total. So the full POWER fetch at the current settings is
+# 588 + 2 = 590 requests. Under "ALL" it would be 84 + 2 = 86.
 POWER_HOURLY_CHUNK = "Y"
 
 # --------------------------------------------------------------------------
@@ -256,15 +335,34 @@ ERA5_DAILY_STATS: dict[str, str] = {
 # Hours requested from the hourly ERA5 product.
 ERA5_HOURS: list[str] = [f"{h:02d}:00" for h in range(24)]
 
-# Size of one hourly-ERA5 CDS request. "M" = one request per domain-month
-# (168 requests total, each small and cheap to retry). "Y" = one per
-# domain-year (14 requests, each much larger and slower to queue; try one by
-# hand before switching). Ignored when TIME_FREQ == "M".
+# Size of one hourly-ERA5 CDS request. Ignored when TIME_FREQ == "M".
+#
+#   "M" -- one request per domain-month. 7 years x 12 months x 2 domains =
+#          168 requests, each ~1,3 MB and cheap to retry.  <-- CURRENT
+#   "Y" -- one request per domain-year, 14 total. TESTED BY HAND AND REFUSED:
+#          `era5.fetch_chunk_hourly(cfg.TROPIS, 2018)` is ~53 000 fields, which
+#          exceeds the CDS cost limit. The CDS either declines it outright or
+#          gives it very low priority. This is a settled negative result, not
+#          an untried option -- do not switch to it.
+#
+# A quarterly chunk (~13 000 fields, 56 requests) is the untested middle
+# ground; the cost threshold sits somewhere between a month and a year and only
+# the ends have been probed. Adding it needs a "Q" branch in
+# `fetch_chunk_hourly` AND a matching glob in `_files`, or `load_era5` picks up
+# the wrong set.
 ERA5_HOURLY_CHUNK = "M"
 
 # --------------------------------------------------------------------------
 # Final column order and target
 # --------------------------------------------------------------------------
+# The PREDICTOR columns, in the order the processed table carries them.
+#
+# This is not the full column list. build.py additionally emits calendar
+# features derived from the time key (`year`, `month_of_year`, `day_of_year`,
+# `hour_of_day_utc`, `hour_of_day_local`) and the bookkeeping columns
+# (`days_in_month`, `observed_days`, `coverage`, `period_days`, `area_km2`).
+# Downstream code that selects features by "everything numeric that is not the
+# target" will pick those up too -- see the note in the modelling package.
 FEATURE_COLUMNS: list[str] = (
     ["lat", "lon"]
     + POWER_PARAMS

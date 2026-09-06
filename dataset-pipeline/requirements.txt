@@ -3,9 +3,17 @@ pandas>=2.2
 numpy>=1.26
 openpyxl>=3.1          # PLN .xlsx reader
 requests>=2.31         # NASA POWER HTTP API
-pyarrow>=15.0          # parquet output (optional but recommended)
+pyarrow>=15.0          # parquet output -- REQUIRED, not optional: parquet is the
+                       # primary output and the CSV mirror is skipped above
+                       # 500 000 rows, which every hourly build exceeds
 
 # ERA5 only
 cdsapi>=0.7.4          # Copernicus Climate Data Store client
 xarray>=2024.3
 netcdf4>=1.6
+
+# Not installed by this file, but the RUNBOOK asks for it alongside:
+#   pip install -r requirements.txt truststore
+# truststore lets requests use the OS keychain, which the KSC MERLIN archive
+# needs on macOS -- without it merlin_download raises CERTIFICATE_VERIFY_FAILED
+# where curl succeeds.

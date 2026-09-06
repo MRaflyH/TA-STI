@@ -23,13 +23,18 @@ increasing order of how much they will annoy you if you skip them.
    afternoon.
 
 2. COVERAGE. Prints every month with its day-coverage and marks which ones
-   cfg.MIN_COVERAGE would drop. Read this before accepting 0.9: the gate is not
-   neutral, it preferentially removes quiet months, and quiet months are the
-   low-target examples the model most needs.
+   cfg.MIN_COVERAGE would drop. Read this before accepting the current setting.
+   MIN_COVERAGE is 0.0, so the gate is OFF and nothing is dropped: thin months
+   contribute a full complement of hourly rows, most of them false zeros.
+   Raising the gate is not neutral either -- it preferentially removes quiet
+   months, and quiet months are the low-target examples the model most needs.
+   The table below is what lets you choose between those two errors on
+   evidence.
 
 3. ONE MONTH, AGGREGATED. Builds the hourly cell-period table for a single
    month so the shape, the zero share and the target distribution are visible
-   before committing to seven years and 589 network requests.
+   before committing to seven years and ~758 network requests (590 POWER at
+   POWER_HOURLY_CHUNK="Y", plus 168 ERA5).
 """
 
 from __future__ import annotations
@@ -88,26 +93,48 @@ def check_timezone(strikes: pd.DataFrame, domain: cfg.Domain) -> None:
 
 
 def check_coverage(strikes: pd.DataFrame, domain: cfg.Domain) -> pd.DataFrame:
-    print(f"\n--- monthly coverage [{domain.name}] "
-          f"gate = {cfg.MIN_COVERAGE:.0%} ---")
+    gate_off = cfg.MIN_COVERAGE <= 0
+    # "gate = 0%" reads as "everything is dropped", which is the opposite of
+    # what a 0.0 threshold does. Say OFF.
+    label = "OFF" if gate_off else f"{cfg.MIN_COVERAGE:.0%}"
+    print(f"\n--- monthly coverage [{domain.name}] gate = {label} ---")
     cov = lit.observed_months(strikes, domain).sort_values("month")
 
     dropped = cov[cov["coverage"] < cfg.MIN_COVERAGE]
     for r in cov.itertuples():
-        flag = "  DROPPED" if r.coverage < cfg.MIN_COVERAGE else ""
+        flag = "  DROPPED" if not gate_off and r.coverage < cfg.MIN_COVERAGE else ""
         print(f"  {r.month}  {r.observed_days:>2d}/{r.days_in_month:>2d} days  "
               f"{r.coverage:>6.1%}{flag}")
 
     print(f"\n  months present  : {len(cov)}")
-    print(f"  months dropped  : {len(dropped)} at the current gate")
-    if len(dropped):
-        print(
-            "  !! Check WHICH months these are before accepting the gate. If "
-            "they cluster in the dry season they are your low-activity "
-            "examples, and dropping them biases the target distribution "
-            "upward. Lowering cfg.MIN_COVERAGE keeps them at the cost of more "
-            "false zeros; there is no setting that avoids both."
-        )
+
+    if gate_off:
+        # The rows a 0.9 gate WOULD have removed are the useful number here:
+        # they are the months currently contributing false zeros.
+        thin = cov[cov["coverage"] < 0.9]
+        print(f"  months dropped  : 0 -- the gate is off "
+              f"(cfg.MIN_COVERAGE = {cfg.MIN_COVERAGE})")
+        print(f"  months below 90%: {len(thin)} of {len(cov)}, kept anyway")
+        if len(thin):
+            unobserved = int((thin["days_in_month"] - thin["observed_days"]).sum())
+            print(
+                f"  !! Those months contribute roughly {unobserved * 24:,} "
+                f"cell-hour rows per cell whose zero target is an absence of "
+                f"observation, not an observation of absence. They are kept "
+                f"deliberately, but `coverage` is on every output row -- filter "
+                f"or weight on it at modelling time, and report its "
+                f"distribution in Bab IV beside the zero share."
+            )
+    else:
+        print(f"  months dropped  : {len(dropped)} at the current gate")
+        if len(dropped):
+            print(
+                "  !! Check WHICH months these are before accepting the gate. "
+                "If they cluster in the dry season they are your low-activity "
+                "examples, and dropping them biases the target distribution "
+                "upward. Lowering cfg.MIN_COVERAGE keeps them at the cost of "
+                "more false zeros; there is no setting that avoids both."
+            )
     return cov
 
 

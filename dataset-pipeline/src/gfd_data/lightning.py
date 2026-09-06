@@ -1,4 +1,4 @@
-"""Load raw cloud-to-ground strike records and aggregate them into monthly GFD.
+"""Load raw cloud-to-ground strike records and aggregate them into gridded GFD.
 
 Two very different raw formats come in here:
 
@@ -11,7 +11,8 @@ Both are normalised to the same tidy strike frame::
 
     timestamp (tz-aware UTC) | lat | lon | peak_current_ka | polarity | source
 
-and then gridded to one row per (grid cell, month).
+and then gridded to one row per (grid cell, period), where the period follows
+cfg.TIME_FREQ -- a clock hour at the current setting, not a month.
 """
 
 from __future__ import annotations
@@ -70,8 +71,13 @@ def load_pln_workbook(path: str | Path, sheets: list[str] | None = None) -> pd.D
 
     strikes = pd.concat(frames, ignore_index=True)
 
-    # Keep cloud-to-ground only. Earlier years of the LDS export may contain
-    # intra-cloud rows ("IC"); 2024 happens to contain none.
+    # Keep cloud-to-ground only. The filter runs unconditionally.
+    #
+    # When only 2024 was on disk, that year contained no IC rows at all. The
+    # full 2018-2024 set is now loaded and whether the earlier years carry any
+    # is a countable fact nobody has counted -- run the filter with a counter
+    # if the number matters for Bab IV, rather than repeating the 2024 result
+    # as though it held for all seven years.
     strikes = strikes[strikes["discrimination"].str.upper().str.startswith("CG", na=False)]
     strikes["polarity"] = np.where(
         strikes["discrimination"].str.endswith("+", na=False), "positive", "negative"
@@ -158,7 +164,7 @@ def load_merlin(
 
 
 # ==========================================================================
-# 3. Gridding: strikes -> monthly GFD per 0.5 deg cell
+# 3. Gridding: strikes -> GFD per 0.5 deg cell per cfg.TIME_FREQ period
 # ==========================================================================
 def _cell_area_km2(lat_center: float, grid_deg: float = cfg.GRID_DEG) -> float:
     """Approximate area of a lat/lon cell, accounting for meridian convergence."""
@@ -288,17 +294,37 @@ def aggregate_gfd(
     from the training set -- which at hourly resolution is almost the entire
     dataset.
 
-    So the gate stays monthly: a month passes or fails on its day-coverage, and
-    every period inside a passing month becomes a row, zero-flash periods
-    included. The cost is the inverse error -- an offline stretch inside an
-    otherwise well-covered month becomes a run of false zeros. cfg.MIN_COVERAGE
-    (0.9 below monthly) is what bounds that error, and the printed coverage
-    report is what lets you see it. Read the report; do not assume.
+    So the gate can only ever be monthly: a month passes or fails on its
+    day-coverage, and every period inside a passing month becomes a row,
+    zero-flash periods included. The cost is the inverse error -- an offline
+    stretch inside an otherwise well-covered month becomes a run of false
+    zeros.
 
-    This is a weaker guarantee at hourly than at daily, and the weakness is
-    worth stating in the thesis: the daily gate can only certify that the
-    network was up on 90% of a month's *days*, never that it was up for all 24
-    hours of any one of them.
+    AND THE GATE IS CURRENTLY OFF. cfg.MIN_COVERAGE is 0.0, so the filter below
+    is skipped entirely: every month holding at least one strike record
+    contributes rows, however thin. A month observed on 6 of 31 days still
+    emits 744 hourly rows, and the ~600 hours inside the 25 unobserved days
+    become rows asserting "no lightning here" -- absences of observation
+    wearing a zero, against a target that is already >99% zeros.
+
+    Two things follow, and neither is optional:
+
+    1. `coverage` and `observed_days` are carried on EVERY output row. Filter
+       or weight on `coverage` at modelling time and record the threshold in
+       the experiment config (F-05).
+    2. Report the distribution of `coverage` over the rows actually trained on,
+       beside the zero share.
+
+    Raising the gate to 0.9 would move the error rather than remove it: a 90%
+    gate preferentially deletes quiet months, and quiet months are the
+    low-target examples the model most needs. There is no setting that avoids
+    both. `python -m gfd_data.smoke_lightning` prints the per-month coverage
+    table that shows which trade you would actually be making.
+
+    Even with a gate enabled the guarantee would be weak, and the weakness
+    belongs in the thesis: a day-coverage gate can only certify that the
+    network was up on some fraction of a month's *days*, never that it was up
+    for all 24 hours of any one of them.
 
     ``min_coverage`` defaults to cfg.MIN_COVERAGE.
     """
@@ -313,6 +339,13 @@ def aggregate_gfd(
     df[cfg.TIME_COL] = naive.dt.to_period(cfg.TIME_FREQ)
     df["month"] = naive.dt.to_period("M")
 
+    # NB: computed from `strikes`, not from the bbox-clipped `df`. Deliberate --
+    # the proxy is "was the network up anywhere", so a strike just outside the
+    # snapped box is still evidence the detector was running. It does mean the
+    # coverage figures are not conditioned on the modelling domain; both
+    # loaders return data already confined to their region, so in practice the
+    # two are nearly identical. Do not "fix" this to use `df` without deciding
+    # which question you want the proxy to answer.
     coverage = observed_months(strikes, domain)
     configured = pd.period_range(
         f"{domain.year_start}-01", f"{domain.year_end}-12", freq="M"

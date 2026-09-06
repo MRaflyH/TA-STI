@@ -1,4 +1,4 @@
-"""End-to-end build test on ONE month. ~8 network requests, not 589.
+"""End-to-end build test on ONE month. ~32 network requests, not ~758.
 
     python -m gfd_data.smoke_build                        # tropis, latest Jan
     python -m gfd_data.smoke_build --domain subtropis --year 2024 --month 7
@@ -21,6 +21,13 @@ invisible in the per-source smoke tests:
 
 So this script checks key overlap explicitly, before and after the merge, and
 tells you which side is empty.
+
+WHAT IT COSTS. `fetch_minimum` walks every native POWER point in the domain --
+30 for tropis, 54 for subtropis -- for a single one-month window, plus one
+regional AOD request and one ERA5 chunk. So roughly 32 requests for tropis and
+56 for subtropis, against ~758 for the full fetch (590 POWER + 168 ERA5).
+Everything it pulls is cached under its normal filename, so the bulk run reuses
+it rather than re-requesting. `--no-fetch` costs nothing at all.
 """
 
 from __future__ import annotations
