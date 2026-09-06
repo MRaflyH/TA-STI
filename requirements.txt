@@ -1,0 +1,87 @@
+# ONE environment for the whole project.
+#
+#     python3 -m venv .venv
+#     source .venv/bin/activate
+#     pip install -r requirements.txt
+#     pip freeze > environment-lock.txt
+#
+# The pipeline and the modelling code used to have separate requirements files.
+# The reason was operational: installing Qiskit could disturb a download that
+# was mid-flight. All four acquisitions are complete, so that reason has
+# expired -- and the asymmetry it left behind (modelling pinned exactly with a
+# lock file, pipeline on open ranges with none) was an NF-02 reproducibility
+# gap in its own right.
+#
+# Verified on Python 3.13.7, which is what both of the merged venvs ran. Note
+# that the two files this replaces both claimed "verified on Python 3.12";
+# that was stale. Python 3.10 remains the floor, because
+# qiskit-machine-learning 0.9 dropped 3.9.
+#
+# EVERYTHING IS PINNED EXACTLY. A build that cannot be reproduced is an NF-02
+# failure, and open ranges are how a rebuild six months from now quietly gets a
+# different pandas.
+
+# --------------------------------------------------------------------------
+# Numerics -- shared by the pipeline and the modelling code
+# --------------------------------------------------------------------------
+# These are the versions the pipeline ACTUALLY RAN ON for the build of
+# 2026-09-06 that produced gfd_tropis_hourly.parquet and
+# gfd_subtropis_hourly.parquet, so that build is reproducible by evidence
+# rather than by assumption.
+#
+# This is NOT what the old modelling lock recorded (pandas 3.0.2, numpy 2.4.4).
+# The pipeline's versions win because the pipeline has a proven working run
+# behind 583 MB of irreplaceable downloads, and the modelling package is empty
+# -- so any incompatibility surfaces in code that does not exist yet rather
+# than in code that already works. The one bump this imposes is
+# numpy 2.4.4 -> 2.5.2 under qiskit-aer, which ships compiled extensions.
+pandas==3.0.5
+numpy==2.5.2
+scipy==1.17.1
+pyarrow==25.0.1        # parquet output -- REQUIRED, not optional: parquet is
+                       # the primary output and the CSV mirror is skipped above
+                       # 500 000 rows, which every hourly build exceeds
+
+# --------------------------------------------------------------------------
+# Data acquisition
+# --------------------------------------------------------------------------
+openpyxl==3.1.5        # PLN .xlsx reader
+requests==2.34.2       # NASA POWER HTTP API
+truststore==0.10.4     # lets requests use the macOS keychain. WITHOUT IT
+                       # merlin_download raises CERTIFICATE_VERIFY_FAILED where
+                       # curl succeeds. The RUNBOOK used to ask for this as a
+                       # separate install; it belongs here.
+
+# ERA5 / Copernicus CDS only
+cdsapi==0.7.7
+xarray==2026.7.0
+netCDF4==1.7.4
+
+# --------------------------------------------------------------------------
+# Quantum stack -- PINNED EXACTLY, and the pins matter
+# --------------------------------------------------------------------------
+# qiskit-machine-learning 0.8.x pins qiskit<2.0; 0.9.x requires qiskit>=2.0.
+# An unpinned install can resolve to either side of that boundary and fail in
+# ways that look like a code bug rather than a resolution problem. The API also
+# changed across it: 2.x circuit-library constructors are snake_case functions
+# (efficient_su2), the primitives are V2, and V1 primitives are gone.
+#
+# qiskit-ibm-runtime is deliberately ABSENT. Real hardware is scoped to
+# small-sample final validation only; adding it is a new decision, not a
+# swapped import.
+qiskit==2.5.2
+qiskit-machine-learning==0.9.1
+qiskit-aer==0.17.2
+
+# --------------------------------------------------------------------------
+# Classical ML
+# --------------------------------------------------------------------------
+# scikit-learn supplies the classical-NN baseline and the shared preprocessing
+# chain both models consume, so its version is part of what makes a result
+# reproducible.
+scikit-learn==1.8.0
+
+# --------------------------------------------------------------------------
+# Figures
+# --------------------------------------------------------------------------
+matplotlib==3.10.8
