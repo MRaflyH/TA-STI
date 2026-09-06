@@ -79,16 +79,34 @@ Two settings only matter below monthly:
 
 ## Step 0 — environment
 
+**One environment for the whole project, at the repo root.** The pipeline and
+the modelling code used to have separate `requirements.txt` files; installing
+Qiskit could otherwise disturb a download mid-flight. All four acquisitions are
+complete, so that reason has expired, and the asymmetry it left behind — the
+modelling side pinned exactly with a lock, this side on open ranges with none —
+was an NF-02 gap in its own right.
+
 ```bash
-python -m venv .venv && source .venv/bin/activate     # Windows: .venv\Scripts\activate
-pip install -r requirements.txt truststore
+cd "$(git rev-parse --show-toplevel)"
+python3 -m venv .venv && source .venv/bin/activate    # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
 ```
 
-`xarray`, `netcdf4` and `cdsapi` are only needed for ERA5. Steps 1–3 work
-without them. **`pyarrow` is required, not optional** — parquet is the primary
-output at hourly resolution and the CSV mirror is skipped above 500 000 rows.
+Verified on Python 3.13.7; 3.10 is the floor, because `qiskit-machine-learning`
+0.9 dropped 3.9. Everything is pinned exactly, and `environment-lock.txt` at the
+root records the full resolved set — regenerate it with `pip freeze` after any
+change.
 
-Every command below runs from `dataset-pipeline/src/`, with the venv active.
+`truststore` is now in `requirements.txt` rather than appended to the install
+command. It lets `requests` use the macOS keychain; without it
+`merlin_download` raises `CERTIFICATE_VERIFY_FAILED` where `curl` succeeds.
+
+`xarray`, `netCDF4` and `cdsapi` are only *used* by ERA5 — steps 1–3 do not need
+them — but they are installed regardless now that there is one environment.
+**`pyarrow` is required, not optional** — parquet is the primary output at
+hourly resolution and the CSV mirror is skipped above 500 000 rows.
+
+Every command below runs from `code/pipeline/src/`, with the venv active.
 Running them from the repo root gives `ModuleNotFoundError: No module named
 'gfd_data'`.
 
@@ -104,7 +122,7 @@ separate files. It keeps rows whose `Discrimination` starts with `CG` and
 derives polarity from the `+`/`-` suffix.
 
 ```bash
-cd dataset-pipeline/src
+cd code/pipeline/src
 python -c "from gfd_data.lightning import load_pln; d=load_pln(); print(d.shape, d.timestamp.min(), d.timestamp.max())"
 ```
 
@@ -170,7 +188,7 @@ reasoning, change the verdict.
 **Status: complete.** 89 CSV exports in `data/raw/merlin/`.
 
 ```bash
-ls dataset-pipeline/data/raw/merlin/*.csv | wc -l    # 89
+ls code/pipeline/data/raw/merlin/*.csv | wc -l    # 89
 ```
 
 Export from <https://kscweather.ksc.nasa.gov/wxarchive/MerlinCloudToGround> and
@@ -634,7 +652,7 @@ Read the build report every time, not just the file list:
 ## Data on disk
 
 ```
-dataset-pipeline/data/
+code/pipeline/data/
 ├── raw/            source files, never edited
 │   ├── pln/        PLN Puslitbang .xlsx (obtained via supervisors — not public)
 │   ├── merlin/     KSC archive .csv exports (89 files)
