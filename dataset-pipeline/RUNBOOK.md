@@ -18,11 +18,17 @@ Both domains cover **2018–2024**, and both are now complete on disk:
 | Domain | Source | Status |
 |---|---|---|
 | tropis | PLN Puslitbang LDS | **complete.** 2.242.100 CG strikes, 2018-01-01 .. 2024-12-31 |
-| subtropis | NASA MERLIN | **complete.** 89 exports, ~4,3 juta strikes, ~557 MB |
+| subtropis | NASA MERLIN | **complete.** 89 exports, 5.301.491 strikes, 2018-01-03 .. 2024-12-31, 583 MB |
 
 The tropis figure is CG-only and post-filter — it is what `load_pln()` returns,
 not the raw row count. Re-derive it rather than quoting it if a workbook is ever
 added or replaced (step 1).
+
+The subtropis figure is post-deduplication: three exact-duplicate strike records
+across overlapping export boundaries are dropped on load. Note the span begins
+2018-01-03, not 2018-01-01 — the first export window starts there. **Five of the
+89 exports returned nothing usable and three months are consequently missing
+entirely; see step 2.**
 
 ---
 
@@ -113,16 +119,16 @@ converts. Re-run this after any change to `data/raw/pln/` and check the shape
 and the span; the filename says `20182024`, the contents are what the loader
 reports.
 
-**The one thing still unconfirmed with PLN.** The loader assumes `Date and time`
-is local Jakarta time (`Domain.tz = "Asia/Jakarta"` in `config.py`). Nothing in
-the export states its clock. If the LDS actually writes UTC, change that field
-to `"UTC"`.
+**The PLN clock — checked, and the assumption holds.** The loader treats `Date
+and time` as local Jakarta time (`Domain.tz = "Asia/Jakarta"` in `config.py`).
+Nothing in the export states its clock, so this was an assumption. It has now
+been tested physically.
 
-At monthly resolution this shifted a handful of strikes across month boundaries.
-**At hourly resolution it is not small.** A seven-hour error puts every tropis
-strike in the wrong bin and moves the entire diurnal cycle, which is one of the
-strongest signals in the hourly target. `TZ_MODE` being forced to UTC does not
-rescue you: that fixes the *label*, and this is about whether the source
+At monthly resolution a seven-hour error shifted a handful of strikes across
+month boundaries. **At hourly resolution it would not be small.** It puts every
+tropis strike in the wrong bin and moves the entire diurnal cycle, which is one
+of the strongest signals in the hourly target. `TZ_MODE` being forced to UTC does
+not rescue you: that fixes the *label*, and this is about whether the source
 timestamps were correctly interpreted before labelling.
 
 The check is physical, and it costs nothing:
@@ -131,12 +137,31 @@ The check is physical, and it costs nothing:
 python3 -m gfd_data.smoke_lightning --domain tropis
 ```
 
-Convection over West Java peaks in the local mid-to-late afternoon, so the flash
-count by local hour should show a clear afternoon maximum. Florida is the
-control: same physics, and MERLIN really is UTC, so its local-hour peak should
-land in the afternoon too. A tropis peak in the small hours means the timezone
-is wrong. Run it before building anything hourly; get a definite answer from PLN
-rather than trusting the smoke test alone.
+Run 2026-09-06, over all 2.242.100 strikes:
+
+```
+  16:00 local    431,544  ########################################  <-- peak
+  17:00 local    379,375  ###################################
+  15:00 local    356,536  #################################
+  04:00 local     13,753  #
+  peak local hour : 16:00 (Asia/Jakarta)
+```
+
+A clean afternoon convective maximum. The argument is tighter than "that looks
+plausible": the loader localises the raw field as Jakarta and the smoke test
+converts back, so the histogram above is the raw field's own hour. If the export
+were actually UTC, true West Java local time would be raw + 7 and the peak would
+fall at 23:00 — a midnight maximum for tropical convection, which is not
+physical. The field is local.
+
+Florida is the control and behaves the same way: MERLIN really is UTC, and its
+local-hour peak lands at 15:00.
+
+Still worth written confirmation from PLN through the pembimbing, but this is a
+validation result now rather than a blocker, and it belongs in Bab III as one.
+`config.py` still opens its `TROPIS` definition with "THE OPEN QUESTION IN THIS
+FILE" and carries `tz="Asia/Jakarta",   # VERIFY with PLN Puslitbang` — keep the
+reasoning, change the verdict.
 
 ---
 
@@ -161,8 +186,9 @@ data/raw/merlin/
 ```
 
 The archive caps each export at **30 days**, so 2018–2024 took **89 exports**
-(~4,3 juta strikes, ~557 MB). Do not rename the files: the archive's own
-filenames are your provenance record, and the loader does not care what they are
+(5.301.491 strikes after de-duplication, 583 MB). Do not rename the files: the
+archive's own filenames are your provenance record, and the loader does not care
+what they are
 called. Never merge them by hand — concatenation in code is reproducible and a
 manual merge is not.
 
@@ -177,6 +203,66 @@ python3 -m gfd_data.merlin_download ... --dry-run   # list windows, fetch nothin
 89 files on disk. The difference is manual re-pulls and boundary retries, not a
 gap — the loader globs the folder and de-duplicates, so it does not matter. Do
 not "fix" it by deleting files.
+
+### Empty and truncated exports — five files, three lost months
+
+Five of the 89 exports returned nothing usable. Four are well-formed CSVs with a
+header and zero data rows; one returned a single row for a 29-day window.
+
+| File | Window | Rows |
+|---|---|---|
+| `merlin_20210306_20210403.csv` | 6 Mar – 3 Apr 2021 | 0 |
+| `merlin_20221204_20230101.csv` | 4 Dec 2022 – 1 Jan 2023 | 1 |
+| `merlin_20230102_20230130.csv` | 2 – 30 Jan 2023 | 0 |
+| `merlin_20231019_20231116.csv` | 19 Oct – 16 Nov 2023 | 0 |
+| `merlin_20240212_20240311.csv` | 12 Feb – 11 Mar 2024 | 0 |
+
+**These are not transport failures.** `fetch_window` validates the response with
+`looks_like_csv()` and writes a non-CSV body to `FAILED_<dates>.html` without
+saving a CSV at all, so a VPN drop or a geo-block could not have produced them.
+The archive answered, correctly formed, with nothing in it.
+
+Three months consequently hold no strike record at all and are absent from the
+processed table: **2021-03, 2022-12, 2024-02**. Every day of 2018–2024 was
+requested by some export, so this is not a gap in what was asked for.
+
+**2021-03 is a proven instrument gap.** METAR observations from stations around
+the Cape, fetched from the Iowa Environmental Mesonet ASOS archive, show
+thunderstorms during a month MERLIN recorded as empty:
+
+```
+2021-03-31 20:54Z  KCOF ... +TSRA BKN021 24/20 ... TSB54
+2021-03-06 15:53Z  KDAB ... -TSRA ... OCNL LTGICCG OHD-NW-N TS OHD-NW-N MOV E
+2021-03-06 15:57Z  KDAB ... +TSRA ... OCNL LTGICCG OHD-NW-N
+```
+
+`+TSRA` at KCOF is a heavy thunderstorm **at Patrick SFB**, one of the three
+sites where the MERLIN sensors are installed. `LTGICCG OHD` at Daytona is
+in-cloud *and cloud-to-ground* lightning directly overhead at 29,2°N −81,1°W,
+inside the domain box. MERLIN returned zero CG strikes for the whole month.
+
+2022-12 and 2024-02 have not been checked the same way. Do that before treating
+either as a genuine zero:
+
+```bash
+python metar_check.py --month 2022-12 --raw     # see merlin-crosscheck/
+```
+
+The bar is `TSRA` or `LTGICCG OHD` at a station inside the box. `LTG DSNT SW` or
+a bare `VCTS` proves nothing — lightning visible on the horizon may have been
+outside the box or beyond useful sensor range.
+
+**Current handling: all three months are excluded, not filled.** That is
+`aggregate_gfd`'s default and no code was changed for it. Filling them would
+assert ~40.000 cell-hour rows of confident zero per month, which for 2021-03 is
+now known to be false. Revisit if the other two are checked and come back clean.
+
+**Nothing was deleted.** The five files remain in `data/raw/merlin/`. Re-pulling
+them is untried; `fetch_window` skips a window whose file already exists unless
+`--overwrite` is passed, so a naive re-run prints `cached` and fetches nothing.
+
+The wider question — whether MERLIN downtime is confined to these five windows
+or runs through the whole record — is open. See "Still unverified" item 7.
 
 **Two schema facts that bite, and are not optional reading:**
 
@@ -244,6 +330,12 @@ of parameters.
 than seven, and the cache is finer grained so an interrupted run resumes closer
 to where it stopped. Requests are synchronous, small, and paced 2 s apart;
 budget several hours. Anything already on disk is skipped.
+
+**On disk: 591 files, 482 MB.** 378 subtropis point files (54 points × 7 years,
+exact) and 211 tropis (30 × 7 = 210, plus one), plus the 2 regional AOD files.
+The extra is point `m006p500_p106p250`, which has 8 files where every other point
+has 7 — a duplicated year window from a re-pull. The loader globs and the build
+reported 100% key overlap, so it is harmless, but it has not been examined.
 
 `AOD_55_ADJ` is the exception in every sense: monthly, and therefore fetched
 through the **regional** endpoint, one request per domain for the whole span.
@@ -406,6 +498,43 @@ One thing hourly makes *simpler*: there is no daily statistic to choose, so the
 daily-max-CAPE-versus-mean argument (`ERA5_DAILY_STATS`, live only at
 `TIME_FREQ = "D"`) does not belong in this thesis at all.
 
+**4e. KX is absent from the subtropis build — unexplained.**
+
+On disk: **168 files, 258 MB**, exactly as budgeted. But the build reports
+`!! absent features: ['KX']` for subtropis. Tropis carries all 14 predictors;
+subtropis carries 13. The column is not null — it never arrives.
+
+The cause has not been diagnosed. Three possibilities, in decreasing order of
+cost: the subtropis download requested a different variable list (84 CDS requests
+to fix), a subset of files failed (fewer), or the variable carries a different
+short name in the subtropis files and `ERA5_SHORTNAME_MAP` misses it — a code fix
+with no download at all. That last one is plausible enough to check first:
+
+```bash
+python3 -c "
+import xarray as xr
+from gfd_data import config as cfg
+for dom in ['tropis','subtropis']:
+    files = sorted(cfg.RAW_ERA5_DIR.glob(f'*{dom}*.nc'))
+    seen = {}
+    for f in files:
+        with xr.open_dataset(f) as ds:
+            for v in ds.data_vars: seen[v] = seen.get(v, 0) + 1
+    print(dom, len(files), sorted(seen.items()))
+"
+```
+
+**Why it matters beyond one column.** `run_cross` fits on one domain and applies
+that model to the other, so a 14-feature source against a 13-feature target
+either raises a shape error or gets silently intersected by the shared
+preprocessing chain — dropping KX from both domains without recording it. K index
+is also one of the fourteen predictors the predecessor used, so losing it means
+the feature set no longer matches theirs. If KX is dropped, drop it from **both**
+domains explicitly in `config.py` and say so in Bab IV.
+
+Deferred, not resolved. The modelling package is being rewritten, so this can be
+settled against the new feature-selection code.
+
 ---
 
 ## Step 5 — build the modelling tables
@@ -483,8 +612,13 @@ roughly 32, not the ~590 a full POWER fetch costs.
 
 Read the build report every time, not just the file list:
 
-- `zero-target share` — printed to two decimals, because it will be well above
-  99% at hourly.
+- `zero-target share` — printed to two decimals. **Measured: 94,30% tropis,
+  97,00% subtropis.** Earlier drafts of this file, of `README.md` and of
+  `config.py` estimated ">99%"; that was too high, and should be corrected
+  wherever it still appears. The conclusion does not change — predicting zero
+  everywhere still explains most of the variance — but the project has ~105.000
+  non-zero tropis cell-hours and ~99.000 subtropis, which is more usable signal
+  than ">99% zeros" implies.
 - the `!! at hourly resolution the target is a COUNT process` warning.
 - `NO DATA for N months` — months with no records at all, excluded rather than
   zero-filled. **There is no "dropping N months below coverage" line**, because
@@ -539,7 +673,7 @@ a month passes on its day-coverage, and every hour inside it becomes a row.
 With the gate at 0.0 it does not even do that. A month observed on 6 of 31 days
 still emits 744 hourly rows, and the ~600 hours inside the 25 unobserved days
 become rows asserting "no lightning here" — absences of observation wearing a
-zero, against a target that is already >99% zeros.
+zero, against a target that is 94,30% zeros in tropis and 97,00% in subtropis.
 
 Two things follow, and neither is optional:
 
@@ -554,6 +688,22 @@ preferentially deletes quiet months, and quiet months are the low-target
 examples the model most needs. There is no setting that avoids both. Run
 `python3 -m gfd_data.smoke_lightning` to see the per-month coverage table and
 which trade you would actually be making.
+
+**The built tables make that trade concrete, and it is worse than it sounds.** A
+0,9 gate would delete **56 of 81 subtropis months and 26 of 84 tropis** — about
+70% of Florida. Worse, it deletes *opposite halves of the year* in the two
+domains: tropis thins in the JJAS dry season, subtropis in DJF winter. The two
+training sets would no longer span comparable seasonal ranges, and any
+cross-domain generalization gap measured afterwards would be partly an artefact
+of the filter. **The gate stays at 0.0. It is the wrong lever** — `coverage`
+conflates a quiet sky with a dead detector, and at 0,9 the quiet skies vastly
+outnumber the dead detectors, so the filter discards hundreds of real
+observations to remove a handful of false ones.
+
+The right instrument is a real observation record rather than a threshold on a
+proxy. Specific periods known to be instrument gaps should be excluded by date
+(step 2 does this for three MERLIN months); see "Still unverified" item 7 for the
+general version, which is not built.
 
 **Empty cells are kept as zeros.** `aggregate_gfd(fill_empty_cells=True)` inserts
 explicit `flash_count = 0` rows. Dropping them would quietly train the model on
@@ -586,10 +736,10 @@ and the evaluation section should probably carry occurrence metrics alongside
 RMSE and R².
 
 **Sample size grows, but not in the way that helps.** Millions of rows against
-`AerSimulator` means subsampling, and a subsample of a 99%-zero target is mostly
-zeros — you end up with a few thousand training rows again, drawn from a noisier
-distribution. Design the sampling deliberately (stratify on non-zero rows) and
-record it in the experiment config.
+`AerSimulator` means subsampling, and a uniform subsample of a 94–97%-zero target
+is almost all zeros — you end up with a few thousand training rows again, drawn
+from a noisier distribution. Design the sampling deliberately (stratify on
+non-zero rows) and record it in the experiment config.
 
 **GFD normalisation.** `gfd_per_km2_per_year = flash_count / area_km2 /
 period_days × 365,25`, where `period_days` is 1/24 for an hour, 1 for a day, and
@@ -612,21 +762,142 @@ a land mask, and record the decision.
 
 ---
 
+## Build of 2026-09-06 — the first real tables
+
+`python3 -m gfd_data.build`, hourly, both domains, nothing fetched.
+
+| | tropis | subtropis |
+|---|---|---|
+| strikes | 2.242.100 | 5.301.491 |
+| cell-hours | 1.841.040 | 3.314.304 |
+| with ≥1 flash | 104.955 | 99.273 |
+| zero-target share | 94,30% | 97,00% |
+| months covered | 84 of 84 | 81 of 84 |
+| mean day-coverage | 86% (min 13%) | 59% (min 3%) |
+| cells | 30 | 56 |
+| features | 14 | 13 (no KX) |
+| non-zero range | 1 .. 2.391 | 1 .. 11.777 |
+
+Both written to `data/processed/` as parquet plus `.meta.json`. CSV skipped —
+both exceed the 500 000-row limit.
+
+**Schema verified on read-back.** `time` round-trips as `period[h]`, and the
+duplicate `lat`/`lon` columns visible in the smoke-test merge output do not
+survive into the parquet. 29 columns tropis, 28 subtropis; otherwise identical.
+
+### Three findings from the built tables
+
+**1. The two domains are not observed to a comparable standard.** Tropis mean
+day-coverage is 86%; subtropis is 59%. Given the export gaps in step 2, an
+unknown share of that difference is instrument downtime rather than quiet sky.
+The cross-domain gap is the TA's core result, so this belongs in Bab IV with both
+numbers in it, not in a footnote.
+
+**2. Six tropis cells hold zero flashes across all seven years** — 20% of the
+grid:
+
+```
+-7,75 106,25   -7,75 106,75                        Indian Ocean, southern edge
+-5,75 106,25   -5,75 107,75   108,25   108,75      northern edge, Java Sea
+```
+
+The southern pair is sea. The northern four are not — that is the coast around
+Jakarta and Cirebon, which is not lightning-free, and the fifth cell in that row
+(107,25) does carry flashes. The likelier reading is that the snapped bounding
+box reaches past the LDS network's useful range, giving tropis an artificial zero
+rim. Under `SPLIT_STRATEGY = "cell"` these six could land entirely in test, where
+a model would score perfectly on them for the wrong reason. Dropping
+all-zero cells is a defensible preprocessing step; record it if taken.
+
+**3. Subtropis flash counts fall off with distance from the Cape, Spearman
+−0,955.** No subtropis cell is empty, but the range is four orders of magnitude:
+
+```
+28,75 −80,75     31 km    444.193 flashes
+26,75 −78,75    267 km          87 flashes
+```
+
+**State this carefully.** Florida's peninsula is genuinely the most
+lightning-prone part of the United States and the Cape sits near its middle, so
+distance-from-sensors and distance-from-sea-breeze-convergence are nearly
+collinear inside this box — a perfect detector would show a gradient here too. At
+matched distances the inland cells carry roughly 3× the ocean cells, which is
+real physics. The defensible claim is that instrument response and climatology
+are **confounded** here and cannot be separated using MERLIN alone, not that the
+gradient is an artefact.
+
+A land mask would not fix it: 30,25/−81,25 is over land and still carries only
+6.968 flashes against 437.287 at 28,75/−81,25.
+
+Separating the two effects needs an instrument with uniform detection efficiency
+across the box. GOES-16 GLM is one, and the MERLIN/GLM ratio against distance
+would give the detection-efficiency curve directly. Expensive — GLM L2 LCFA
+granules are 20 seconds each, 5–9 GB per day — so this is a possibility, not a
+plan.
+
+### Cross-check tooling
+
+`merlin-crosscheck/` lives outside this repo and imports nothing from
+`gfd_data`. `metar_check.py` runs the METAR test (cheap, a few hundred KB per
+month, no VPN); `glm_check.py` runs the GLM one, scoped to specific days.
+
+---
+
 ## Still unverified — carry these into the thesis, not into a footnote
 
-1. **The PLN source clock.** `Domain.tz = "Asia/Jakarta"` is an assumption. See
-   step 1. This is the single most consequential unverified item in the build.
+1. **The PLN source clock — resolved, pending written confirmation.** The diurnal
+   check gives a 16:00 local peak with Florida as a matching control, and the UTC
+   alternative would imply a physically impossible midnight maximum (step 1). The
+   Jakarta assumption holds. Confirmation from PLN through the pembimbing is
+   still worth having, but this is no longer a risk to the build.
 2. **CG/IC in MERLIN.** No discrimination column. If the KSC export includes
    intracloud strokes, the subtropis target is not ground flash density.
+
+   One piece of evidence now points the right way: MERLIN is **5,7% positive**
+   against PLN's **14,1%**, on a signed peak-current comparison over the full
+   record. IC contamination raises the positive fraction, and MERLIN sits well
+   below the CG-only reference. Low-amplitude positive fractions are also close
+   (3,1% against 2,6%). Suggestive that the export is CG-only, but not
+   conclusive — confirm against the archive documentation before Bab III.
 3. **Flash versus stroke.** PLN groups strokes into flashes via `Multi.`; MERLIN
    does not. Comparing raw MERLIN rows against flash-grouped PLN rows compares
    stroke density to flash density. Harmonise on one side or the other and record
    which.
 4. **The two ERA5 flux-divergence variable names.** Step 4b.
-5. **Detection efficiency.** MERLIN is ~10 sensors around the Cape, not a
-   Florida-wide network. An uncorrected GFD field will show a spurious radial
-   gradient centred on KSC. The two domains come from different networks, so a
-   cross-domain generalization gap may be measuring instrument rather than
-   climate — the biggest threat to the validity of the core experiment.
+5. **Detection efficiency — now measured, and confounded.** Subtropis flash
+   counts correlate with distance from the Cape at Spearman −0,955, from 444.193
+   flashes at 31 km down to 87 at 267 km. Tropis shows the same effect in a
+   different form: six edge cells with zero flashes in seven years. Both are
+   consistent with range-limited networks, but on the subtropis side the gradient
+   is confounded with real Florida climatology and cannot be separated using
+   MERLIN alone. The two domains come from different networks, so a cross-domain
+   generalization gap may be measuring instrument rather than climate — still the
+   biggest threat to the validity of the core experiment.
 6. **The CDS queue explanation.** Fair-share demotion or European daytime load.
    Both fit; neither is established.
+7. **MERLIN uptime across the whole record.** Five exports returned nothing or
+   almost nothing, and METAR proves MERLIN missed a thunderstorm sitting on one
+   of its own sensor sites in March 2021 (step 2). The three fully-empty months
+   are only the cases where MERLIN logged *literally nothing* — a month where it
+   was down for three weeks but caught one storm on day 29 appears in the
+   coverage table at 1/31 and looks merely quiet. Subtropis has 56 of 81 months
+   below 90% day-coverage. The strike-day proxy cannot distinguish downtime from
+   quiet sky, so `coverage` may be systematically overstating uptime for
+   subtropis across 2018–2024.
+
+   A real observation record is buildable: a day when a station inside the box
+   reports `TSRA` and MERLIN has zero strikes is a day MERLIN was not working. If
+   it is built it must be built for **both** domains — West Java has METAR
+   stations too (Husein Sastranegara, Soekarno-Hatta, Halim) and IEM carries
+   international stations — or it injects a domain-dependent selection effect
+   into the one comparison the TA exists to make. Not started.
+
+   The natural home for it is an optional coverage source on `observed_months`:
+   the union of windows actually observed, where such a record exists, falling
+   back to the strike-day proxy where it does not. Raised and deferred, not
+   rejected. `lightning.py` is currently untouched.
+8. **KX missing from subtropis.** Step 4e. Unexplained, deferred.
+9. **2022-12 and 2024-02.** Absent from the subtropis table, and not yet checked
+   against METAR the way 2021-03 was. Currently excluded, which is the safe
+   default but not an established finding either way.
+

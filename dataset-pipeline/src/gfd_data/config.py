@@ -116,8 +116,10 @@ TZ_MODE = "utc"
 # A month observed on 6 of 31 days still emits 744 hourly rows, and the ~600
 # hours inside the 25 unobserved days become rows asserting "no lightning
 # here". They are not observations of zero; they are absences of observation
-# wearing a zero. Against a target that is already >99% zeros, these are
-# invisible in aggregate and impossible to distinguish downstream.
+# wearing a zero. Against a target that is 94,30% zeros in tropis and 97,00% in
+# subtropis (measured, build of 2026-09-06 -- earlier comments here estimated
+# ">99%" and were wrong), these are invisible in aggregate and impossible to
+# distinguish downstream.
 #
 # The gate is off deliberately for now, so the two mitigations below are not
 # optional -- one of them has to happen before any result is reported:
@@ -132,6 +134,21 @@ TZ_MODE = "utc"
 # examples the model most needs. There is no setting that avoids both errors.
 # `python -m gfd_data.smoke_lightning` prints the per-month coverage table that
 # lets you see which trade you are actually making.
+#
+# THE BUILT TABLES MAKE THAT TRADE CONCRETE, AND IT IS WORSE THAN IT SOUNDS.
+# A 0.9 gate would delete 56 of 81 subtropis months and 26 of 84 tropis --
+# about 70% of Florida. Worse, it deletes OPPOSITE HALVES OF THE YEAR in the
+# two domains: tropis thins in the JJAS dry season, subtropis in DJF winter.
+# The two training sets would no longer span comparable seasonal ranges, and
+# any cross-domain generalization gap measured afterwards would be partly an
+# artefact of the filter.
+#
+# So this stays at 0.0, and the reason is not just "0.9 deletes too much" --
+# it is that this is the WRONG LEVER. `coverage` conflates a quiet sky with a
+# dead detector, and at 0.9 the quiet skies vastly outnumber the dead
+# detectors, so the filter discards hundreds of real observations to remove a
+# handful of false ones. Periods known to be instrument gaps should be excluded
+# BY DATE instead; see RUNBOOK step 2 and "Still unverified" item 7.
 MIN_COVERAGE = 0.0
 
 
@@ -181,19 +198,33 @@ TROPIS = Domain(
     lat_min=-8.0, lat_max=-5.5,
     lon_min=106.0, lon_max=109.0,
     year_start=2018, year_end=2024,
-    # THE OPEN QUESTION IN THIS FILE. The loader localises `Date and time` as
-    # Asia/Jakarta and converts to UTC. Nothing in the export states its clock;
-    # this is an assumption, and it has never been confirmed with PLN.
+    # SETTLED 2026-09-06, but read the reasoning -- it is a validation result
+    # worth reproducing, not a value to take on faith.
+    #
+    # The loader localises `Date and time` as Asia/Jakarta and converts to UTC.
+    # Nothing in the export states its clock, so this began as an assumption.
     #
     # At monthly resolution a seven-hour error moved a handful of strikes
-    # across month boundaries. At hourly it displaces EVERY tropis row by seven
-    # hours in exactly the dimension hourly resolution exists to capture, and
-    # produces a plausible cross-domain gap that is pure artefact.
+    # across month boundaries. At hourly it would displace EVERY tropis row by
+    # seven hours in exactly the dimension hourly resolution exists to capture,
+    # and produce a plausible cross-domain gap that is pure artefact.
     #
-    # `python -m gfd_data.smoke_lightning` checks this physically: convection
-    # over West Java peaks in the local mid-to-late afternoon. A local-hour peak
-    # in the small hours means this field is wrong. Run it; do not assume.
-    tz="Asia/Jakarta",   # VERIFY with PLN Puslitbang -- see RUNBOOK step 1.
+    # `python -m gfd_data.smoke_lightning --domain tropis` checks it physically
+    # and gives a clean afternoon convective maximum over all 2.242.100
+    # strikes: peak 16:00 local (431.544 flashes), 15:00 and 17:00 flanking it,
+    # trough 08:00-10:00. The argument is tighter than "that looks plausible" --
+    # the loader localises the raw field as Jakarta and the smoke test converts
+    # back, so that histogram is the raw field's OWN hour. If the export were
+    # UTC, true local time would be raw + 7 and the peak would fall at 23:00, a
+    # midnight maximum for tropical convection, which is not physical.
+    #
+    # Florida is the control and behaves the same way: MERLIN really is UTC,
+    # and its local-hour peak lands at 15:00.
+    #
+    # Written confirmation from PLN through the pembimbing is still worth
+    # having, and this belongs in Bab III as a validation paragraph. But it is
+    # no longer a risk to the build.
+    tz="Asia/Jakarta",   # confirmed by diurnal check -- see RUNBOOK step 1.
 )
 
 SUBTROPIS = Domain(
@@ -307,6 +338,36 @@ ERA5_VARIABLES: list[str] = [
 
 # Map the short names that appear inside the downloaded NetCDF onto the column
 # names used in the modelling table.
+#
+# KX IS MISSING FROM THE SUBTROPIS BUILD AND NOBODY KNOWS WHY. The build of
+# 2026-09-06 reports `!! absent features: ['KX']` for subtropis; tropis carries
+# all 14 predictors, subtropis 13. The column is not null -- it never arrives.
+# Both domains have the full 84 .nc files, so this is not a download shortfall
+# by file count.
+#
+# Three candidate causes, cheapest first: the subtropis files carry k_index
+# under a short name this map does not have (a one-line fix here), a subset of
+# subtropis files lack the variable, or the subtropis download requested a
+# different variable list (84 CDS requests to fix). Check with:
+#
+#   python -c "
+#   import xarray as xr
+#   from gfd_data import config as cfg
+#   for dom in ['tropis','subtropis']:
+#       files = sorted(cfg.RAW_ERA5_DIR.glob(f'*{dom}*.nc'))
+#       seen = {}
+#       for f in files:
+#           with xr.open_dataset(f) as ds:
+#               for v in ds.data_vars: seen[v] = seen.get(v, 0) + 1
+#       print(dom, len(files), sorted(seen.items()))
+#   "
+#
+# This is not cosmetic. `run_cross` fits on one domain and applies that model
+# to the other, so a 14-feature source against a 13-feature target either
+# raises a shape error or gets silently intersected by the shared preprocessing
+# chain -- dropping KX from BOTH domains without recording it. K index is also
+# one of the fourteen predictors the predecessor study used. If KX is dropped,
+# drop it from both domains explicitly here and say so in Bab IV.
 ERA5_SHORTNAME_MAP: dict[str, str] = {
     "cape": "CAPE",
     "kx": "KX",

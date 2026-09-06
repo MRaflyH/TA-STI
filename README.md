@@ -104,14 +104,19 @@ domain.
 
 | Source | Role | Domain | Status |
 |---|---|---|---|
-| PLN Puslitbang LDS | strike records → GFD target | tropis | complete, 2018–2024 |
-| NASA MERLIN (KSC archive) | strike records → GFD target | subtropis | complete, 89 exports |
-| NASA POWER | surface meteorology predictors | both | HTTP API |
-| ERA5 (Copernicus CDS) | thermodynamic predictors | both | queued API, account needed |
+| PLN Puslitbang LDS | strike records → GFD target | tropis | complete, 2018–2024, 2.242.100 CG strikes |
+| NASA MERLIN (KSC archive) | strike records → GFD target | subtropis | complete, 89 exports, 5.301.491 strikes — but 5 exports returned nothing and 3 months are missing |
+| NASA POWER | surface meteorology predictors | both | complete, 591 files |
+| ERA5 (Copernicus CDS) | thermodynamic predictors | both | complete, 168 files — but `KX` is absent from subtropis |
+
+Both processed tables are built: `gfd_tropis_hourly.parquet` (1.841.040 rows,
+14 features) and `gfd_subtropis_hourly.parquet` (3.314.304 rows, 13 features).
 
 Full acquisition instructions, request counts, and the validation log are in
 `RUNBOOK.md`. Read it before running anything that costs network requests — the
-POWER fetch is ~590 requests and the ERA5 fetch is 168 queued ones.
+POWER fetch is ~590 requests and the ERA5 fetch is 168 queued ones. The
+"Still unverified" section at the end is the list of things that have to reach
+the thesis as limitations rather than be quietly assumed away.
 
 ### Setup
 
@@ -173,15 +178,28 @@ python3 -m gfd_data.smoke_era5 --clean              # remove what the test wrote
 
 The build prints a report, not just files. Worth checking every time:
 
-- `zero-target share` — well above 99% at hourly resolution
+- `zero-target share` — **94,30% tropis, 97,00% subtropis** (measured, build of
+  2026-09-06). Earlier drafts estimated ">99%" and were wrong. The conclusion is
+  unchanged — predicting zero everywhere still explains most of the variance —
+  but there are ~105 000 non-zero tropis cell-hours and ~99 000 subtropis
 - `!! at hourly resolution the target is a COUNT process` — read it, every time
 - `NO DATA for N months` — months with no records at all, excluded rather than
-  zero-filled. There is no "dropping N months below coverage" line, because
-  `MIN_COVERAGE = 0.0` switches that filter off — see RUNBOOK "Decisions"
-- `months covered` — day-coverage per month; low values mean detector gaps, and
-  with the gate off they are kept
+  zero-filled. Currently 3 for subtropis (2021-03, 2022-12, 2024-02); see RUNBOOK
+  step 2, where 2021-03 is a proven MERLIN outage. There is no "dropping N months
+  below coverage" line, because `MIN_COVERAGE = 0.0` switches that filter off —
+  see RUNBOOK "Decisions"
+- `months covered` — day-coverage per month. **Tropis averages 86%, subtropis
+  59%**; the two domains are not observed to a comparable standard, which matters
+  for the cross-domain comparison. Low values mean detector gaps, and with the
+  gate off they are kept
 - `N native points -> M cells` — regridding; `0% still empty` is what you want
-- `!! N of M cells have ZERO flashes` — usually sea or beyond detector range
+- `!! N of M cells have ZERO flashes` — sea, or beyond detector range. Check
+  *which* before assuming sea: six tropis cells are empty across all seven years
+  and four of them are the northern coastal row near Jakarta and Cirebon, which
+  is not lightning-free. That points at the box reaching past the LDS network's
+  useful range rather than at water
+- `!! absent features: [...]` — a predictor column that never arrived. Currently
+  `KX` for subtropis, unexplained; see RUNBOOK step 4e
 - `missing-value share by feature` — read before modelling
 
 ## The modelling experiment (`modelling/`)
@@ -220,9 +238,10 @@ Nothing under either `data/` directory is committed.
 dataset-pipeline/data/
 ├── raw/            source files, never edited
 │   ├── pln/        PLN Puslitbang .xlsx (via supervisors — not public)
-│   ├── merlin/     KSC archive .csv exports (89 files)
-│   ├── power/      NASA POWER .json responses
-│   └── era5/       Copernicus CDS .nc downloads
+│   ├── merlin/     KSC archive .csv exports (89 files; 5 returned no usable
+│   │               data and are kept as provenance — RUNBOOK step 2)
+│   ├── power/      NASA POWER .json responses (591 files)
+│   └── era5/       Copernicus CDS .nc downloads (168 files)
 ├── interim/        smoke-test scratch
 └── processed/      gfd_<domain>_<resolution>.parquet + .meta.json
 ```
