@@ -26,3 +26,19 @@
 *.lol
 *.bbl-SAVE-ERROR
 *.bcf-SAVE-ERROR
+
+# --- added with the code/ restructure ---
+# Single environment at the repo root now, so this cannot live in
+# code/pipeline/ or code/modelling/ any more.
+.venv/
+
+# Data is never committed.
+#   raw/       irreplaceable -- the PLN records came through the supervisors
+#              and are not public
+#   processed/ regenerable by one command
+code/pipeline/data/
+code/modelling/data/
+
+# Python
+__pycache__/
+*.pyc
