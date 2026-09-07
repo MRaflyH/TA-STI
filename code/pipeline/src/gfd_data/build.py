@@ -120,10 +120,23 @@ def build_domain(
     ordered = (
         ["domain", cfg.TIME_COL] + time_cols
         + ["lat", "lon"] + present
-        + ["flash_count", "area_km2", "days_in_month", "observed_days",
+        + ["flash_count"] + cfg.INTENSITY_COLUMNS
+        + ["area_km2", "days_in_month", "observed_days",
            "coverage", "period_days", "gfd_per_km2_per_day", cfg.TARGET_COLUMN]
     )
     table = table[[c for c in ordered if c in table.columns]]
+
+    # D-08. Intensity is a conditional target: it exists only where lightning
+    # occurred. Report the usable row count here so the modelling code is not
+    # the first place anyone notices how small that subset is.
+    kept_intensity = [c for c in cfg.INTENSITY_COLUMNS if c in table.columns]
+    if kept_intensity:
+        n_nonzero = int((table["flash_count"] > 0).sum())
+        n_usable = int(table.loc[table["flash_count"] > 0, kept_intensity]
+                       .notna().all(axis=1).sum())
+        print(f"  intensity target  : {n_usable:,} of {n_nonzero:,} non-zero "
+              f"cell-{noun}s carry all {len(kept_intensity)} statistics "
+              f"({n_usable / max(n_nonzero, 1):.1%})")
 
     missing_feats = [c for c in cfg.FEATURE_COLUMNS if c not in table.columns]
     if missing_feats:
@@ -220,6 +233,15 @@ def write(table: pd.DataFrame, domain: cfg.Domain, force_csv: bool = False) -> d
         "power_params": cfg.POWER_PARAMS,
         "era5_variables": cfg.ERA5_VARIABLES,
         "target": cfg.TARGET_COLUMN,
+        # F-05. The modelling contracts are part of what this dataset IS, not
+        # commentary on it: which columns may be predictors, which are the
+        # second target, and which predictor was dropped for cross-domain
+        # symmetry. A replay that reads the parquet without these reads a
+        # different dataset. See code/modelling/DECISIONS.md, D-01 and D-08.
+        "intensity_columns": [c for c in cfg.INTENSITY_COLUMNS if c in table.columns],
+        "dropped_predictors": cfg.DROPPED_PREDICTORS,
+        "exclude_columns": cfg.EXCLUDE_COLUMNS,
+        "columns": list(table.columns),
         # Only this domain's inputs, and no OS clutter (.DS_Store, Icon\r).
         "sources": sorted(
             p.name

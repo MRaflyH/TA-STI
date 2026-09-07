@@ -85,3 +85,13 @@ scikit-learn==1.8.0
 # Figures
 # --------------------------------------------------------------------------
 matplotlib==3.10.8
+
+# Modelling. The QNN and the NN train through ONE torch loop so that
+# the only difference between them is the layer -- scikit-learn's MLPRegressor
+# owns its own loop and cannot be made to match batch size, optimizer, early
+# stopping or seed handling.
+#
+# Installed on macOS arm64 from the CPU index. On Linux, plain `torch` pulls
+# the CUDA build (~2,5 GB) -- use the same --index-url there:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch==2.14.0

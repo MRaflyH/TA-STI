@@ -378,16 +378,39 @@ def aggregate_gfd(
 
     df = df[df["month"].isin(set(coverage["month"]))]
 
+    # Intensity statistics, per (cell, period). These are NOT predictors --
+    # they come from the same strikes as the target -- but they are a second
+    # modelling target, and recovering them later would cost a full rebuild.
+    #
+    # Signed mean is kept because polarity carries physical meaning; the
+    # spread statistics use the absolute value, because a cell-hour holding
+    # one +40 kA and one -40 kA strike has a mean near zero and a median
+    # magnitude of 40, and the second number is the useful one.
+    #
+    # The median is the headline statistic rather than the mean: CG peak
+    # current is heavy-tailed, so the mean of a handful of strikes is
+    # dominated by whichever one happened to be largest.
+    df = df.assign(abs_peak_current_ka=df["peak_current_ka"].abs())
+
     agg = (
         df.groupby(["lat_bin", "lon_bin", cfg.TIME_COL], observed=True)
         .agg(
             flash_count=("lat", "size"),
             mean_peak_current_ka=("peak_current_ka", "mean"),
             positive_share=("polarity", lambda s: (s == "positive").mean()),
+            median_abs_peak_current_ka=("abs_peak_current_ka", "median"),
+            max_abs_peak_current_ka=("abs_peak_current_ka", "max"),
+            # The slow one -- a Python-level lambda over every non-empty
+            # cell-period. Roughly 105 000 groups for tropis and 99 000 for
+            # subtropis, so it costs tens of seconds, not minutes. Drop this
+            # line if the build time ever matters more than the statistic.
+            p95_abs_peak_current_ka=(
+                "abs_peak_current_ka", lambda s: s.quantile(0.95)
+            ),
         )
         .reset_index()
     )
-
+    
     if fill_empty_cells:
         cells = full_cell_index(domain, grid_deg)
         times = _time_index(coverage)

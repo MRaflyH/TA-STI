@@ -438,6 +438,49 @@ FEATURE_COLUMNS: list[str] = (
 TARGET_COLUMN = "gfd_per_km2_per_year"
 
 # --------------------------------------------------------------------------
+# Modelling contracts -- read by code/modelling/, recorded here so the
+# pipeline and the models cannot disagree about what a predictor is.
+# Every entry below is justified in code/modelling/DECISIONS.md.
+# --------------------------------------------------------------------------
+
+# D-01. KX is emitted for tropis and absent for subtropis. The column is real
+# data and deleting it from the build would cost a rebuild to recover, so the
+# pipeline keeps it -- but NO MODEL MAY USE IT. The cross-domain experiment
+# requires an identical feature set on both sides, and subtropis does not have
+# it. Reversible: the CDS serves k_index for the subtropis box when requested
+# alone (verified 2026-09-06, 84 and 27 seconds), so 84 supplementary
+# single-variable requests would restore symmetry at 14 predictors.
+DROPPED_PREDICTORS: list[str] = ["KX"]
+
+# D-08. Derived from the SAME strike records as the target, so predicting GFD
+# from any of these is leakage. They are NaN wherever flash_count == 0, which
+# is correct: the mean intensity of no strikes is undefined, not zero.
+#
+# UNITS CAVEAT. tropis reads PLN's "Signal (kA)", which is labelled kA.
+# subtropis reads MERLIN's "Signal Strength", which is NOT labelled. The
+# magnitudes are comparable (-74.5, -36.4 against PLN's -51, -33, -23) but that
+# is not proof. Validate against published CG peak-current climatology before
+# any cross-domain intensity claim.
+INTENSITY_COLUMNS: list[str] = [
+    "mean_peak_current_ka",
+    "positive_share",
+    "median_abs_peak_current_ka",
+    "max_abs_peak_current_ka",
+    "p95_abs_peak_current_ka",
+]
+
+# Never a predictor, under any task. `year` is worse than useless under a
+# chronological split (every test row carries an unseen value); days_in_month
+# is bookkeeping; coverage is correlated with the target through lightning
+# activity itself (D-10).
+EXCLUDE_COLUMNS: list[str] = [
+    "domain", TIME_COL,
+    "year", "days_in_month", "observed_days", "coverage",
+    "area_km2", "period_days",
+    "flash_count", "gfd_per_km2_per_day", TARGET_COLUMN,
+] + INTENSITY_COLUMNS + DROPPED_PREDICTORS
+
+# --------------------------------------------------------------------------
 # Sentinels
 # --------------------------------------------------------------------------
 POWER_FILL_VALUE = -999.0  # NASA POWER missing-data sentinel
