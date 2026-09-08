@@ -308,11 +308,30 @@ def _stratified_draw(df: pd.DataFrame, n: int, rng: np.random.Generator) -> pd.D
 
 
 # --------------------------------------------------------------------------
+# D-40. Dimensionality reduction
+# --------------------------------------------------------------------------
+def _n_components(spec: str | None) -> int | None:
+    """Components requested by cfg.FEATURE_REDUCTION. None = no reduction.
+
+    A bare parser rather than a lookup table so that "pca4" works without an
+    edit here. Anything that is not None and does not start with "pca" is an
+    error rather than a silent pass-through -- a typo in a sweep value must
+    fail, not quietly disable the axis. That failure mode is exactly what
+    D-40 exists to fix.
+    """
+    if spec is None:
+        return None
+    if not isinstance(spec, str) or not spec.startswith("pca"):
+        raise ValueError(f"unknown FEATURE_REDUCTION: {spec!r}")
+    return int(spec[3:])
+
+
+# --------------------------------------------------------------------------
 # Scaling -- fitted on training rows alone
 # --------------------------------------------------------------------------
 @dataclass
 class Scaler:
-    """Min-max onto FEATURE_RANGE, plus an optional target standardiser.
+    """Optional PCA, then min-max onto FEATURE_RANGE, plus a target standardiser.
 
     ONE scaler serves both models. D-09 requires that the only difference
     between the QNN and the NN be the layer, so they cannot have different
@@ -323,13 +342,100 @@ class Scaler:
     value above the training maximum maps past pi, and a rotation past pi
     aliases back onto a different angle -- the model returns a confident wrong
     answer rather than raising.
+
+    THE ORDER IS THE DECISION (D-40):
+
+        raw -> standardise -> PCA -> min-max onto [0, pi] -> clip
+               \\_____________________/
+                only when FEATURE_REDUCTION is not None
+
+    Standardise before PCA, because unstandardised PCA is dominated by
+    whichever feature has the largest variance in its native units -- PS in
+    kPa against AOD dimensionless against lat/lon in degrees. Min-max AFTER
+    PCA, because components are unbounded and centred near zero and would
+    break the [0, pi] contract the rotation gates depend on. Clip last,
+    because D-35's aliasing argument is about what reaches the gates.
+
+    When FEATURE_REDUCTION is None there is NO standardiser: every branch
+    below is skipped and the chain is raw -> min-max -> clip, bit-for-bit what
+    it was before D-40. The two paths differ in kind, not degree.
+
+    Putting the reduction here rather than in prepare() is what makes it
+    inherit three rules for free: fit-on-train (D-35), each model carrying its
+    own transform and the cross-domain arm using the SOURCE domain's (D-36),
+    and the clip landing at the end of the chain.
     """
     lo: np.ndarray = field(default_factory=lambda: np.empty(0))
     hi: np.ndarray = field(default_factory=lambda: np.empty(0))
     y_mean: float = 0.0
     y_std: float = 1.0
 
+    # D-40. Reduction state. All three stay at their defaults and every branch
+    # that touches them is skipped when FEATURE_REDUCTION is None.
+    x_mean: np.ndarray = field(default_factory=lambda: np.empty(0))
+    x_std: np.ndarray = field(default_factory=lambda: np.empty(0))
+    components: np.ndarray | None = None
+    explained_variance_ratio: np.ndarray | None = None
+
+    def _fit_reduce(self, X: np.ndarray, k: int) -> np.ndarray:
+        """Standardise, then project onto the top k principal components.
+
+        Fitted on the rows handed to fit(), which prepare() guarantees are
+        training rows only (D-35).
+
+        Written out rather than imported for the reason RidgeModel is: the
+        centring, the component order and the sign convention are all
+        decisions, and a dependency whose defaults have to be checked costs
+        more than fifteen lines.
+
+        SIGN CONVENTION. SVD sign is arbitrary -- a flipped component is
+        mathematically identical and changes every downstream number. NF-02
+        claims bit-for-bit reproducibility, so the sign is pinned by a stated
+        rule: the largest-magnitude loading in each component is positive.
+        """
+        if k > X.shape[1]:
+            raise ValueError(
+                f"FEATURE_REDUCTION asks for {k} components from only "
+                f"{X.shape[1]} features"
+            )
+        self.x_mean = np.nanmean(X, axis=0)
+        std = np.nanstd(X, axis=0)
+        self.x_std = np.where(std > 0, std, 1.0)
+
+        Z = (X - self.x_mean) / self.x_std
+        _, s, vt = np.linalg.svd(Z, full_matrices=False)
+
+        comp = vt[:k]
+        pivot = np.argmax(np.abs(comp), axis=1)
+        signs = np.sign(comp[np.arange(k), pivot])
+        signs[signs == 0] = 1.0
+        self.components = comp * signs[:, None]
+
+        total = float(np.sum(s ** 2))
+        self.explained_variance_ratio = (
+            (s[:k] ** 2 / total) if total > 0 else np.zeros(k)
+        )
+        return Z @ self.components.T
+
+    def _reduce(self, X: np.ndarray) -> np.ndarray:
+        """Apply the fitted projection. A no-op when no reduction was fitted."""
+        if self.components is None:
+            return X
+        return ((X - self.x_mean) / self.x_std) @ self.components.T
+
+    @property
+    def n_out(self) -> int:
+        """Width of what transform() emits -- the model's input dimension."""
+        return len(self.lo)
+
     def fit(self, X: np.ndarray, y: np.ndarray | None = None) -> "Scaler":
+        # D-40. Reduce FIRST, so lo/hi are measured on the components. Fitting
+        # the min-max on raw columns and then projecting in transform() would
+        # rescale one space against ranges belonging to another.
+        k = _n_components(mcfg.FEATURE_REDUCTION)
+        if k is not None:
+            X = self._fit_reduce(X, k)
+
         self.lo = np.nanmin(X, axis=0)
         self.hi = np.nanmax(X, axis=0)
         # A constant column would divide by zero and produce NaN for every
@@ -344,6 +450,7 @@ class Scaler:
         return self
 
     def transform(self, X: np.ndarray, clip: bool = True) -> np.ndarray:
+        X = self._reduce(X)
         unit = (X - self.lo) / (self.hi - self.lo)
         if clip and mcfg.CLIP_TEST_FEATURES:
             unit = np.clip(unit, 0.0, 1.0)

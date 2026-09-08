@@ -1,0 +1,18 @@
+{
+  "n_features": 15,
+  "shape_train": [
+    500,
+    15
+  ],
+  "shape_val": [
+    1000,
+    15
+  ],
+  "shape_test": [
+    21600,
+    15
+  ],
+  "X_train": "8b460ecc0dc8116d0f60f45387149460594e8303ff5cec76e3647eabdc14aa2f",
+  "X_val": "93b54026b041c2100e924342dd17a8a15487deddfbcfe1e4414656b22a42ef89",
+  "X_test": "6818feb02f070d361d03cf1852b94037c175b7d7379d9c8c7bc3dc62ab879ea8"
+}

@@ -1,7 +1,8 @@
 # DECISIONS.md
 
 **Project-wide decision record. Merged 8 September 2026.
-Batch 3 (modelling design, D-29 to D-39) added 8 September 2026.**
+Batch 3 (modelling design, D-29 to D-39) added 8 September 2026.
+D-40 added 8 September 2026 with the code change it records.**
 
 Where this disagrees with `config.py`, `config.py` wins.
 
@@ -59,6 +60,7 @@ One entry moved and one is new. Everything else keeps the ID it had.
 | D-22 – D-27 | batch 2 | unchanged |
 | D-28 | new | the PennyLane gradient backend, which had no ID at all |
 | D-29 – D-39 | batch 3 | modelling design: what the code implements and the record did not carry |
+| D-40 | — | the PCA reduction axis, wired; recorded with the change that made it real |
 
 **Why D-21 moved rather than the modelling D-14.** The modelling IDs are cited
 from executable code — `dataset.assert_no_leakage` raises a `ValueError` naming
@@ -140,6 +142,7 @@ judul changes. **They are one conversation, not two** — see the section below.
 | | D-02 | Feature set: 13 base predictors, hour encoding as an axis |
 | | D-11 | All-zero cells are identified before any split |
 | | **D-35** | Feature scaling: min-max onto [0, π], clipped, fitted on train alone |
+| | **D-40** | Dimensionality reduction: standardise → PCA → min-max → clip |
 | §5 Experimental protocol | D-04 | Train hourly, aggregate the predictions to a reporting window |
 | | D-06 | Rolling-origin cross-validation across years |
 | | D-07 | Training rows may be reshaped; test rows may not |
@@ -184,6 +187,7 @@ judul changes. **They are one conversation, not two** — see the section below.
 | | **D-36** | The residual cross-domain gap as a transfer finding |
 | | **D-37** | The sweep asymmetry, declared |
 | | **D-29** | Seed and fold counts, declared |
+| | **D-40** | The reduction sweep, and which side of the parity flip a result sits on |
 
 ### Bab V — Penutup dan Evaluasi
 
@@ -1283,6 +1287,125 @@ freely reversible — the quantum arm needs a bounded range whatever else change
 is a better sentence than "features were scaled to [0, π]".
 
 **Who.** Not recorded.
+
+---
+
+## D-40 — Dimensionality reduction: standardise → PCA → min-max → clip
+
+**Decided.** `FEATURE_REDUCTION` now does what it claims. `None` (the default)
+is unchanged; `"pca8"` and `"pca6"` project onto 8 and 6 principal components
+and **the circuit is built at that width**.
+
+Before this change the setting was declared in `config.py`, listed in `SWEEPS`,
+and set by `run_sweep` — but read by nothing. The sweep ran, completed, and
+returned three identical result sets. See the register, A3.
+
+**The order, and why each step is where it is.**
+
+```
+raw → standardise → PCA → min-max onto [0, π] → clip
+      \___________________/
+       only when FEATURE_REDUCTION is not None
+```
+
+*Standardise before PCA*, because unstandardised PCA is dominated by whichever
+feature has the largest variance in its native units — `PS` in kPa against
+`AOD_55_ADJ` dimensionless against `lat`/`lon` in degrees. Skipping it would
+give a pressure-and-longitude detector wearing the name of a decomposition.
+
+*Min-max after PCA*, not before. Components are unbounded and centred near
+zero. Scaling to [0, π] first and projecting afterwards would put arbitrary
+values into the rotation gates, which is precisely what D-35 exists to prevent.
+
+*Clip last*, because D-35's aliasing argument is about what reaches the gates,
+not about what leaves the table.
+
+**Where it is fitted, and why there.** Inside `Scaler`, on the training rows
+`prepare()` hands it. That placement is the design: the reduction **inherits
+three rules rather than restating them**. Fit-on-train comes from D-35 because
+`Scaler` is already fitted on `X_train` alone. Per-model transforms and the
+cross-domain arm using the **source** domain's projection come from D-36
+because `evaluate` already routes through `preps[name].scaler`. The clip lands
+at the end of the chain because it already did. A PCA fitted on the target
+domain would be exactly the leak D-36 exists to prevent, and putting the
+projection anywhere else would have required re-arguing all three.
+
+**The unreduced path is bit-for-bit unchanged, and the two paths differ in
+kind.** When `FEATURE_REDUCTION is None` there is **no standardiser at all** —
+every reduction branch is skipped and the chain is raw → min-max → clip,
+exactly as before. The standardiser exists only to make PCA well-posed, so it
+appears and disappears with it. That is correct, and it is worth stating
+because a reader should learn it here rather than discover it in the code.
+
+**The qubit count follows the data, not the config.** This was the defect's
+root. `fit_models` computed `n = n_features_configured()`, which derives 15
+from `BASE_FEATURES` and `HOUR_ENCODING` alone; under `pca6` the prepared
+matrix is 6 columns wide and the circuit would have been built with 15 qubits
+and fed 6. It now reads `n = prep.X_train.shape[1]`. Everything downstream is
+already parameterised by `n` — `make_qnode`, `weight_shape`, `n_weights`, the
+observable, and `solve_matched_hidden` — so the whole chain recomputes itself.
+
+**The parity gap inverts, and Bab IV has to say which side it is on.**
+
+| setting | qubits | circuit weights | QNN trainable | `nn_matched` | parity step | relation |
+|---|---|---|---|---|---|---|
+| `None` | 15 | 45 | **47** | **52** | 17 | matched **larger** |
+| `pca8` | 8 | 24 | **26** | **21** | 10 | matched **smaller** |
+| `pca6` | 6 | 18 | **20** | **17** | 8 | matched **smaller** |
+
+**[derived]**, and the `None` row reproduces D-34's 47-against-52 in steps of
+17, which is what confirms the arithmetic is reading the same code path.
+
+At 15 qubits the parameter-matched network is *larger* than the QNN; at 8 and
+6 it is *smaller*. So the sign of the handicap flips with the reduction. Any
+sentence in Bab IV comparing `qnn` to `nn_matched` must say which side of that
+flip it sits on — "parameter-matched" is not a fixed relationship across this
+axis, and D-34's instruction to report both counts rather than claim equality
+becomes load-bearing rather than pedantic.
+
+**What the axis measures — say this plainly.** Every arm gets the reduced
+features, not just the QNN. D-09's claim is that the only difference between
+arms is the layer; reducing the QNN's input alone would break that outright and
+leave no way to tell whether a gap came from the layer or from the
+preprocessing.
+
+The consequence is that **this axis asks whether the whole ladder does better
+in a reduced space** — not whether PCA rescues the QNN. The classical ceiling
+is reduced alongside it. That is also the comparison the predecessor's use of
+PCA invites, since he reduced everything too.
+
+**What it costs.** Three things.
+
+*The sign convention is a decision, not a detail.* SVD component signs are
+arbitrary — a flipped component is mathematically identical and changes every
+downstream number. NF-02 claims bit-for-bit reproducibility, so the sign is
+pinned by a stated rule: **the largest-magnitude loading in each component is
+positive.** Without it, two runs on identical data could differ.
+
+*The projection is written out rather than imported*, following the precedent
+`RidgeModel` already sets — the centring, the component order and the sign
+convention are all decisions, and a dependency whose defaults have to be
+checked costs more than fifteen lines. `sklearn` is already present via
+`sklearn.metrics`, so this is a consistency call and not a dependency one.
+
+*`_config_snapshot()` changed shape.* It now carries `feature_reduction` and
+the realised `n_qubits`. Without them a results file cannot say what feature
+space it was computed in, which is an F-05 replay gap — and the first runs
+under the new code would have been the ones that could not be reconstructed.
+**Results files written before 2026-09-08 lack both keys**; anything reading
+them must tolerate their absence.
+
+**How to reverse it.** `FEATURE_REDUCTION = None` restores the original path
+exactly, and the verification script proves that rather than asserting it.
+
+**Bab.** III for the transform order and the fit-on-train rule; IV for the
+sweep result and the parity flip.
+
+**Who.** **Rafly's**, taken 8 September 2026 on both open questions — that
+every arm receives the reduced features, and that the snapshot change ships
+with the wiring rather than after it. The defect was found in the batch 3 read
+of the package; the placement inside `Scaler` and the order of the chain are
+mine.
 
 ---
 
@@ -2463,8 +2586,8 @@ out in the chapters shown.
 # Discrepancy register
 
 Every known conflict between this record and the repo, or inside the repo.
-Two fixes have landed; eleven are outstanding, of which **two are code defects
-rather than documentation drift** (O9 and O10) and one is a deletion (O8).
+Three fixes have landed; ten are outstanding, of which **one is a code defect
+rather than documentation drift** (O10) and one is a deletion (O8).
 
 ## Applied
 
@@ -2505,6 +2628,42 @@ touched.
 
 Verified after the fix: `grep -rn "{dom}" code/` returns exactly one hit,
 `RUNBOOK.md:536` — outstanding item O4.
+
+### A3 — `FEATURE_REDUCTION` declared, swept, and never read — WIRED, D-40
+
+**Was the most consequential defect in the register**, because it was the one
+that could have put a false claim in the thesis rather than a stale comment.
+
+`FEATURE_REDUCTION` was defined in `config.py` (`None | "pca6" | "pca8"`,
+marked "sweep axis") and listed in `SWEEPS`. `run_sweep` resolved the knob name
+and `setattr` succeeded. **Nothing read it** — neither `feature_names()` nor
+`prepare()` referenced it, and no PCA was applied anywhere in the package.
+
+So the sweep ran, completed, and returned **three identical result sets**. Read
+at face value that is a clean null: *dimensionality reduction makes no
+difference to this model*. The predecessor study used PCA in its main path and
+varied the component count as an experimental factor, so that would have been a
+**false negative on a direct comparison point, produced by code that does
+nothing, in a sweep that reports success** — indefensible in the way hardest to
+recover from, a stated result the code cannot have produced.
+
+**Fixed by wiring it.** The reduction now lives inside `Scaler`, so it inherits
+fit-on-train (D-35) and the per-model and source-domain routing (D-36) rather
+than restating them; and `fit_models` derives the qubit count from
+`prep.X_train.shape[1]` rather than from `n_features_configured()`, which is
+where the count had detached from the data. `_config_snapshot()` gained
+`feature_reduction` and `n_qubits`. Full reasoning at **D-40**.
+
+**Verified by `verify_pca_wiring.py`**, which is written to run in two phases —
+`--capture` on the code *before* the edit, `--check` after. A check that only
+exists after the edit cannot prove the edit changed nothing. It asserts hash
+equality on `X_train` / `X_val` / `X_test` for the unreduced path, three
+distinct feature counts (15 / 8 / 6), three distinct datasets, the recomputed
+parity chain, and the two new snapshot keys.
+
+**Not closed until that script is green.** The code and the script were written
+in one session and neither was executed against the repo; the entry records the
+fix, and the run records that it worked.
 
 ## Outstanding
 
@@ -2697,37 +2856,6 @@ git rm code/modelling/src/gfd_model/experiments.py.bak
 ```
 
 Move this to **Applied** once removed.
-
-### O9 — `FEATURE_REDUCTION` is declared, swept, and never read — CODE DEFECT
-
-**This is a defect in the code, not drift in the documentation**, and it is the
-one on this list that could put a false claim in the thesis.
-
-`FEATURE_REDUCTION` is defined in `config.py` (`None | "pca6" | "pca8"`, marked
-"sweep axis") and listed in `SWEEPS` as `(None, "pca8", "pca6")`. `run_sweep`
-resolves the knob name to `FEATURE_REDUCTION` and `setattr`s it successfully.
-
-**Nothing reads it.** `dataset.feature_names()` and `dataset.prepare()` never
-reference it; no PCA is applied anywhere in the package.
-
-**So the sweep runs, completes, and returns three identical result sets.** Read
-at face value that is a clean null: *dimensionality reduction makes no
-difference to this model*. **The predecessor study used PCA**, and the number of
-principal components was one of his experimental factors — so this is a false
-negative on a direct comparison point, produced by code that does nothing, in a
-sweep that reports success.
-
-If it reached Bab IV it would be indefensible, and it would be indefensible in
-the specific way that is hardest to recover from: a stated result that the code
-cannot have produced.
-
-**Fix: either implement it or delete it.** Both are defensible; leaving it
-declared is not. If deleted, remove the `SWEEPS` entry too, and say in Bab IV
-that PCA was not tested and why — which is a weaker but honest position.
-
-```bash
-grep -rn "FEATURE_REDUCTION" code/modelling/src/
-```
 
 ### O10 — `MODEL_LADDER` is assigned twice in `config.py`
 
@@ -3061,9 +3189,10 @@ carries a correction paragraph — it sized its budget against a sweep corner
 PennyLane switch was mine, and Rafly did not make it.
 
 **Four discrepancies were added**, two of them code defects rather than
-documentation drift — `FEATURE_REDUCTION` declared and never read (O9), and
+documentation drift — `FEATURE_REDUCTION` declared and never read, and
 `MODEL_LADDER` assigned twice (O10) — plus a deletion (O8) and a superseded
-benchmark contradicting D-28 in `config.py` (O11).
+benchmark contradicting D-28 in `config.py` (O11). **The first has since been
+fixed**: it was wired on 8 September and is recorded at D-40 and A3.
 
 **What batch 3 did not do.** It did not fill the twelve missing `Who` fields on
 D-01 to D-14 (open question 20), and it did not run any of the four outstanding

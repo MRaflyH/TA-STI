@@ -67,7 +67,7 @@ class Run:
     config: dict = field(default_factory=dict)
 
 
-def _config_snapshot() -> dict:
+def _config_snapshot(n_qubits: int | None = None) -> dict:
     """Enough config to replay a run. Mirrors the pipeline's meta.json habit."""
     return {
         "task": mcfg.TASK,
@@ -88,6 +88,12 @@ def _config_snapshot() -> dict:
         "train_zero_ratio": mcfg.TRAIN_ZERO_RATIO,
         "test_days": mcfg.TEST_DAYS,
         "max_val_rows": mcfg.MAX_VAL_ROWS,
+        # D-40. Which reduction produced this run, and the qubit count it
+        # actually realised. Without these a results file cannot say what
+        # feature space it was computed in, which is an F-05 replay gap.
+        # SHAPE CHANGE: files written before 2026-09-08 lack both keys.
+        "feature_reduction": mcfg.FEATURE_REDUCTION,
+        "n_qubits": n_qubits,
     }
 
 
@@ -112,9 +118,20 @@ def fit_models(
     is reported separately (D-09).
     """
     df = ds.load_pooled() if source == "pooled" else ds.load(source)
-    n = n_features_configured()
 
     prep = ds.prepare(df, fold, stage, seed=seed, train_rows=train_rows)
+
+    # D-40. The qubit count follows the DATA, not the config.
+    #
+    # This line used to read `n = n_features_configured()`, which computes 15
+    # from BASE_FEATURES and HOUR_ENCODING alone. Under FEATURE_REDUCTION the
+    # prepared matrix is narrower than that -- 6 under pca6 -- and the circuit
+    # would have been built with 15 qubits and fed 6 columns. Reading the
+    # width off the prepared array is what makes the reduction axis real, and
+    # it is the more robust source in general: the model cannot disagree with
+    # its own input.
+    n = prep.X_train.shape[1]
+
     bias = C.initial_bias(prep.y_train, stage)
     qnn_params = QuantumModel(n, stage=stage, seed=seed).n_trainable
 
@@ -251,7 +268,7 @@ def evaluate(
             n_params=int(getattr(model, "n_trainable", 0)),
             seconds=diag.seconds, epochs_run=diag.epochs_run,
             best_epoch=diag.best_epoch, stopped_early=diag.stopped_early,
-            metrics=scores, config=_config_snapshot(),
+            metrics=scores, config=_config_snapshot(fit["n_features"]),
         ))
     return runs
 
