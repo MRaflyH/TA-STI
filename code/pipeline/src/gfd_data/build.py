@@ -237,7 +237,7 @@ def write(table: pd.DataFrame, domain: cfg.Domain, force_csv: bool = False) -> d
         # commentary on it: which columns may be predictors, which are the
         # second target, and which predictor was dropped for cross-domain
         # symmetry. A replay that reads the parquet without these reads a
-        # different dataset. See code/modelling/DECISIONS.md, D-01 and D-08.
+        # different dataset. See DECISIONS.md, D-01 and D-08.
         "intensity_columns": [c for c in cfg.INTENSITY_COLUMNS if c in table.columns],
         "dropped_predictors": cfg.DROPPED_PREDICTORS,
         "exclude_columns": cfg.EXCLUDE_COLUMNS,

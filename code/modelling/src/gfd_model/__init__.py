@@ -1,6 +1,6 @@
 """Modelling half of the GFD project: QNN and NN, tropis and subtropis.
 
-Read `code/modelling/DECISIONS.md` before changing anything here. Every
+Read `DECISIONS.md` before changing anything here. Every
 constant in `config.py` that a reader could reasonably have set differently
 carries the decision ID that justifies it, and a config that disagrees with
 the decision record is worse than either alone.

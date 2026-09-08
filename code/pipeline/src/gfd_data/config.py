@@ -434,7 +434,7 @@ TARGET_COLUMN = "gfd_per_km2_per_year"
 # --------------------------------------------------------------------------
 # Modelling contracts -- read by code/modelling/, recorded here so the
 # pipeline and the models cannot disagree about what a predictor is.
-# Every entry below is justified in code/modelling/DECISIONS.md.
+# Every entry below is justified in DECISIONS.md.
 # --------------------------------------------------------------------------
 
 # D-01. KX is emitted for tropis and absent for subtropis. The column is real

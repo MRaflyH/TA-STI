@@ -252,7 +252,7 @@ OUTPUT_AFFINE_HEAD = True
 #
 # qiskit-machine-learning 0.9.1 has no adjoint gradient; parameter shift needs
 # 2 circuits per weight (90 per sample), adjoint needs one backward pass for
-# all 45. A scaling difference, not a constant factor. See DECISIONS.md D-14.
+# all 45. A scaling difference, not a constant factor. See DECISIONS.md D-28.
 DEVICE = "lightning.qubit"      # "lightning.qubit" | "default.qubit"
 DIFF_METHOD = "adjoint"         # "adjoint" | "backprop" | "parameter-shift"
 SHOTS: int | None = None        # None = exact. Shot noise is a sweep axis.
