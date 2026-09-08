@@ -3,7 +3,9 @@
 **Project-wide decision record. Merged 8 September 2026.
 Batch 3 (modelling design, D-29 to D-39) added 8 September 2026.
 D-40 added 8 September 2026 with the code change it records; wiring applied,
-verified and committed the same day.**
+verified and committed the same day.
+Batch 4 (environment, reproducibility, repository, paper — D-41 to D-46) added
+8 September 2026. **The record is complete.**
 
 Where this disagrees with `config.py`, `config.py` wins.
 
@@ -62,6 +64,7 @@ One entry moved and one is new. Everything else keeps the ID it had.
 | D-28 | new | the PennyLane gradient backend, which had no ID at all |
 | D-29 – D-39 | batch 3 | modelling design: what the code implements and the record did not carry |
 | D-40 | — | the PCA reduction axis, wired; recorded with the change that made it real |
+| D-41 – D-46 | batch 4 | environment, reproducibility, repository, paper — the final batch |
 
 **Why D-21 moved rather than the modelling D-14.** The modelling IDs are cited
 from executable code — `dataset.assert_no_leakage` raises a `ValueError` naming
@@ -154,6 +157,7 @@ judul changes. **They are one conversation, not two** — see the section below.
 | | **D-30** | **Equal optimizer steps per epoch** — the batch's headline |
 | | **D-37** | Sweep protocol: one fold, one seed, config mutated in place |
 | §6 Implementation | D-09 | PyTorch for both models, via `TorchConnector` |
+| | **D-41** | One pinned environment at the repo root |
 | | D-28 | PennyLane over Qiskit for gradients |
 | | **D-32** | A trainable affine head on the quantum output |
 | | **D-31** | Output-bias initialisation and layer calibration, both arms |
@@ -161,6 +165,8 @@ judul changes. **They are one conversation, not two** — see the section below.
 | | **D-34** | The ladder is six rungs, and parity is 47 against 52 |
 | | **D-39** | A reduced Qiskit run, to show the two gradient paths converge |
 | §7 Requirements | D-12 | NF-01 will not be met at hourly resolution, stated in advance |
+| | **D-42** | Reproducibility as NF-02 evidence: what is claimed, and what is shown |
+| | **D-43** | The PLN redistribution constraint (rest of the entry is not in the thesis) |
 
 ### Bab IV — Hasil dan Pembahasan
 
@@ -200,6 +206,20 @@ judul changes. **They are one conversation, not two** — see the section below.
 | D-01 | `KX` and the weakened predecessor comparison | Bab IV |
 | **D-34** | `nn_full`, and parameter parity as a weak currency | Bab III §6 |
 | **D-30** | Which comparison the thesis is actually making | Bab III §5 |
+| **D-41** | The pinned environment as NF-02 evidence | Bab III §6 |
+| **D-42** | NF-02 met in mechanism, untested end-to-end | Bab III §7 |
+
+### Not in the thesis — working conventions
+
+Four entries govern how the work is done rather than what it claims, and belong
+in no chapter. They are recorded so they are not rediscovered the hard way.
+
+| ID | Entry |
+|---|---|
+| D-43 | Repository layout, and what is never committed |
+| D-44 | XeLaTeX with Biber, on the full MacTeX |
+| D-45 | `Template Baskara` is pristine, and divergences from it are recorded |
+| D-46 | Bahasa Indonesia for deliverables, English for code |
 
 ---
 
@@ -2357,6 +2377,93 @@ circuit.
 
 ---
 
+## D-41 — One pinned environment at the repo root
+
+**Decided.** A single `requirements.txt` at the repo root covers the pipeline
+and the modelling code. **Everything is pinned exactly** — no open ranges.
+`environment-lock.txt` is a `pip freeze` of that environment, regenerated after
+any change. Verified on **Python 3.13.7**; **3.10 is the floor**, because
+`qiskit-machine-learning` 0.9 dropped 3.9.
+
+**Why one file.** The two halves used to have separate requirements. The reason
+was operational: installing Qiskit could disturb a download that was mid-flight.
+All four acquisitions completed, so **the reason expired** — and the asymmetry
+it left behind was itself an NF-02 gap, with the modelling side pinned exactly
+and locked while the pipeline ran on open ranges with no lock at all.
+
+**Why exact pins.** A build that cannot be reproduced is an NF-02 failure, and
+open ranges are how a rebuild six months from now quietly gets a different
+pandas.
+
+**Which versions won, and why.** The pipeline's — pandas 3.0.5, numpy 2.5.2 —
+not the old modelling lock's pandas 3.0.2 / numpy 2.4.4. The pipeline had a
+proven working run behind 583 MB of irreplaceable downloads and the modelling
+package was empty at the time, so any incompatibility would surface in code that
+did not exist yet rather than in code that already worked. The one bump this
+imposed was numpy 2.4.4 → 2.5.2 under `qiskit-aer`, which ships compiled
+extensions.
+
+Both merged venvs ran 3.13.7. Both of the files this replaced claimed "verified
+on Python 3.12"; that was stale.
+
+**Three pins that carry an argument rather than a version.**
+
+`truststore==0.10.4` — without it `merlin_download` raises
+`CERTIFICATE_VERIFY_FAILED` where `curl` succeeds, because macOS ships its trust
+roots in the Keychain while Python verifies against `certifi`. The RUNBOOK used
+to ask for it as a separate install; it belongs in the file.
+
+`pyarrow==25.0.1` — **required, not optional.** Parquet is the primary output
+and the CSV mirror is skipped above 500.000 rows, which every hourly build
+exceeds.
+
+`qiskit-ibm-runtime` is **deliberately absent.** Real hardware is scoped to
+small-sample final validation only; adding the package is a new decision, not a
+swapped import. Its absence is what keeps that decision from being made by
+accident.
+
+**The qiskit pin boundary is load-bearing.** `qiskit-machine-learning` 0.8.x
+pins `qiskit<2.0`; 0.9.x requires `qiskit>=2.0`. An unpinned install can resolve
+to either side and fail in ways that look like a code bug rather than a
+resolution problem — the 2.x circuit-library constructors are snake_case
+functions, the primitives are V2, and V1 primitives are gone.
+
+**What it costs.** `torch` is a ~200 MB CPU-only install, and on Linux plain
+`torch` pulls the CUDA build at ~2,5 GB — the file records the
+`--index-url https://download.pytorch.org/whl/cpu` workaround because the
+default is wrong on the platform this was not developed on.
+
+**The environment did not describe the code it ran, and this is the batch's
+headline.** Until 8 September 2026 **neither `requirements.txt` nor
+`environment-lock.txt` contained `pennylane` or `pennylane_lightning`**, while
+`qnn.py` imports PennyLane at module scope and **every reported result in this
+project was differentiated by it** (D-28).
+
+So a fresh `pip install -r requirements.txt` produced an environment in which
+`from gfd_model import qnn` raises `ImportError`. **The modelling half did not
+run at all from the environment the repo described.** Eleven packages were
+missing from the lock — `pennylane==0.45.1`, `pennylane_lightning==0.45.0`, and
+nine transitive dependencies (`appdirs`, `autograd`, `autoray`, `cachetools`,
+`diastatic-malt`, `gast`, `scipy-openblas32`, `termcolor`, `tomlkit`)
+**[measured 8 September 2026]**.
+
+**State the larger claim plainly, because it is the one that matters: the
+environment the repo described could not have produced the reported results.**
+Neither file carried the framework every result was differentiated by. That is
+not a missing pin — it is the reproducibility claim and the artifact disagreeing
+about what the artifact is. Fixed and verified the same day; see register A4.
+
+**How to reverse it.** Splitting the environment again would reinstate the
+NF-02 asymmetry the merge removed. The pins are the point.
+
+**Bab.** III, implementation subsection, with the version table. Bab V where
+NF-02 is evaluated.
+
+**Who.** Not recorded. The merge of the two files is documented in
+`requirements.txt`'s own header; who decided it is not.
+
+---
+
 ## §7 — Requirements
 
 ## D-12 — NF-01 will not be met at hourly resolution, stated in advance
@@ -2379,6 +2486,72 @@ far stronger answer than either quietly missing it or quietly redefining it.
 **Bab.** III when NF-01 is restated, Bab V in the evaluation.
 
 **Who.** Not recorded in the modelling record.
+
+---
+
+## D-42 — Reproducibility as NF-02 evidence: what is claimed, and what is shown
+
+**Decided.** NF-02 is treated as an evidentiary requirement with named
+artifacts, not as a sentence in a table. Four mechanisms carry it.
+
+**One seed, one meaning.** `RANDOM_SEED = 18222067` is defined once in the
+pipeline config under a "Reproducibility (NF-02)" header, and the modelling
+config does `RANDOM_SEED = pcfg.RANDOM_SEED` — **imported, not copied**, so
+"seed 18222067" cannot come to mean two things. Per-run seeds `(0, 1, 2)` are
+separate and are the replication axis (D-29); this one is the project's
+identity.
+
+**Config snapshots travel with results.** The pipeline writes a `.meta.json`
+beside every processed table; the modelling code writes `_config_snapshot()`
+into every `Run`. Both exist so a result can say what produced it. F-05 asks
+that an experiment be replayable, which means the experiment config must record
+the *build's* choices — regridding, temporal aggregation, coverage, the
+quality filters — not just the model hyperparameters.
+
+**Exact pins and a lock.** D-41.
+
+**A re-runnable check.** `verify_pca_wiring.py` is committed as evidence, in
+two phases — `--capture` before an edit, `--check` after (A3). It is the
+executable statement of what "this change altered nothing" means. The baseline
+it writes is *not* evidence and should not be committed (O12).
+
+**What NF-02 actually claims, and it is weaker than the repo attempts.** The
+requirement reads: *"Eksperimen harus dapat direplikasi dengan hasil
+dokumentasi."* Replicable, with documented results. That is a low bar, and the
+repo aims considerably higher — exact pins, a lock file, a shared seed,
+snapshots on every run, and a verification script.
+
+**What the repo can currently demonstrate.** Be precise here, because the gap
+between claim and evidence is the thing an examiner probes.
+
+*Demonstrated.* The 2026-09-06 build is reproducible by evidence rather than by
+assumption — the pinned versions are the versions it actually ran on. Seeds are
+shared and imported. Every result file carries its config. The D-40 change is
+proved not to have altered the unreduced path, by hash equality against a
+baseline captured from code that no longer exists.
+
+*Not demonstrated.* **No end-to-end replay has ever been run** — nobody has
+built a fresh environment from `requirements.txt`, rebuilt both tables, re-run
+the final set, and compared. Until 8 September that replay would have failed at
+`import pennylane` (D-41), which is a measure of how untested it is. Twelve
+entries carry no attribution (open question 20). Four sweep axes have never been
+run, one is suspect (open questions 21, 23).
+
+**The honest Bab V sentence is that NF-02 is met in mechanism and untested
+end-to-end** — and that is worth saying, because the mechanisms are unusually
+thorough for a TA and claiming more than they show would waste them.
+
+**What it costs.** Snapshot shape changes ripple: D-40 added two keys, so files
+written before 8 September lack them and anything reading a results directory
+must tolerate their absence.
+
+**How to reverse it.** Each mechanism is independent; the seed sharing is one
+import line and would be the worst to lose, because it fails silently.
+
+**Bab.** III where NF-02 is restated, Bab V in the evaluation.
+
+**Who.** Not recorded. The seed value is Rafly's NIM, which makes its choice
+his; the mechanisms around it are not attributed.
 
 ---
 
@@ -2630,10 +2803,217 @@ out in the chapters shown.
 
 ---
 
+# Working conventions — not in the thesis
+
+Four entries that govern how the work is done rather than what it claims. They
+have **no Bab**: a reader of the thesis should never need them, and putting
+repository layout or a LaTeX toolchain into Bab III would pad a methods chapter
+with operational detail. They are recorded because each was decided once, is
+easy to violate by accident, and would otherwise be rediscovered the hard way.
+
+The one exception is noted inside D-43: the PLN redistribution constraint is a
+data-availability fact and does belong in Bab III.
+
+---
+
+## D-43 — Repository layout, and what is never committed
+
+**Decided.** Two top-level trees under the root, plus the record itself.
+
+```
+.
+├── README.md
+├── requirements.txt          ONE environment for all code
+├── environment-lock.txt
+├── DECISIONS.md              this file
+├── paper/
+│   ├── Rafly TA/             the thesis being written — the live document
+│   ├── Rafly Final Proposal/ the submitted proposal (II4091)
+│   └── Template Baskara/     pristine ITB STI template, reference only
+└── code/
+    ├── pipeline/             acquisition + build, with RUNBOOK.md
+    └── modelling/            QNN vs classical NN, with its own RUNBOOK.md
+```
+
+**Why `code/` at all.** The two halves were siblings of `paper/` before the
+September restructure. Grouping them is what made one environment at the root
+the obvious arrangement rather than an awkward one — `.gitignore` records the
+consequence directly: `.venv/` "cannot live in `code/pipeline/` or
+`code/modelling/` any more".
+
+**Two RUNBOOKs, deliberately.** `code/pipeline/RUNBOOK.md` is the acquisition
+record — how each source was obtained, what it cost, what has been tested.
+`code/modelling/RUNBOOK.md` is the experiment log, including a numbered defect
+list. They answer different questions and merging them would bury both.
+
+**`DECISIONS.md` sits at the root with `config.py` as tie-breaker.** Every entry
+carries the line *where this disagrees with `config.py`, `config.py` wins.* That
+rule is why A2 was fixed ahead of everything else: it was inert while `config.py`
+contradicted itself.
+
+**Nothing under `data/` is committed, and the two halves of that are not
+equivalent.** `raw/` is **irreplaceable** — the PLN records came through the
+supervisors and are not public. `processed/` is regenerable by one command and
+safe to delete. `.gitignore` excludes `code/pipeline/data/` and
+`code/modelling/data/`.
+
+**The PLN constraint is not merely a git rule.** The records are **not to be
+redistributed**. That is a real limit on what the thesis can publish and on how
+anyone else could replicate the tropis half — which makes it a data-availability
+statement rather than housekeeping. **It belongs in Bab III**, and it is the
+one part of this entry that does.
+
+**What it costs.** Irreplaceable data with no committed copy is a single point
+of failure. Nothing in the repo enforces a backup of `data/raw/`, and nothing
+records whether one exists. Open question 29.
+
+**How to reverse it.** The layout is a `git mv` away from anything else; the
+`data/` exclusion should not be reversed.
+
+**Bab.** None, except the PLN redistribution constraint, which belongs in
+Bab III.
+
+**Who.** Not recorded. The restructure is described in `.gitignore` and
+`README.md`; who decided it is not.
+
+---
+
+## D-44 — XeLaTeX with Biber, on the full MacTeX
+
+**Decided.** The thesis compiles with **XeLaTeX and Biber**. `pdflatex` and
+`bibtex` **will not work** — that is not a preference.
+
+```bash
+cd "paper/Rafly TA"
+latexmk -xelatex -file-line-error -interaction=nonstopmode TA.tex
+```
+
+By hand it is four passes in a fixed order: `xelatex`, `biber`, `xelatex`,
+`xelatex`. `latexmk -C TA.tex` clears the build state.
+
+**Why XeLaTeX.** `\setmainfont{Times New Roman}` via `fontspec` resolves from
+macOS system fonts, which is a XeLaTeX capability. **Why Biber**, not BibTeX:
+the template loads `biblatex-chicago` with `backend=biber`.
+
+**Why the full distribution, not BasicTeX.** `brew install --cask
+mactex-no-gui`. The preamble loads `algorithm`, `biblatex-chicago`,
+`threeparttable`, `datetime2-bahasai` and others BasicTeX does not ship. Open a
+new terminal afterwards so `xelatex` is on the PATH; `biber` and `latexmk` come
+with it.
+
+**Compile from the directory holding `TA.tex`**, not a parent or a
+subdirectory — every `\input` and every `images/` path is relative to it.
+
+**Two drivers, and checking which one you are editing is not optional.**
+`paper/Rafly TA/TA.tex` drives the Tugas Akhir (II4092, Bab I–VII, `\frontmatter`
+/ `\mainmatter`, two-sided geometry applied *after* the frontmatter).
+`paper/Rafly Final Proposal/ProposalTA.tex` drives the proposal (II4091,
+Bab I–V) with different geometry, frontmatter and float conventions. **A
+convention copied from the wrong one will compile and look wrong.**
+
+**What it costs.** A full MacTeX is several gigabytes, and the toolchain is
+macOS-shaped: the font resolution and the `truststore` requirement in D-41 both
+assume it. Nothing has been tested on another platform.
+
+**How to reverse it.** It is the template's toolchain, not a project choice —
+reversing means diverging from the ITB STI template.
+
+**Bab.** None.
+
+**Who.** **Inherited.** The toolchain comes with `Template Baskara`, whose own
+header specifies the four-pass XeLaTeX/Biber order. Not a project decision.
+
+---
+
+## D-45 — `Template Baskara` is pristine, and divergences from it are recorded
+
+**Decided.** `paper/Template Baskara/` is an **unmodified copy of the upstream
+ITB STI template**. Nothing is ever written into it. It exists to check
+formatting and canonical file names against.
+
+**Its `daftar-pustaka.bib` is dummy data and must never be cited** —
+`laudon2020`, `pressman2019`, `BPBI` and eight others are the template author's
+placeholders.
+
+**Why keep it at all.** A pristine reference is what makes "did I change this,
+or did it arrive this way" answerable by `diff` rather than by memory. Given how
+much of `paper/Rafly TA/` is still template text, that question comes up
+constantly.
+
+**The divergences that exist so far.**
+
+*Two supervisors rather than one.* The template ships a one-supervisor Lembar
+Pengesahan live and the two-supervisor `tabular` commented out.
+`paper/Rafly TA/2 Lembar Pengesahan.tex` correctly uses the two-supervisor
+variant with both names and NIPs, and the one-supervisor block removed.
+
+*The bibliography has not been ported.* `paper/Rafly TA/daftar-pustaka.bib` is
+**byte-identical to the template's dummy file** **[measured 8 September 2026]** —
+not one real reference. The proposal's real bibliography lives in
+`paper/Rafly Final Proposal/` and is where the port comes from. Open question 27.
+
+**A third divergence is claimed but not present in the file.** A `tabular*` fix
+to the Lembar Pengesahan has been referred to; there is **no `tabular*` anywhere
+in `paper/`**, and the file uses plain `\begin{tabular}{p{1cm}p{7cm}p{7cm}}` —
+15 cm of declared column width. Whether that overflows depends on the geometry
+in force, and this file is `\input` **before** the `\newgeometry` block, so it
+uses the document's initial margins rather than the inner=4cm / outer=3cm ones.
+**Recorded as unresolved rather than reconstructed** — open question 26.
+
+**What it costs.** A pristine copy is dead weight in the repository and its
+build artifacts (`TA.aux`, `TA.bbl`, `TA.blg`, `TA.bcf`) are present, which
+`.gitignore` should already exclude. Cheap, and the `diff` capability is worth
+it.
+
+**How to reverse it.** Deleting it loses the reference `diff`. Writing into it
+loses it just as completely and less visibly.
+
+**Bab.** None.
+
+**Who.** Not recorded. Stated as rule 1 in `README.md`.
+
+---
+
+## D-46 — Bahasa Indonesia for deliverables, English for code
+
+**Decided.** Everything the examiners read is in **Bahasa Indonesia** — the
+thesis, the proposal, figure captions, table headers. Everything in the
+repository that only developers read is in **English** — source, comments,
+docstrings, both RUNBOOKs, `README.md`, and this record.
+
+**Why.** The deliverable's language is set by the institution. The code's is set
+by its vocabulary: the libraries, the error messages and the literature are all
+English, and a comment that switches language mid-sentence to name
+`flash_count` reads worse than one that does not. Keeping the boundary at the
+artifact rather than inside a file means no file is bilingual.
+
+**The boundary has one visible seam.** Identifiers are English (`flash_count`,
+`coverage`) while the domains are named in Indonesian (`tropis`, `subtropis`),
+and `Bab III` / `Bab IV` appear throughout the English text of this record
+because they name chapters of an Indonesian document. Both are correct and both
+look like inconsistencies at a glance.
+
+**What it costs.** Every number that crosses the boundary changes notation:
+**decimal comma in the thesis, decimal point in code and in JSON.** `0,943` and
+`0.943` are the same number and a copy-paste in either direction is wrong. This
+record uses the comma, matching the deliverable.
+
+**How to reverse it.** Not reversible in the deliverable direction.
+
+**Bab.** None.
+
+**Who.** **Not recorded, and not written down anywhere in the repository.** It
+is followed consistently across every file, and stated in none of them —
+`README.md`, both RUNBOOKs and every config comment are silent on it. Recorded
+here as observed practice. If it was ever a decision rather than an assumption,
+that is not recoverable.
+
+---
+
 # Discrepancy register
 
 Every known conflict between this record and the repo, or inside the repo.
-Three fixes have landed; eleven are outstanding, of which **one is a code
+Four fixes have landed; fifteen are outstanding, of which **one is a code
 defect rather than documentation drift** (O10) and two are housekeeping
 removals (O8, O12).
 
@@ -2721,6 +3101,46 @@ parity chain, and the two new snapshot keys.
 Check 1 is the one that mattered. The two-phase design earned its keep: the
 baseline was captured from code that no longer exists, which is the only way
 "the edit changed nothing" can be a measurement rather than an assertion.
+
+### A4 — PennyLane was in neither `requirements.txt` nor the lock — FIXED
+
+**The most serious defect found in any batch, and the only one that invalidated
+a claim rather than a comment.**
+
+`qnn.py` imports PennyLane at module scope, and every reported result in the
+project was differentiated by `lightning.qubit` + `adjoint` (D-28). **Neither
+`requirements.txt` nor `environment-lock.txt` contained `pennylane` or
+`pennylane_lightning`.**
+
+So `pip install -r requirements.txt` produced an environment where
+`from gfd_model import qnn` raises `ImportError`. **The modelling half did not
+run at all from the environment the repo described.**
+
+**How it was caught, and the inference is worth recording.** The lock is a
+`pip freeze`, so it lists transitive dependencies. None of PennyLane's were
+present — no `autoray`, `autograd`, `appdirs`, `semantic-version`, `cachetools`.
+A freeze taken from a machine with PennyLane installed could not look like that,
+so the lock was demonstrably a snapshot of an environment without it. **The
+absence of the dependencies proved the absence of the package**, which a
+direct search for `pennylane` alone would have left ambiguous.
+
+**Confirmed on disk 8 September 2026: eleven packages missing from the lock** —
+`pennylane==0.45.1`, `pennylane_lightning==0.45.0`, and nine transitive
+dependencies: `appdirs`, `autograd`, `autoray`, `cachetools`, `diastatic-malt`,
+`gast`, `scipy-openblas32`, `termcolor`, `tomlkit`. Both pins were missing from
+`requirements.txt` as well.
+
+**Fixed the same day.** Both files updated, clean import verified, committed.
+`requirements.txt`'s numerics section — which justified the version choice by
+saying the modelling package was empty — was corrected to past tense in the same
+edit.
+
+**The claim to carry into Bab V.** Not "a pin was missing". **The environment
+the repo described could not have produced the reported results**, because
+neither the requirements file nor the lock carried the framework every result
+was differentiated by. That is the reproducibility claim and the artifact
+disagreeing about what the artifact is, which is the failure NF-02 exists to
+prevent. See D-41 and D-42.
 
 ## Outstanding
 
@@ -2939,6 +3359,85 @@ executable statement of what "the unreduced path is unchanged" means, and it
 is re-runnable in `--capture` mode against any future edit to the same code.
 The script is reusable; the baseline is not.
 
+### O13 — `README.md` is stale in three places
+
+Confirmed on disk 8 September 2026.
+
+**Line 32** — the layout tree calls `code/modelling/` "QNN vs classical NN —
+BEING REBUILT, empty", and rule 3 below it says nothing that used to be in it
+carries forward "including every number in the old `results/`, which were
+computed on synthetic tables". The package is complete and its results are real.
+
+**Lines 121–122** — "so the two domains do **not** currently present the same
+feature set to a cross-domain experiment". D-01 resolved that by dropping `KX`
+from both.
+
+**Note what is NOT stale: line 117 is accurate as written.** `KX` genuinely is
+absent from the subtropis files at the pipeline level — 14 features against 13
+in the built tables. D-01 is the *modelling-level* drop that makes the two
+domains symmetric downstream. The two statements describe different layers and
+only the second one went out of date.
+
+**Line 197** points readers at `RUNBOOK.md` step 4e, which is itself stale
+(O4). Fixing O4 fixes what this line points at; the pointer is fine.
+
+**Fix:** past tense on line 32 and rule 3; delete the clause at 121–122 and
+replace with a pointer to D-01.
+
+```bash
+grep -n "BEING REBUILT\|do \*\*not\*\* currently present\|step 4e" README.md
+```
+
+### O14 — `results/` is committed while the config says it is not
+
+`mcfg.RESULTS_DIR` and `mcfg.FIGURES_DIR` both carry the comment `# NOT in
+git`. `.gitignore` excludes only `code/pipeline/data/` and
+`code/modelling/data/`. The `final_*.jsonl` and `sweep_*.jsonl` files **are in
+the repository**.
+
+Committing results is defensible and arguably good for NF-02 — a results file
+carrying its own `_config_snapshot` is exactly the evidence D-42 wants. But the
+comment and the reality disagree, and one of them has to move.
+
+**Fix: decide which, then make both files say it.** If results stay committed,
+delete the `# NOT in git` comments and say in D-42 that they are evidence. If
+they go, add `code/modelling/results/` to `.gitignore` and accept that the
+evidence lives only in the record.
+
+```bash
+grep -n "NOT in git" code/modelling/src/gfd_model/config.py
+git ls-files code/modelling/results/ | head
+```
+
+### O15 — D-09's title still says `TorchConnector`
+
+The entry is titled "PyTorch for both models, via `TorchConnector`", and its
+body already carries the correction pointing at D-28. But `qnn.py` uses
+PennyLane's `qml.qnn.TorchLayer`, not
+`qiskit_machine_learning.connectors.TorchConnector`. D-28 changed the mechanism
+and the title did not follow.
+
+**Fix: retitle to "PyTorch for both models, through one shared loop"** — which
+is what the entry is actually about and what survives the backend change.
+
+### O16 — the `qiskit-machine-learning` pin may be dead
+
+`requirements.txt` pins `qiskit-machine-learning==0.9.1` and defends it with a
+paragraph about the 0.8/0.9 boundary. But `qnn.py` imports from
+`qiskit.circuit.library`, `qiskit.quantum_info` and `qiskit.primitives` — not
+from `qiskit_machine_learning` — and D-28 retired the only use it had.
+
+If the package is genuinely unused the pin is harmless, but the paragraph
+defending it is stale and the dependency is dead weight in an environment whose
+whole argument is that it is minimal and exact. **[unverified]**
+
+**Settled by:**
+```bash
+grep -rn "qiskit_machine_learning\|qiskit-machine-learning" code/
+```
+If nothing outside `requirements.txt` matches, drop the pin and the paragraph,
+and note in D-41 that the qiskit-version boundary argument no longer applies.
+
 ### O10 — `MODEL_LADDER` is assigned twice in `config.py`
 
 The first assignment lists five rungs; a second, later assignment adds
@@ -3009,7 +3508,7 @@ Consolidated and deduplicated from all three inputs. **Answered questions are
 kept rather than deleted** — a question that was asked and closed is evidence of
 a check made, and several were closed by measurements worth citing.
 
-Six answered, eighteen open.
+Six answered, twenty-two open.
 
 ## Answered
 
@@ -3204,6 +3703,63 @@ fit at full `TRAIN_ROWS` on both domains and comparing spectra** — no training
 needed, just `prepare()` and read `scaler.explained_variance_ratio`. Minutes,
 not hours. **Do this before any of D-40's spectrum argument reaches Bab IV.**
 
+### 26. What was the Lembar Pengesahan `tabular*` fix?
+D-45. A `tabular*` fix has been referred to, and **there is no `tabular*`
+anywhere in `paper/`**. `paper/Rafly TA/2 Lembar Pengesahan.tex` uses plain
+`\begin{tabular}{p{1cm}p{7cm}p{7cm}}` — 15 cm of declared column width, before
+intercolumn space.
+
+Whether that overflows depends on the geometry in force, and **this file is
+`\input` before the `\newgeometry` block**, so it uses the document's initial
+margins rather than the inner=4cm / outer=3cm ones that apply from `\mainmatter`.
+
+Three possibilities and I will not guess between them: the fix is pending; it
+was applied and later reverted; or it was something other than `tabular*` and
+the name is a misremembering.
+
+**Settled by Rafly saying which**, plus:
+```bash
+grep -rn "tabular\*" paper/
+grep -n "geometry" "paper/Rafly TA/TA.tex" | head
+```
+
+### 27. The bibliography has not been ported
+D-45. `paper/Rafly TA/daftar-pustaka.bib` is **byte-identical to the template's
+dummy file** — `laudon2020`, `pressman2019`, `BPBI` and eight more placeholders,
+not one real reference **[measured 8 September 2026]**.
+
+The proposal's real bibliography is in `paper/Rafly Final Proposal/`. Until the
+port happens, **any `\autocite` added to a Bab will either fail or silently cite
+a placeholder**, and the second is worse.
+
+**Settled by:** porting it. Mechanical, but it gates every citation in every
+chapter, so it is on the critical path for writing rather than beside it.
+
+### 28. Has an end-to-end replay ever been run?
+D-42. No. Nobody has built a fresh environment from `requirements.txt`, rebuilt
+both tables, re-run the final set and compared. Until 8 September that replay
+would have failed at `import pennylane` (A4) — which is itself the measure of
+how untested it is.
+
+NF-02 is currently **met in mechanism and untested end-to-end**, and Bab V
+should say exactly that rather than more.
+
+**Settled by:** doing it once, on a clean venv, and recording the result. The
+build is the expensive half; the modelling final set is ~8,4 h.
+
+### 29. Is `data/raw/` backed up anywhere?
+D-43. The PLN records are irreplaceable, came through the supervisors, are not
+public, and are **not in git by design**. Nothing in the repository enforces or
+records a backup, and nothing states whether one exists.
+
+This is the only single point of failure in the project where the loss is
+permanent — code, results and the record are all reconstructable and 583 MB of
+MERLIN exports plus the PLN workbooks are not.
+
+**Settled by:** Rafly confirming where the second copy is, and D-43 recording
+it. If there is no second copy, that is the highest-value thing on this list and
+it is not a documentation task.
+
 ### 21. Does the `shots` sweep axis work at all? — SUSPECT AND UNTESTED
 D-33, D-37. `SWEEPS["shots"] = (None, 4096, 1024)` while
 `DIFF_METHOD = "adjoint"`. **Adjoint differentiation is an analytic method and
@@ -3268,33 +3824,66 @@ on the theoretical argument — sound, but an argument.
 
 ---
 
-# Batch 3 — written 8 September 2026
+# The record, complete
 
-**Modelling design.** Eleven entries, D-29 to D-39, covering what
-`code/modelling/src/gfd_model/` implements and the record did not carry: the
-compute budget, the equal-step training cap, output-bias initialisation and
-layer calibration, the affine head, the quantum architecture, the six-rung
-ladder, feature scaling, per-model scalers, the sweep protocol, sampling
-mechanics, and the reduced Qiskit comparison run.
+**Four batches, 46 entries, 8 September 2026.**
 
-**Two existing entries were corrected.** D-07's subsampling arithmetic now
-carries a correction paragraph — it sized its budget against a sweep corner
-(13 qubits at reps = 4) at an optimistic 1 ms, while the reported runs use
-15 qubits at reps = 2 at a measured 6,97 ms. D-28's `Who` is answered: the
-PennyLane switch was mine, and Rafly did not make it.
+| Batch | Scope | Entries |
+|---|---|---|
+| 1 | Data and target definition | D-03, D-04, D-15 to D-21 |
+| 2 | Acquisition and data quality | D-22 to D-27 |
+| 3 | Modelling design | D-29 to D-39 |
+| 4 | Environment, reproducibility, repository, paper | D-41 to D-46 |
+| — | Merged from `code/modelling/DECISIONS.md` | D-01 to D-14 |
+| — | Written with the code change it records | D-40 |
 
-**Four discrepancies were added**, two of them code defects rather than
-documentation drift — `FEATURE_REDUCTION` declared and never read, and
-`MODEL_LADDER` assigned twice (O10) — plus a deletion (O8) and a superseded
-benchmark contradicting D-28 in `config.py` (O11). **The first has since been
-fixed**: it was wired on 8 September and is recorded at D-40 and A3.
+**Every decision this project makes that a reader could reasonably have made
+differently now has an ID, a reason where one exists, a cost, a reversal path, a
+chapter, and an honest attribution — including "not recorded" where that is the
+truth.**
 
-**What batch 3 did not do.** It did not fill the twelve missing `Who` fields on
-D-01 to D-14 (open question 20), and it did not run any of the four outstanding
-sweeps, the `shots` check, or the D-39 comparison. Those are executions, not
-writing.
+## What remains unrecorded
 
-**The record is now complete in coverage.** Every decision the project makes
-that a reader could reasonably have made differently has an ID, a reason where
-one exists, and an honest "not recorded" where one does not. What remains is
-execution and attribution, both tracked in the open questions.
+Three things, and none of them is a gap in coverage.
+
+**Attribution on twelve entries.** D-01, D-02 and D-05 to D-14 carry
+"Not recorded in the modelling record" (open question 20). Recoverable from the
+September chats; not attempted here, and **not reconstructable from the code** —
+which is the whole reason the field exists.
+
+**Seven hyperparameters have no recorded reasoning** (open question 22).
+`LEARNING_RATE`, `BATCH_SIZE`, `NN_LARGE_HIDDEN`, ridge `alpha`,
+`VAL_FRACTION`, `FEATURE_MAP_REPS`, and linear entanglement on both map and
+ansatz. Rafly does not have them either. A justification written now would be a
+reconstruction, which is what this record exists to avoid — so they stay
+unrecorded, and the *pattern* is recorded instead: **the hyperparameters that
+shape the comparison are the ones with the least justification behind them.**
+
+**The Bahasa/English convention was never written down** (D-46). Followed
+consistently in every file, stated in none. Recorded as observed practice.
+
+## What remains undone
+
+Recording is complete; execution is not. Fifteen register items are outstanding
+and twenty-two questions are open. The ones that gate the thesis rather than
+tidy the repository:
+
+- **The MERLIN CG/IC question** (10) — decides what the subtropis target is
+  called, and is needed before Bab III.
+- **The bibliography port** (27) — gates every citation in every chapter.
+- **`config.py:255`** (O6) — a wrong D-number in the declared source of truth.
+- **The two title questions** (8, 9) — one pembimbing conversation, and the
+  contents table now puts them adjacent so they read as one.
+- **`data/raw/` backup** (29) — the only permanent loss on the list.
+
+## How to keep it true
+
+The rule that has done the most work here: **where this disagrees with
+`config.py`, `config.py` wins** — and when `config.py` disagreed with itself
+(A2), fixing that came before everything else, because the rule was inert until
+it did.
+
+The second: **a decision with no recorded author is a finding, not a formatting
+gap.** Two entries in this record invert the assumption a reader would otherwise
+make about who decided what. Both were caught by a field that cannot be
+reconstructed after the fact.
