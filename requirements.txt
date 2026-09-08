@@ -30,11 +30,14 @@
 # rather than by assumption.
 #
 # This is NOT what the old modelling lock recorded (pandas 3.0.2, numpy 2.4.4).
-# The pipeline's versions win because the pipeline has a proven working run
-# behind 583 MB of irreplaceable downloads, and the modelling package is empty
-# -- so any incompatibility surfaces in code that does not exist yet rather
-# than in code that already works. The one bump this imposes is
-# numpy 2.4.4 -> 2.5.2 under qiskit-aer, which ships compiled extensions.
+# The pipeline's versions won because the pipeline had a proven working run
+# behind 583 MB of irreplaceable downloads, and at merge time the modelling
+# package was empty -- so any incompatibility would surface in code that did
+# not exist yet rather than in code that already worked. The one bump this
+# imposed is numpy 2.4.4 -> 2.5.2 under qiskit-aer, which ships compiled
+# extensions; tested and passed.
+#
+# The modelling package is no longer empty. These pins now carry both halves.
 pandas==3.0.5
 numpy==2.5.2
 scipy==1.17.1
@@ -72,6 +75,31 @@ netCDF4==1.7.4
 qiskit==2.5.2
 qiskit-machine-learning==0.9.1
 qiskit-aer==0.17.2
+
+# --------------------------------------------------------------------------
+# Gradients -- WHY THERE ARE TWO QUANTUM FRAMEWORKS HERE
+# --------------------------------------------------------------------------
+# The circuits above are Qiskit and the architecture is the Qiskit template.
+# But qiskit-machine-learning 0.9.1 exposes NO adjoint or backprop gradient;
+# its only exact method is parameter shift, which needs 2 circuits per weight
+# -- 90 per sample at 45 weights. Adjoint needs one backward pass for all 45.
+#
+# MEASURED, 15 qubits / 45 weights: Qiskit Statevector + ParamShift 438,70
+# ms/sample (526,5 h for the 36-run final set) against PennyLane
+# lightning.qubit + adjoint at 6,97 (8,4 h). Every reported result in this
+# project is differentiated by PennyLane. See DECISIONS.md D-28.
+#
+# THESE WERE MISSING UNTIL 2026-09-08. `qnn.py` imports pennylane at module
+# scope, so a fresh install from this file produced an environment in which
+# the modelling package would not import at all -- an NF-02 failure in the
+# requirement the one-environment merge exists to serve. Do not remove them.
+#
+# NOT pennylane-qiskit. The plugin pins its own Qiskit range and could drag
+# this environment off 2.5.2 and break the pipeline. Equivalence to the Qiskit
+# circuit is proved numerically instead, by qnn.verify_against_qiskit() to
+# 1e-10, which is a stronger claim than a converter would give.
+pennylane==0.45.1
+pennylane-lightning==0.45.0    # import name is pennylane_lightning
 
 # --------------------------------------------------------------------------
 # Classical ML

@@ -2,7 +2,8 @@
 
 **Project-wide decision record. Merged 8 September 2026.
 Batch 3 (modelling design, D-29 to D-39) added 8 September 2026.
-D-40 added 8 September 2026 with the code change it records.**
+D-40 added 8 September 2026 with the code change it records; wiring applied,
+verified and committed the same day.**
 
 Where this disagrees with `config.py`, `config.py` wins.
 
@@ -1374,6 +1375,49 @@ in a reduced space** — not whether PCA rescues the QNN. The classical ceiling
 is reduced alongside it. That is also the comparison the predecessor's use of
 PCA invites, since he reduced everything too.
 
+**The variance spectrum is a result, not a diagnostic — and it is nearly flat.**
+Measured on tropis, fold 2, occurrence stage, 500 rows **[measured
+8 September 2026]**:
+
+| | retained |
+|---|---|
+| `pca8` | **84,0%** |
+| `pca6` | **72,0%** |
+
+Per component: 0,228 · 0,169 · 0,103 · 0,077 · 0,073 · 0,069 · 0,064 · 0,055.
+These sum to 0,719 and 0,838, reproducing the two cumulative figures
+**[derived]**.
+
+A uniform spectrum on 15 features would put **6,67%** in every component. PC1
+holds 3,4× that and PC2 2,5×, but **from PC3 the spectrum sits between 1,5× and
+0,8× uniform** — 0,103, 0,077, 0,073, 0,069, 0,064, 0,055, six components
+declining by almost nothing. **There is no elbow.** The seven components not
+listed hold 16,2% between them, averaging 0,35× uniform, so there is a decaying
+tail — but the middle of the spectrum is close to structureless.
+
+**What that means, and it is the interesting part.** A flat spectrum says the
+fifteen predictors are **close to genuinely independent** rather than redundant
+measurements of one underlying atmospheric state. Two consequences follow, and
+both belong in Bab IV:
+
+**Any k is arbitrary.** With no natural cut point there is no principled basis
+for choosing 6 over 8 over 11. The sweep values are round numbers, and the entry
+should say so rather than imply a scree plot was read.
+
+**If PCA turns out not to help, the honest explanation is available in
+advance.** It would be *"there was little redundancy to remove"* — not *"we
+reduced too aggressively"*. That distinction matters because the predecessor
+used PCA in his main path and varied the component count as an experimental
+factor. A bare null against him is weak; **a null plus a flat spectrum is an
+explanation of why his reduction had less to work with on this feature set than
+it might appear**, and it is measured rather than argued.
+
+**Caveat, and it is not small.** 500 rows, one fold, one domain. The spectrum
+could differ on subtropis, whose predictors come from the same four sources but
+a different climate, and 500 rows is the sweep budget rather than the training
+budget. **Re-check on subtropis at full `TRAIN_ROWS` before any of this reaches
+Bab IV.** Open question 25.
+
 **What it costs.** Three things.
 
 *The sign convention is a decision, not a detail.* SVD component signs are
@@ -1396,7 +1440,10 @@ under the new code would have been the ones that could not be reconstructed.
 them must tolerate their absence.
 
 **How to reverse it.** `FEATURE_REDUCTION = None` restores the original path
-exactly, and the verification script proves that rather than asserting it.
+exactly, and `verify_pca_wiring.py` **proved** that rather than asserting it:
+hash equality on `X_train`, `X_val` and `X_test` against baselines captured
+from the pre-edit code **[measured 8 September 2026]**. No existing result
+changed.
 
 **Bab.** III for the transform order and the fit-on-train rule; IV for the
 sweep result and the parity flip.
@@ -2586,8 +2633,9 @@ out in the chapters shown.
 # Discrepancy register
 
 Every known conflict between this record and the repo, or inside the repo.
-Three fixes have landed; ten are outstanding, of which **one is a code defect
-rather than documentation drift** (O10) and one is a deletion (O8).
+Three fixes have landed; eleven are outstanding, of which **one is a code
+defect rather than documentation drift** (O10) and two are housekeeping
+removals (O8, O12).
 
 ## Applied
 
@@ -2661,9 +2709,18 @@ equality on `X_train` / `X_val` / `X_test` for the unreduced path, three
 distinct feature counts (15 / 8 / 6), three distinct datasets, the recomputed
 parity chain, and the two new snapshot keys.
 
-**Not closed until that script is green.** The code and the script were written
-in one session and neither was executed against the repo; the entry records the
-fix, and the run records that it worked.
+**Green, 8 September 2026. Applied and committed.** All five checks pass:
+
+1. the unreduced path reproduces the pre-edit hashes **bit-for-bit**, so no
+   existing result changed;
+2. `None` / `pca8` / `pca6` give 15 / 8 / 6 features;
+3. the three produce distinct data, not just distinct widths;
+4. the parity chain recomputes — 47/52, 26/21, 20/17;
+5. `_config_snapshot` carries `feature_reduction` and `n_qubits`.
+
+Check 1 is the one that mattered. The two-phase design earned its keep: the
+baseline was captured from code that no longer exists, which is the only way
+"the edit changed nothing" can be a measurement rather than an assertion.
 
 ## Outstanding
 
@@ -2857,6 +2914,31 @@ git rm code/modelling/src/gfd_model/experiments.py.bak
 
 Move this to **Applied** once removed.
 
+### O12 — `pca_wiring_baseline.json` is committed and should not be
+
+A one-shot artifact. It holds hashes of arrays produced by **code that no
+longer exists** — the pre-D-40 `Scaler` — so it cannot be regenerated from the
+current tree and cannot be re-checked against it. Its job was done the moment
+A3 went green.
+
+Leaving it committed invites exactly one mistake: someone re-runs
+`--check` months from now, it passes against a stale baseline, and the pass
+means nothing. Worse, it *looks* like standing evidence when it is a spent
+receipt.
+
+**Fix: gitignore it and remove it from the index.** The verification result
+lives in A3 and in the commit message, which is where a finding belongs.
+
+```bash
+git rm --cached code/modelling/src/pca_wiring_baseline.json
+echo "pca_wiring_baseline.json" >> .gitignore
+```
+
+**`verify_pca_wiring.py` stays committed.** It is NF-02 evidence: it is the
+executable statement of what "the unreduced path is unchanged" means, and it
+is re-runnable in `--capture` mode against any future edit to the same code.
+The script is reusable; the baseline is not.
+
 ### O10 — `MODEL_LADDER` is assigned twice in `config.py`
 
 The first assignment lists five rungs; a second, later assignment adds
@@ -2927,7 +3009,7 @@ Consolidated and deduplicated from all three inputs. **Answered questions are
 kept rather than deleted** — a question that was asked and closed is evidence of
 a check made, and several were closed by measurements worth citing.
 
-Six answered, seventeen open.
+Six answered, eighteen open.
 
 ## Answered
 
@@ -3108,6 +3190,19 @@ question that gets asked.
 **Settled by:** a pass through the September chats, which are searchable. Not
 attempted here, and **not reconstructable from the code** — the whole point of
 the field is that it cannot be inferred from the artefact.
+
+### 25. Does the flat variance spectrum hold beyond one fold of one domain?
+D-40. Measured on **tropis, fold 2, occurrence, 500 rows**: `pca8` retains
+84,0%, `pca6` 72,0%, with the per-component spectrum nearly flat from PC3 on.
+The interpretation resting on it — that the predictors are close to
+independent, that any k is arbitrary, and that a PCA null would mean "little
+redundancy to remove" — is only as good as that one cell.
+
+Subtropis draws the same four sources over a different climate, and 500 rows is
+the sweep budget rather than the training budget. **Settled by re-running the
+fit at full `TRAIN_ROWS` on both domains and comparing spectra** — no training
+needed, just `prepare()` and read `scaler.explained_variance_ratio`. Minutes,
+not hours. **Do this before any of D-40's spectrum argument reaches Bab IV.**
 
 ### 21. Does the `shots` sweep axis work at all? — SUSPECT AND UNTESTED
 D-33, D-37. `SWEEPS["shots"] = (None, 4096, 1024)` while
