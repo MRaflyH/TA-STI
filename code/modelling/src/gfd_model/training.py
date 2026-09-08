@@ -138,10 +138,28 @@ def fit(
     since_improved = 0
     epochs = max_epochs or mcfg.MAX_EPOCHS
 
+    # Equal OPTIMIZER STEPS per epoch, not equal passes over the data.
+    #
+    # Without this, nn_full (1,8M rows) takes ~28.000 steps in a single epoch
+    # while the matched arms (3.000 rows) take ~47. Early stopping only acts
+    # at epoch boundaries, so nn_full had already run 35x the total training
+    # of every other arm before validation was first checked -- at a learning
+    # rate tuned for the small ones. It scored worse than the trivial floor on
+    # subtropis occurrence as a result, which reads as "more data hurts" and
+    # is really "the shared loop was unfair to the large-data arm".
+    #
+    # Capping steps makes the budget identical across arms; a large-data arm
+    # simply draws each batch from a bigger pool, and the shuffle means it
+    # still sees new rows every epoch. That is the comparison D-09 wants:
+    # same budget, more data.
+    max_steps = max(1, -(-mcfg.TRAIN_ROWS // mcfg.BATCH_SIZE))
+
     for epoch in range(epochs):
         model.train()
         running, seen = 0.0, 0
-        for xb, yb in loader:
+        for step, (xb, yb) in enumerate(loader):
+            if step >= max_steps:
+                break
             opt.zero_grad()
             loss = loss_fn(model(xb), yb)
             loss.backward()

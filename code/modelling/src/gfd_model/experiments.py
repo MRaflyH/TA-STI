@@ -118,12 +118,19 @@ def fit_models(
     bias = C.initial_bias(prep.y_train, stage)
     qnn_params = QuantumModel(n, stage=stage, seed=seed).n_trainable
 
-    fitted, diagnostics = {}, {}
+    fitted, diagnostics, rows_used, preps = {}, {}, {}, {}
     for name in (models or mcfg.MODEL_LADDER):
         p = prep
         if name == "nn_full":
             # Every row, not the QNN's subsample. Deliberately breaks parity.
-            p = ds.prepare(df, fold, stage, seed=seed, train_rows=None)
+            #
+            # NOTE the sentinel. `train_rows=None` means "use the config
+            # default" in prepare(), NOT "use everything" -- the first run of
+            # this file passed None and nn_full silently trained on 3.000 rows
+            # like every other arm, producing numbers identical to nn_large in
+            # all 432 rows. A value larger than any table makes subsample() a
+            # no-op, which is what this arm needs.
+            p = ds.prepare(df, fold, stage, seed=seed, train_rows=10**9)
 
         model = C.build(name, n, stage, seed=seed,
                         qnn_params=qnn_params, output_bias=bias)
@@ -132,16 +139,19 @@ def fit_models(
 
         fitted[name] = model
         diagnostics[name] = result
+        # Per model, not per prep: nn_full trains on a different table and
+        # reporting the shared prep's size made it look like every other arm.
+        rows_used[name] = int(len(p.y_train))
+        # Keep the Prepared, not just the row count. nn_full's scaler is
+        # fitted on 2,4M rows and the shared one on 3.000; evaluating a
+        # model through the wrong scaler shifts every test feature.
+        preps[name] = p
         if verbose:
             n_par = getattr(model, "n_trainable", 0)
             print(f"    {name:<18s} {n_par:>5d} par  {result.summary()}")
 
     # D-03/D-04. Retransformation bias, corrected on VALIDATION rows only.
-    # Fitting MSE on log1p(count) gives the conditional mean IN LOG SPACE;
-    # expm1 of that is median-like and sits below the mean count, so every
-    # GFD number comes out systematically low. Measured 0,37-0,45 of observed
-    # across the whole ladder -- every model, so it is the transform, not the
-    # model. Fitting this on test would be target leakage as calibration.
+    # Fitting this on test would be target leakage dressed as calibration.
     smearing = {}
     if stage == "count":
         obs_val = M.to_counts(prep.y_val, prep.scaler)
@@ -154,7 +164,8 @@ def fit_models(
                 print(f"    {name:<18s} smearing x{smearing[name]:.3f}")
 
     return {"models": fitted, "diagnostics": diagnostics, "prepared": prep,
-            "smearing": smearing, "n_features": n, "source": source}
+            "smearing": smearing, "rows_used": rows_used, "preps": preps,
+            "n_features": n, "source": source}
 
 
 # --------------------------------------------------------------------------
@@ -175,29 +186,39 @@ def evaluate(
     transformed by the scaler fitted on the source -- re-fitting here would
     leak target statistics into a model that must never have seen them.
     """
-    prep = fit["prepared"]
-    scaler = prep.scaler
+    default_prep = fit["prepared"]
+    preps = fit.get("preps", {})
 
-    if target == fit["source"]:
-        X, y, index = prep.X_test, prep.y_test, prep.test_index
-    else:
+    # Cross-domain target rows are loaded ONCE, unscaled. Each model then
+    # transforms them with its OWN scaler: nn_full's is fitted on 2,4M rows
+    # and every other arm's on 3.000, and mixing them shifts every feature.
+    target_rows = None
+    if target != fit["source"]:
         df = ds.load_pooled() if target == "pooled" else ds.load(target)
         df = ds.add_hour_encoding(df)
         names = ds.feature_names(df)
         ds.assert_no_leakage(names)
 
         _, _, test = ds.split(df, fold)
-        test = ds.sample_test_days(ds.stage_rows(test, stage))
-        X = scaler.transform(test[names].to_numpy(dtype=np.float64))
-        y = ds.make_target(test, stage)
-        if stage == "count":
-            y = scaler.transform_y(y)
-        index = test[[mcfg.TIME_COL, "lat", "lon", "area_km2",
-                      mcfg.COUNT_COLUMN]].reset_index(drop=True)
+        target_rows = (ds.sample_test_days(ds.stage_rows(test, stage)), names)
 
     runs = []
     for name, model in fit["models"].items():
         diag = fit["diagnostics"][name]
+        prep = preps.get(name, default_prep)
+        scaler = prep.scaler
+
+        if target_rows is None:
+            X, y, index = prep.X_test, prep.y_test, prep.test_index
+        else:
+            test, names = target_rows
+            X = scaler.transform(test[names].to_numpy(dtype=np.float64))
+            y = ds.make_target(test, stage)
+            if stage == "count":
+                y = scaler.transform_y(y)
+            index = test[[mcfg.TIME_COL, "lat", "lon", "area_km2",
+                          mcfg.COUNT_COLUMN]].reset_index(drop=True)
+
         pred = T.predict(model, X, stage=stage)
 
         if stage == "occurrence":
@@ -208,11 +229,12 @@ def evaluate(
             counts_pred = M.to_counts(pred, scaler)
             counts_obs = index[mcfg.COUNT_COLUMN].to_numpy(dtype=float)
 
-            # Raw and corrected, both reported. The raw curve shows the size
-            # of the retransformation bias; the corrected one is the number to
-            # quote. For a CROSS-DOMAIN scenario the factor comes from the
-            # SOURCE domain and cannot know the target's scale -- that
-            # residual gap is a transfer finding, not an artefact.
+            # Raw and smearing-corrected, both reported. The raw curve shows
+            # the size of the retransformation bias; the corrected one is the
+            # number to quote. For a CROSS-DOMAIN scenario the factor comes
+            # from the SOURCE domain, so it does not fix a target-scale
+            # mismatch -- that residual gap is a transfer finding, not an
+            # artefact to correct away.
             factor = fit.get("smearing", {}).get(name, 1.0)
             scores["smearing_factor"] = float(factor)
             scores["windows"] = M.evaluate_windows(
@@ -224,7 +246,8 @@ def evaluate(
 
         runs.append(Run(
             scenario=scenario, stage=stage, model=name, fold=fold.name,
-            seed=seed, train_rows=len(prep.y_train),
+            seed=seed,
+            train_rows=int(len(prep.y_train)),
             n_params=int(getattr(model, "n_trainable", 0)),
             seconds=diag.seconds, epochs_run=diag.epochs_run,
             best_epoch=diag.best_epoch, stopped_early=diag.stopped_early,
