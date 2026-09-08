@@ -1,6 +1,7 @@
 # DECISIONS.md
 
-**Project-wide decision record. Merged 8 September 2026.**
+**Project-wide decision record. Merged 8 September 2026.
+Batch 3 (modelling design, D-29 to D-39) added 8 September 2026.**
 
 Where this disagrees with `config.py`, `config.py` wins.
 
@@ -57,6 +58,7 @@ One entry moved and one is new. Everything else keeps the ID it had.
 | D-21 | batch 1 | **was batch 1's D-14**, which collided with the modelling record's D-14 |
 | D-22 – D-27 | batch 2 | unchanged |
 | D-28 | new | the PennyLane gradient backend, which had no ID at all |
+| D-29 – D-39 | batch 3 | modelling design: what the code implements and the record did not carry |
 
 **Why D-21 moved rather than the modelling D-14.** The modelling IDs are cited
 from executable code — `dataset.assert_no_leakage` raises a `ValueError` naming
@@ -137,12 +139,23 @@ judul changes. **They are one conversation, not two** — see the section below.
 | | D-08 | Intensity is built into the pipeline, used later |
 | | D-02 | Feature set: 13 base predictors, hour encoding as an axis |
 | | D-11 | All-zero cells are identified before any split |
+| | **D-35** | Feature scaling: min-max onto [0, π], clipped, fitted on train alone |
 | §5 Experimental protocol | D-04 | Train hourly, aggregate the predictions to a reporting window |
 | | D-06 | Rolling-origin cross-validation across years |
 | | D-07 | Training rows may be reshaped; test rows may not |
 | | D-13 | The default task is a hurdle model |
+| | **D-38** | Sampling mechanics: stratified, largest-remainder, stage-filtered first |
+| | **D-36** | Every model carries its own scaler; cross-domain uses the source's |
+| | **D-29** | The compute budget, and the two-tier split it forces |
+| | **D-30** | **Equal optimizer steps per epoch** — the batch's headline |
+| | **D-37** | Sweep protocol: one fold, one seed, config mutated in place |
 | §6 Implementation | D-09 | PyTorch for both models, via `TorchConnector` |
 | | D-28 | PennyLane over Qiskit for gradients |
+| | **D-32** | A trainable affine head on the quantum output |
+| | **D-31** | Output-bias initialisation and layer calibration, both arms |
+| | **D-33** | Quantum architecture: `z` map, `real_amplitudes` reps = 2, local readout |
+| | **D-34** | The ladder is six rungs, and parity is 47 against 52 |
+| | **D-39** | A reduced Qiskit run, to show the two gradient paths converge |
 | §7 Requirements | D-12 | NF-01 will not be met at hourly resolution, stated in advance |
 
 ### Bab IV — Hasil dan Pembahasan
@@ -166,6 +179,11 @@ judul changes. **They are one conversation, not two** — see the section below.
 | | D-08 | The units argument and the detection-efficiency bias |
 | | D-01 | The cost of dropping `KX` |
 | | D-03 | The calibration factor |
+| | **D-30** | `nn_full` under an equalised step budget — same budget, more data |
+| | **D-34** | The six-rung ladder, and 47 against 52 |
+| | **D-36** | The residual cross-domain gap as a transfer finding |
+| | **D-37** | The sweep asymmetry, declared |
+| | **D-29** | Seed and fold counts, declared |
 
 ### Bab V — Penutup dan Evaluasi
 
@@ -175,6 +193,8 @@ judul changes. **They are one conversation, not two** — see the section below.
 | D-14 | Sample efficiency: the finding and its limitation | Bab IV |
 | D-20 | The NF-01 renegotiation | Bab III §3 |
 | D-01 | `KX` and the weakened predecessor comparison | Bab IV |
+| **D-34** | `nn_full`, and parameter parity as a weak currency | Bab III §6 |
+| **D-30** | Which comparison the thesis is actually making | Bab III §5 |
 
 ---
 
@@ -1216,6 +1236,56 @@ in Bab III. Open question 15.
 
 ---
 
+## D-35 — Feature scaling: min-max onto [0, π], clipped, fitted on train alone
+
+**Decided.** `FEATURE_RANGE = (0.0, π)`, `CLIP_TEST_FEATURES = True`,
+`STANDARDISE_TARGET = True`. One `Scaler` serves both arms. It is fitted on the
+**training rows only** and then applied to validation and test.
+
+**Why clipping is a correctness measure, not a convenience.** This is the part
+to lead with. A test value above the training maximum maps past π, and a
+rotation past π **aliases back onto a different angle**. The model does not
+raise, does not warn, and does not produce an obviously bad number — it returns
+a confident wrong answer for that row. Clipping converts a silent wrong answer
+into a saturated one, which is the failure mode you can reason about.
+
+**Why [0, π] specifically.** Angle encoding needs a bounded range; an MLP is
+indifferent to it. So the interval is chosen for the quantum arm and the
+classical arm accepts it, which is the correct direction for the constraint to
+flow under D-09.
+
+**Why one scaler.** D-09 requires the only difference between the arms to be
+the layer. Different preprocessing would be a second difference, and it is
+exactly the kind an examiner asks about. **D-09 covers this only by
+implication** — it says "same optimizer, batch size, loss, early stopping, seed
+handling" and does not name the scaler. This entry is that gap closed.
+
+**Target standardisation** happens after D-03's `log1p`, so both models see a
+comparable loss surface, and is inverted before any reported number.
+
+**What it costs.** Two asymmetries worth knowing about.
+
+*Training is not clipped; validation and test are.* `prepare()` calls
+`scaler.transform(Xtr, clip=False)` and clips everywhere else. That is
+consistent — the scaler's range is *defined* by the training rows, so nothing
+in training can fall outside it — but it means the clip path is exercised only
+on data the model is judged on.
+
+*Constant columns are mapped to the bottom of the range.* A column with
+`hi <= lo` would divide by zero and produce NaN for every row; `fit()` sets
+`hi = lo + 1` instead. Silent, and correct, but it means a degenerate feature
+becomes a constant 0 rather than an error.
+
+**How to reverse it.** All three are config values. `FEATURE_RANGE` is not
+freely reversible — the quantum arm needs a bounded range whatever else changes.
+
+**Bab.** III, preprocessing subsection, with the aliasing rationale stated. It
+is a better sentence than "features were scaled to [0, π]".
+
+**Who.** Not recorded.
+
+---
+
 ## §5 — Experimental protocol
 
 ## D-04 — Train hourly, aggregate the predictions to a reporting window
@@ -1391,8 +1461,23 @@ so 130 evaluations per sample per step. At an optimistic 1 ms per statevector
 evaluation, one epoch over 10.000 samples is roughly 20 minutes — and the
 matrix needs dozens of epochs across dozens of configurations across five
 seeds. The full table is four orders of magnitude out of reach. A design
-constraint, not a tuning problem. (D-28 later cut the per-sample cost by roughly
-63×; the design constraint stands.)
+constraint, not a tuning problem.
+
+**Correction — the arithmetic above describes a run that was not made.** It
+assumes 13 qubits at `ANSATZ_REPS = 4`, giving 65 weights, and an optimistic
+1 ms per statevector evaluation. The reported runs use **15 qubits at reps = 2**
+— 45 weights, per `qnn.py`'s `(ANSATZ_REPS + 1) × per_layer` — at a **measured
+6,97 ms** per sample on the backend actually used (D-28). Both configurations
+are legal; 13/4 is a corner of the `ansatz_reps` sweep, not the default.
+
+The two errors do not point the same way. **The weight over-count partially
+offsets the timing optimism**: 65 × 2 evaluations at 1,00 ms gives 130 ms per
+sample, against a real 45 × 2 at 4,87 ms giving 438,70 ms on Qiskit
+parameter-shift. Net, this entry **underestimates by 3,4×** **[derived]**.
+
+**The design constraint stands and is if anything stronger** — the full table is
+further out of reach than the paragraph says, not nearer. Only the illustrative
+numbers are wrong. Quote D-28's measured figures in Bab III rather than these.
 
 **D-13 changes the arithmetic favourably.** Stage 2 trains on non-zero rows
 only: 104.955 tropis and 99.273 subtropis. Both are within reach without
@@ -1445,6 +1530,231 @@ runnable if a reviewer asks for it.
 **Bab.** III for the formulation, Bab IV for the stage-wise results.
 
 **Who.** Not recorded in the modelling record.
+
+---
+
+## D-38 — Sampling mechanics: stratified, largest-remainder, stage-filtered first
+
+**Decided.** Three mechanical choices inside `dataset.py`, each of which was a
+bug before it was a decision.
+
+**Stratified draws, not uniform.** `STRATIFY_BY = ("lat", "lon",
+"month_of_year")`. An unstratified draw from a table with a strong seasonal
+cycle and a 20% dead rim (D-11) is not a miniature of the whole — it can come
+out "all Jakarta and all December".
+
+**Largest-remainder allocation.** Per-stratum counts are floored, then the
+remainder is handed to the strata with the largest fractional parts, so the
+draw sums to **exactly** n rather than to n ± the number of strata.
+
+**Stage filter before the validation cap, not after.** `prepare()` applies
+`stage_rows()` to train, validation and test, and only then caps validation to
+`MAX_VAL_ROWS`.
+
+**Why the ordering matters, measured.** The other order caps to 1.000 rows and
+*then* drops zeros, which left the count stage with **112 validation rows** —
+far too few to early-stop on. The comment in `prepare()` records this as the
+reason the two lines are in this order, which is the only thing stopping someone
+from "tidying" them back.
+
+**What it costs.** Stratification is not free at scale, and the strata are
+defined by columns that must exist in the frame — `_stratified_draw` falls back
+to an unstratified sample if none of `STRATIFY_BY` is present, silently. That
+fallback has never fired, but nothing announces it if it does.
+
+**How to reverse it.** `STRATIFY_BY` is a config tuple. The ordering is
+structural and should not be reversed.
+
+**Bab.** III, sampling subsection. The 112-row figure is worth keeping — it is
+concrete evidence that the ordering is load-bearing rather than stylistic.
+
+**Who.** Not recorded. All three read as fixes made during implementation.
+
+---
+
+## D-36 — Every model carries its own scaler, and cross-domain uses the source's
+
+**Decided.** Two rules that interact.
+
+**Each arm keeps its own `Prepared`.** `fit_models` stores `preps[name]` per
+model and `evaluate` uses that model's scaler, not a shared one.
+
+**Cross-domain evaluation transforms the target domain's rows with the scaler
+fitted on the SOURCE domain.** Target rows are loaded once, unscaled, and each
+model applies its own transform.
+
+**Why the source scaler.** Re-fitting on the target would leak target statistics
+into a model that must never have seen them. A cross-domain result computed that
+way measures a model that has already been told the answer's range.
+
+**Why per-model scalers — and this was a real bug.** `nn_full` trains on every
+row (D-34), so its scaler is fitted on ~2,4M rows while every other arm's is
+fitted on 3.000. Evaluating `nn_full` through the shared 3.000-row scaler
+shifted every test feature. Symptom: validation losses healthy at 0,08–0,22
+against a test log loss of 0,2867. **After the fix `nn_full` went from worst to
+best in 5 of 8 cells.**
+
+**What it costs.** A consequence worth stating rather than correcting away: for
+a cross-domain scenario the D-03 smearing factor also comes from the **source**
+domain, so it does not fix a target-scale mismatch. The residual gap that leaves
+is a **transfer finding**, not an artefact. Say so in Bab IV — the temptation is
+to fit the factor on the target and make the number look better.
+
+**How to reverse it.** Structural. Reversing either rule reintroduces a
+documented bug.
+
+**Bab.** III for the protocol, IV for the residual cross-domain gap.
+
+**Who.** Not recorded. Both read as fixes made during implementation.
+
+---
+
+## D-29 — The compute budget, and the two-tier split it forces
+
+**Decided.** `TRAIN_ROWS = 3.000`, `MAX_EPOCHS = 30`,
+`EARLY_STOPPING_PATIENCE = 6`, `SEEDS = (0, 1, 2)`, `MAX_VAL_ROWS = 1.000`,
+`VAL_FRACTION = 0.15`, `TEST_DAYS = 30`. Sweeps override to 1.000 rows,
+15 epochs, `TEST_DAYS = 20`, one seed, one fold (D-37).
+
+**Why these values.** The budget is one night for the final set, and the numbers
+are solved backwards from it. 36 QNN runs — 2 stages × 2 domains × 3 folds ×
+3 seeds — at ~18 min each is ~11 h. `config.py` records what each rung cost:
+**4.000 rows × 30 epochs was ~70% of the whole budget**; 3.000 brings it under a
+night. **Five seeds would not fit.** `MAX_EPOCHS` at 50 is 14,4 h against 30 at
+8,7 h.
+
+`MAX_VAL_ROWS = 1.000` is the one that is not obvious. The quantum layer costs
+~7 ms per row, so **evaluation is a first-order cost, not a rounding error**: a
+full 236.610-row validation set costs **27 minutes per epoch against 7 seconds
+of training**. Validation exists only to decide when to stop, and a few thousand
+rows estimate the loss well enough for that.
+
+**What it costs.** Three seeds is the minimum that supports a mean ± sd at all,
+and D-14 shows why it is also the minimum that is safe — a single-seed sweep
+produced a textbook sample-efficiency crossover that three seeds erased
+completely.
+
+`estimate_budget()` in `experiments.py` is the honest version and carries three
+corrections that each mattered: training, validation **and** test inference are
+all first-order at ~7 ms/row (an earlier projection counted training only and
+understated by ~3 h); cell counts differ by domain, 30 against 56; and the count
+stage evaluates on non-zero rows only, so its test set is ~1/20 of the
+occurrence stage's. It is a **worst case** assuming every run reaches
+`MAX_EPOCHS`; observed early stopping fires between epochs 11 and 28, so expect
+~70%.
+
+**How to reverse it.** All config values. Raising any of them is a linear cost;
+the budget is the constraint, not the code.
+
+**Bab.** III for the protocol, IV where the seed and fold counts are declared.
+
+**Who.** Not recorded. The trade-offs are documented in `config.py`; the choice
+of one night as the budget is not attributed anywhere.
+
+---
+
+## D-30 — Equal optimizer steps per epoch, so the shared loop is actually fair
+
+**The headline of this batch.** It is the entry most likely to change what gets
+written in Bab IV, because the pre-fix version produced a result that looked
+like a finding.
+
+**Decided.** `training.fit` caps optimizer steps per epoch at
+`ceil(TRAIN_ROWS / BATCH_SIZE)` — about 47 steps — for **every** arm, whatever
+size its training set is. A large-data arm draws each batch from a bigger pool
+and the shuffle means it still sees new rows every epoch, but its **budget** is
+identical to everyone else's.
+
+**Why. Without the cap, the comparison was broken and the breakage looked like a
+result.** `nn_full` trains on ~2,4M rows. At batch 64 that is roughly 28.000–
+38.000 optimizer steps in a single epoch, against ~47 for the 3.000-row arms —
+**about 35× the training budget**. Early stopping only acts at epoch boundaries,
+so `nn_full` had run far past its optimum before validation was checked even
+once, at a learning rate tuned for the small arms.
+
+**The pre-fix number was misleading, not merely wrong.** `nn_full` scored
+**below the trivial floor** on subtropis occurrence — 0,2867 against 0,1228.
+Read at face value that says **"more data hurts"**, which is a publishable-
+sounding claim about where QNNs and classical models stand. It is false. What it
+actually says is **"the shared loop gave one arm 35× the budget at a learning
+rate tuned for the others."** That number could have entered Bab IV as a
+finding, and it would have been wrong in a way no reader could have caught from
+the results table.
+
+**What the fix makes true.** D-09 claims the only difference between arms is the
+layer, and lists optimizer, batch size, loss, early stopping and seeds as the
+things held equal. **Step count was not on that list and was not equal.** The
+cap is what converts D-09 from an intention into an enforced property. Without
+it the central comparison of the thesis is not the comparison it says it is.
+
+The framing to use: **same budget, more data.** That is the question `nn_full`
+is there to answer, and it is only answerable once the budget is genuinely the
+same.
+
+**What it costs.** `nn_full` no longer uses its data advantage the way an
+unconstrained run would — it sees more distinct rows but takes no more steps. So
+the arm measures "more data at a fixed optimisation budget", not "more data with
+proportionate compute". That is the honest comparison here, but it is a narrower
+claim and Bab V should say which one it is making.
+
+**How to reverse it.** `max_steps` is computed in `training.fit`, not
+configurable. Removing it reintroduces the bug.
+
+**Bab.** III, as a design choice with its measured justification. `RUNBOOK.md`
+already marks it *Bab III material* and it is.
+
+**Who.** Not recorded. It appears as bug 7 in the modelling RUNBOOK's defect
+list — found during implementation, not planned.
+
+---
+
+## D-37 — Sweep protocol: one fold, one seed, shorter runs, config mutated in place
+
+**Decided.** `run_sweep` runs one-factor-at-a-time around the defaults:
+`SWEEP_FOLD = 2` (fold 3, test 2024), **one seed**, `max_epochs = 15`,
+`train_rows = 1.000` except on the `train_rows` axis itself, and
+`TEST_DAYS = 20` instead of 30. The axis under test is written onto the module
+config for the duration and restored in a `finally` block.
+
+Declared axes: `train_rows`, `hour_encoding`, `ansatz_reps`, `feature_map`,
+`observable`, `train_zero_ratio`, `shots`, `feature_reduction`.
+
+**Why.** Sweeps choose settings; they do not produce the headline table. Full
+rolling-origin CV on every axis is unaffordable and would not be more
+informative about which setting to pick. D-06 declares the asymmetry — **this
+entry records the protocol that asymmetry refers to**, which D-06 does not.
+
+The config mutation is deliberate and the docstring says so: the alternative is
+threading every knob through every function signature, making the common path
+harder to read for the benefit of a path used a handful of times.
+
+**What it costs.** Three things.
+
+A sweep result is **one seed**. D-14 is the standing warning: a single-seed
+sweep on `train_rows` produced a clean sample-efficiency crossover that three
+seeds erased, with a seed-to-seed sd four times the apparent effect. **A sweep
+picks a setting; it does not establish a finding.**
+
+`TEST_DAYS = 20` and `max_epochs = 15` mean a swept configuration is not
+measured under the conditions the finals run in. Fine for ranking, not for
+quoting.
+
+The mutation is not thread-safe and leaves the config wrong if the process is
+killed mid-sweep rather than raising.
+
+**Two axes are not sound as written.** `feature_reduction` is never read by any
+code — see the register — and `shots` is untested against an analytic gradient.
+Six of the eight are sound; the entry should not be read as certifying all
+eight. Four of the sound six have not been run at all (`ansatz_reps`,
+`observable`, `feature_map`, `hour_encoding`).
+
+**How to reverse it.** `SWEEP_FOLD`, `SWEEPS` and the overrides are config;
+the mutation pattern is structural to `run_sweep`.
+
+**Bab.** III for the protocol, IV where the asymmetry is declared alongside
+D-06.
+
+**Who.** Not recorded.
 
 ---
 
@@ -1611,15 +1921,269 @@ describing different configurations rather than disagreeing, but they are now in
 one document and a reader will notice. **Unresolved; flagged rather than
 silently reconciled.**
 
-**Who.** **Not established.** The decision appears in the modelling record only
-as a resolved open item under D-09, with no attribution, and the docstring
-records the reasoning without recording the author. Given that D-09's open item
-framed the question — "should be measured rather than assumed" — and this is the
-measurement, it reads as mine. But switching frameworks and refusing
-`pennylane-qiskit` are the kind of decision that would normally have been
-discussed. **Rafly is answering this separately; the question stays open until
-he does.** This is the largest deviation in the project and it is the one entry
-whose provenance most deserves to be right.
+**Who.** **Mine. Benchmarked, recommended and implemented by me.** Rafly does
+not recall being asked, and reports no familiarity with PennyLane. He did not
+make this decision.
+
+**That absence is the record, not a gap in it.** The largest deviation in the
+project — the one that reaches the title page — was taken by the assistant, on
+its own benchmark, and the supervisor of the work found out afterwards. Nothing
+about the decision is wrong: the measurements hold, the equivalence is proved to
+1e-10, and the alternative was a sweep that does not finish. But the *process*
+is worth stating, because "who chose PennyLane" is a fair question at sidang and
+"I did, after Claude benchmarked it and recommended it" is a different answer
+from "Claude did, and I found out later."
+
+Write the technical case in Bab III on its merits. This field exists so the
+provenance is not reconstructed from the merits afterwards.
+
+---
+
+## D-32 — A trainable affine head on the quantum output
+
+**Decided.** `OUTPUT_AFFINE_HEAD = True`. `QuantumModel` wraps the circuit's
+expectation value in a trainable `a·y + b` (`nn.Linear(1, 1)`).
+
+**Why it is structural, not decoration.** A Pauli expectation lives in
+**[−1, 1]**. A standardised `log1p(count)` target does not. Without the head the
+model is **structurally unable to reach the target range**, and the failure
+presents as *"the QNN does not learn"* — which is a conclusion about quantum
+machine learning rather than about a missing two-parameter layer.
+
+For the occurrence stage the output is a **logit**, paired with
+`BCEWithLogitsLoss` rather than sigmoid-then-BCE, which is numerically stabler.
+
+**The Qiskit tutorial omits this**, because its toy target is already in range.
+That is worth a sentence in Bab III: the departure from the reference
+implementation is deliberate and the reason is the target, not the model.
+
+**What it costs.** Two parameters, which is why the QNN reports **47 trainable**
+against 45 circuit weights — see D-34. It also means "the QNN" in every result
+is a circuit *plus* a classical affine layer, and Bab III should say so rather
+than let a reader assume the expectation value is the prediction.
+
+**How to reverse it.** Config flag; `False` substitutes `nn.Identity`. Doing so
+reproduces the "does not learn" failure, which is the point of keeping the flag.
+
+**Bab.** III, architecture subsection.
+
+**Who.** Not recorded.
+
+---
+
+## D-31 — Output-bias initialisation and layer calibration, applied to both arms
+
+**Decided.** Two initialisation steps, given to the quantum and classical arms
+identically.
+
+**`initial_bias(y_train, stage)`** sets the output bias so an untrained model
+predicts the base rate — the logit of the positive rate for occurrence, the mean
+for count. It goes to **every gradient-trained arm**; the closed-form arms solve
+for their intercept directly.
+
+**`calibrate_output()`** rescales the head so the untrained model matches the
+target's marginal spread. Both `QuantumModel` and `ClassicalModel` implement it.
+
+**Why, and both are measured.** Without the bias, a model on a 5,79%-positive
+target spends its whole budget dragging the intercept from 0 to −2,79: at
+lr 0,01 with 16 steps per epoch that move alone takes **~280 steps, more than a
+15-epoch run has**. It never reaches the features.
+
+Without the calibration, the quantum arm has a second version of the same
+problem. `z_feature_map` leaves every qubit on the Bloch equator where ⟨Z⟩ = 0
+exactly; small-angle init tilts each by ~0,1; `local_mean` averages 15 of those
+with mixed signs, so the layer's output std lands near **0,03** against a target
+std of **1,0**. A head starting at weight 1,0 must learn a weight near **30**,
+and at lr 0,01 that takes thousands of steps. **Symptom: occurrence converges
+after 3 epochs to just below the trivial floor, and count is still descending at
+epoch 29 of 30. Two failure modes, one cause.**
+
+**Why both arms get it, and this is the load-bearing part.** A standard-init MLP
+already produces O(1) outputs, so calibration changes little for the classical
+arm. **It is applied anyway.** Giving a calibration step to one arm and
+withholding it from the other is exactly the asymmetry that makes D-09's
+comparison unanswerable at sidang. The classical rescale is exact rather than
+approximate: with `out = W·h + b`, the map `(out − m)/s + bias` is reproduced by
+`W' = W/s` and `b' = (b − m)/s + bias`.
+
+**What it costs.** Both are computed from **training** rows only
+(`max_rows = 256`), so neither leaks. The QNN's calibration reads the layer's
+output on real data before training, which is one extra forward pass.
+
+**How to reverse it.** `calibrate_output` is applied by `training.fit` if the
+model exposes it; removing it from one arm only would break D-09.
+
+**Bab.** III, implementation subsection. The two failure modes are worth
+stating — they are concrete evidence that "the QNN does not learn" is a claim
+that needs a controlled setup behind it.
+
+**Who.** Not recorded. Both read as fixes made during implementation.
+
+---
+
+## D-33 — Quantum architecture: `z` map, `real_amplitudes` at reps = 2, local readout
+
+**Decided.** One qubit per feature, 15 by default. `FEATURE_MAP = "z"` at
+`FEATURE_MAP_REPS = 1`; `ANSATZ = "real_amplitudes"` at `ANSATZ_REPS = 2` with
+`ANSATZ_ENTANGLEMENT = "linear"`; `OBSERVABLE = "local_mean"`; `SHOTS = None`
+(exact expectation values).
+
+Weight count is `(reps + 1) × n` = **45**, plus the D-32 head = 47 trainable.
+
+**Why `local_mean`, which is the one with a real argument behind it.** The stock
+template's `global_z` — Z on every qubit — **saturates badly past a handful of
+qubits and is a known barren-plateau accelerant**. Keeping every term
+single-qubit keeps the cost function local, and the gradient does not vanish
+exponentially with n. **The proposal already commits to local cost functions as
+the barren-plateau mitigation**, so this is the config honouring a commitment
+made in Bab II rather than a free choice.
+
+`global_z` is kept as a sweep value specifically as **the ablation arm that
+demonstrates why it was not chosen** — which is a stronger position than
+asserting it.
+
+`z` over `zz`: the product encoding is shallow and has no entanglement. `zz` at
+`full` on 15 qubits is 105 two-qubit blocks and very deep; the config warns to
+prefer linear or circular if it is tried at all.
+
+**What it costs, and what is not justified.** `ANSATZ_REPS = 2` sits in the
+middle of a 1–4 sweep, and `FEATURE_MAP_REPS = 1`, the linear entanglement on
+both map and ansatz, and `real_amplitudes` over `efficient_su2` **carry no
+recorded reasoning**. They are defaults that survived. The observable choice is
+argued; the rest of the architecture is not.
+
+`SHOTS = None` means every reported number is an exact expectation, so **no
+result in this thesis includes shot noise**. That is the right default for a
+simulator study and it must be stated — a reader may assume otherwise from
+"quantum". See the register on the `shots` sweep axis.
+
+**How to reverse it.** All config values, all sweep axes. Four of the sweeps
+that would inform these choices have not been run.
+
+**Bab.** III, architecture subsection, with the barren-plateau argument and the
+Qiskit circuit figure from `build_circuit()`.
+
+**Who.** Not recorded, except that the local-cost commitment is inherited from
+the proposal.
+
+---
+
+## D-34 — The ladder is six rungs, and parity is 47 against 52
+
+**Decided.** `MODEL_LADDER` runs **six** entries, not the five D-09 names:
+`baseline_trivial`, `ridge`, `nn_matched`, `qnn`, `nn_large`, **`nn_full`**.
+`NN_ACTIVATION = "tanh"`, `NN_LARGE_HIDDEN = (64, 64)`, and `nn_matched`'s width
+is **solved** by `solve_matched_hidden` rather than hand-picked.
+
+**`config.py` defines `MODEL_LADDER` twice.** The first assignment has five
+rungs; a second, later assignment adds `nn_full` and silently shadows it. **The
+six-rung version is the live one** and is what this entry documents. See the
+register — two definitions of the ladder in the modelling half's source of truth
+is a defect even though the effective value is correct.
+
+**Why `nn_full`.** It is `nn_large` trained on every row rather than the QNN's
+subsample, and it **deliberately breaks parity**. The matched arms exist to make
+D-09's comparison meaningful; `nn_full` exists because *"the classical model can
+use 400× the data at a thousandth the cost"* is a real finding about where QNNs
+currently stand, and **an examiner will ask about it whether or not it was
+measured**. Measure it, label it, report it separately, and put it in Bab V.
+Read it alongside D-30 — the arm is only interpretable because the step budget
+was equalised.
+
+**Why `tanh`.** Bounded, like the quantum readout. Keeping the nonlinearity's
+range comparable removes one more difference between the arms.
+
+**Parity is 47 against 52, and the code says to report both.** The QNN has 47
+trainable parameters (45 circuit + 2 head); `solve_matched_hidden(15, 47)`
+returns a hidden width of 3, giving **52**. Exact parity is impossible here:
+parameter count moves in **steps of `n_in + 2` = 17** per hidden unit. The
+docstring's instruction is explicit — *report the actual counts of both models
+rather than claiming they are equal* — and Bab IV should follow it.
+
+Parity is solved rather than guessed so that changing `ANSATZ_REPS` or the
+feature count cannot silently break it.
+
+**What it costs, and this belongs in Bab V.** **Parameter parity is a weak
+currency.** The QNN's 45 weights act on a 32.768-dimensional Hilbert space;
+45 classical weights on 15 inputs buy a hidden layer of **three units**. The two
+are not comparable in any deep sense. That is the argument for reporting the
+whole ladder rather than a single matched pair, and it is a limitation of the
+comparison rather than a result from it.
+
+`ridge` is written out rather than imported from scikit-learn so the intercept
+handling and the unpenalised bias term are visible. On the occurrence stage it
+fits 0/1 labels as a linear probability model — crude, and a reference point
+rather than a contender.
+
+**How to reverse it.** `MODEL_LADDER`, `NN_ACTIVATION` and `NN_LARGE_HIDDEN` are
+config values. `NN_MATCHED_HIDDEN` can override the solver.
+
+**Bab.** III for the ladder, IV for the results, V for `nn_full` and the
+weak-currency argument.
+
+**Who.** Not recorded. `nn_full` appears as a late addition — bugs 6, 7 and 8 in
+the RUNBOOK are all about getting it to run correctly.
+
+---
+
+## D-39 — A reduced Qiskit run, to show the two gradient paths converge together
+
+**Decided, not yet run.** One reduced training run on the Qiskit
+parameter-shift path, compared against the PennyLane adjoint path used for every
+reported result.
+
+**Scope, stated so no reader assumes more:** **500 rows × 15 epochs, one fold,
+one seed, occurrence stage only.** At 438,70 ms/sample that is
+**~55 minutes** **[derived]**. The **full hurdle pair at full size would be
+21,9 h**, and it is not being run.
+
+**Why.** `verify_against_qiskit()` proves the two implementations agree on the
+**forward pass** to 1e-10. That answers a question about the *circuit*. The
+question at sidang is about the **training** — *how do you know PennyLane's
+gradients gave you the same model?* — and forward equivalence does not answer
+it directly.
+
+The theoretical argument is sound: parameter-shift and adjoint both compute the
+exact analytic gradient, so forward equivalence to 1e-10 implies gradient
+equivalence. But that is an argument. **An hour converts it into an exhibit**,
+on the largest deviation in the project (D-28). Ten hours buys very little more,
+because what is being demonstrated is that the curves agree — not that a
+full-fidelity result was reproduced.
+
+**What it shows, and what it does not.** It shows **agreement of training curves
+under a reduced budget**. It does **not** show reproduction of a full-fidelity
+result, it does not cover the count stage, and it does not cover the
+cross-domain scenarios. State all three in Bab III; a demonstration oversold is
+worse than none.
+
+**The command, so this does not become an intention with no execution path:**
+
+```bash
+cd "$(git rev-parse --show-toplevel)/code/modelling/src"
+python3 -c "
+from gfd_model import config as mcfg, dataset as ds, experiments as X
+mcfg.DEVICE, mcfg.DIFF_METHOD = 'default.qubit', 'parameter-shift'
+fit = X.fit_models('tropis', ds.folds()[mcfg.SWEEP_FOLD], 'occurrence',
+                   seed=0, train_rows=500, max_epochs=15, models=('qnn',))
+print(fit['diagnostics']['qnn'].summary())
+"
+```
+
+Run the same line with the defaults restored for the adjoint arm, and compare
+the two `train_loss` / `val_loss` curves. **[unverified]** — the invocation is
+written from the signatures in `experiments.py` and has not been executed; if
+`fit_models` does not accept `models=` as a keyword the call needs adjusting,
+not the decision.
+
+**How to reverse it.** Nothing is committed until it runs. If the curves
+disagree, that is a finding about D-28 and not a defect in this entry.
+
+**Bab.** III, beside the D-28 benchmark table and the equivalence check.
+
+**Who.** **Rafly's**, taken on 8 September 2026 on the reasoning above, after I
+put the cost of both the long and short versions in front of him. He chose the
+short one for the stated reason: the question is about the training, not the
+circuit.
 
 ---
 
@@ -1899,7 +2463,8 @@ out in the chapters shown.
 # Discrepancy register
 
 Every known conflict between this record and the repo, or inside the repo.
-Two fixes have landed; seven are outstanding.
+Two fixes have landed; eleven are outstanding, of which **two are code defects
+rather than documentation drift** (O9 and O10) and one is a deletion (O8).
 
 ## Applied
 
@@ -2106,6 +2671,126 @@ keeping both and making the two roles explicit.
 grep -n "D-07 and D-12" code/modelling/src/gfd_model/metrics.py
 ```
 
+### O8 — `experiments.py.bak` sits inside the package — DELETE IT
+
+**Superseded code inside an importable package, and this is the worst of the
+four found in batch 3** because unlike a stale comment it can be executed.
+
+`code/modelling/src/gfd_model/experiments.py.bak` holds the pre-fix versions of
+two things that were fixed for documented reasons:
+
+- `fit_models` passing `train_rows=None` for `nn_full` — which means *use the
+  config default*, not *use everything*, so `nn_full` silently trained on 3.000
+  rows and produced numbers identical to `nn_large` in all 432 rows of the first
+  run (RUNBOOK bug 6).
+- `evaluate` using a single shared scaler for every arm — the bug D-36 exists to
+  prevent (RUNBOOK bug 8).
+
+Same hazard class as the `config.py` KX block fixed in A2: it looks
+authoritative and it is wrong. Worse, because a copy-paste out of it reinstates
+two known defects.
+
+**Fix: delete the file.** Git has it, which is the whole point of git.
+
+```bash
+git rm code/modelling/src/gfd_model/experiments.py.bak
+```
+
+Move this to **Applied** once removed.
+
+### O9 — `FEATURE_REDUCTION` is declared, swept, and never read — CODE DEFECT
+
+**This is a defect in the code, not drift in the documentation**, and it is the
+one on this list that could put a false claim in the thesis.
+
+`FEATURE_REDUCTION` is defined in `config.py` (`None | "pca6" | "pca8"`, marked
+"sweep axis") and listed in `SWEEPS` as `(None, "pca8", "pca6")`. `run_sweep`
+resolves the knob name to `FEATURE_REDUCTION` and `setattr`s it successfully.
+
+**Nothing reads it.** `dataset.feature_names()` and `dataset.prepare()` never
+reference it; no PCA is applied anywhere in the package.
+
+**So the sweep runs, completes, and returns three identical result sets.** Read
+at face value that is a clean null: *dimensionality reduction makes no
+difference to this model*. **The predecessor study used PCA**, and the number of
+principal components was one of his experimental factors — so this is a false
+negative on a direct comparison point, produced by code that does nothing, in a
+sweep that reports success.
+
+If it reached Bab IV it would be indefensible, and it would be indefensible in
+the specific way that is hardest to recover from: a stated result that the code
+cannot have produced.
+
+**Fix: either implement it or delete it.** Both are defensible; leaving it
+declared is not. If deleted, remove the `SWEEPS` entry too, and say in Bab IV
+that PCA was not tested and why — which is a weaker but honest position.
+
+```bash
+grep -rn "FEATURE_REDUCTION" code/modelling/src/
+```
+
+### O10 — `MODEL_LADDER` is assigned twice in `config.py`
+
+The first assignment lists five rungs; a second, later assignment adds
+`nn_full` and **silently shadows the first**. Only the six-rung version is live,
+and it is the one D-34 documents.
+
+The effective value is correct, so nothing is broken at runtime. But two
+definitions of the model ladder in the file that is the modelling half's source
+of truth is the same failure mode as A2 — a reader who stops at the first
+assignment gets a different answer from the interpreter.
+
+**Fix: delete the first assignment**, keeping the six-rung version and its
+`nn_full` comment.
+
+```bash
+grep -n "^MODEL_LADDER" code/modelling/src/gfd_model/config.py
+```
+
+### O11 — `config.py` carries a superseded benchmark that contradicts D-28
+
+Same pattern as A2, in the same file, and it should be cleared the same way. The
+block sits **immediately above** the current benchmark and recommends a strategy
+D-28 rejects outright.
+
+**Old text — delete:**
+
+```
+# MEASURED 2026-09-06, 13 qubits / 39 weights / StatevectorEstimator, minutes
+# per 10.000-row epoch:
+#     ParamShift  40,9    LinComb  104,2    SPSA  1,2
+#
+# LinComb is SLOWER than ParamShift here, not faster: it builds a
+# controlled-gate circuit per parameter and circuit construction dominates in
+# the reference primitive. Exact gradients at ~41 min/epoch cannot carry a
+# sweep, so SPSA explores and exact gradients confirm the finals. Record this
+# split in Bab III rather than letting it surface in the results.
+#
+# RE-BENCHMARK AGAINST AER before accepting these. qiskit-aer batches through
+# compiled C++ instead of a Python loop and may move ParamShift back into
+# range, which would simplify the whole design.
+```
+
+**New text — replace with:**
+
+```
+# SUPERSEDED BENCHMARK REMOVED. An earlier 13-qubit / 39-weight measurement
+# recommended "SPSA explores, exact gradients confirm the finals". That
+# strategy was tested and REJECTED -- see DECISIONS.md D-28 for the cosine
+# result that killed it. The Aer re-benchmark it asked for was done; its
+# numbers are in the table below. Do not reinstate an SPSA path here.
+```
+
+Three things wrong with the old block, which is why it goes rather than gets a
+footnote: it measures a configuration that is not the default (13 qubits at
+39 weights, against 15 at 45); it recommends a two-tier gradient strategy that
+D-28 rejects on measured evidence; and it asks for an Aer re-benchmark that has
+since been done and appears four lines below it.
+
+```bash
+grep -n "LinComb\|RE-BENCHMARK AGAINST AER" code/modelling/src/gfd_model/config.py
+```
+
 ---
 
 # Open questions
@@ -2114,7 +2799,7 @@ Consolidated and deduplicated from all three inputs. **Answered questions are
 kept rather than deleted** — a question that was asked and closed is evidence of
 a check made, and several were closed by measurements worth citing.
 
-Six answered, thirteen open.
+Six answered, seventeen open.
 
 ## Answered
 
@@ -2296,25 +2981,96 @@ question that gets asked.
 attempted here, and **not reconstructable from the code** — the whole point of
 the field is that it cannot be inferred from the artefact.
 
+### 21. Does the `shots` sweep axis work at all? — SUSPECT AND UNTESTED
+D-33, D-37. `SWEEPS["shots"] = (None, 4096, 1024)` while
+`DIFF_METHOD = "adjoint"`. **Adjoint differentiation is an analytic method and
+does not take finite shots.** PennyLane will either raise, or silently fall back
+to a different gradient method — and if it falls back, the axis measures shot
+noise *and* a changed gradient at the same time, which is uninterpretable.
+
+**Do not describe this as a working sweep axis until it has been run.** Every
+reported number in the project currently uses `SHOTS = None`, so no result
+depends on it; the risk is entirely prospective.
+
+**Settled by one line:**
+```bash
+cd "$(git rev-parse --show-toplevel)/code/modelling/src"
+python3 -c "
+from gfd_model import config as mcfg
+from gfd_model.qnn import make_qnode, n_features_configured
+import torch
+n = n_features_configured()
+q = make_qnode(n, device='lightning.qubit', diff_method='adjoint')
+dev = __import__('pennylane').device('lightning.qubit', wires=n, shots=1024)
+print('constructed; now check whether a backward pass raises')
+"
+```
+If it raises, the axis is removed and Bab III says shot noise was not tested. If
+it falls back, the axis needs `DIFF_METHOD` switched to `parameter-shift` for
+that sweep only, and the cost recomputed against D-28's table.
+
+### 22. Seven hyperparameters have no recorded reasoning
+D-29, D-33, D-34. `LEARNING_RATE = 0.01`, `BATCH_SIZE = 64`,
+`NN_LARGE_HIDDEN = (64, 64)`, ridge `alpha = 1.0`, `VAL_FRACTION = 0.15`,
+`FEATURE_MAP_REPS = 1`, and linear entanglement on both feature map and ansatz.
+None carries a comment or a recoverable chat. Rafly does not have them either,
+so they are recorded as **not recorded** rather than reconstructed.
+
+**The pattern is worth one line in its own right: the hyperparameters that shape
+the comparison are the ones with the least justification behind them.** The
+observable choice is argued from barren plateaus, the budget is argued from one
+night, the step cap is argued from a measured failure — and the learning rate
+that every one of those arguments assumes is a round number nobody defended.
+
+**Settled by:** nothing available. This is a limitation to state in Bab III, not
+a gap to fill: a post-hoc justification written now would be a reconstruction,
+which is exactly what this record exists to avoid.
+
+### 23. Four OFAT sweeps have not been run
+D-37. `ansatz_reps`, `observable`, `feature_map` and `hour_encoding` are
+declared and sound but unexecuted; only `train_rows` is done. Each is ~15 min
+per seed. Until they run, D-33's architecture choices rest on argument alone —
+which is fine for `local_mean`, where the argument is strong, and thin for
+`ansatz_reps = 2`, where there is none.
+
+**Settled by:** running them. `python3 -c "from gfd_model import experiments as
+X; X.run_sweep('observable')"` and the same for the other three.
+
+### 24. Does D-39's comparison run confirm the two gradient paths agree?
+D-39, D-28. Decided and scoped at 500 rows × 15 epochs, occurrence stage, ~55
+minutes. **Not yet run.** Until it is, D-28's training-equivalence claim rests
+on the theoretical argument — sound, but an argument.
+
+**Settled by:** the command in D-39.
+
 ---
 
-# Batch 3 — not written
+# Batch 3 — written 8 September 2026
 
-**Modelling design beyond what the modelling record already holds.** The
-fourteen modelling entries merged into this file (D-01 to D-14) came from
-`code/modelling/DECISIONS.md` and cover the task structure, folds, features,
-subsampling, the model ladder and the sample-efficiency result. They were
-written as the modelling code was built.
+**Modelling design.** Eleven entries, D-29 to D-39, covering what
+`code/modelling/src/gfd_model/` implements and the record did not carry: the
+compute budget, the equal-step training cap, output-bias initialisation and
+layer calibration, the affine head, the quantum architecture, the six-rung
+ladder, feature scaling, per-model scalers, the sweep protocol, sampling
+mechanics, and the reduced Qiskit comparison run.
 
-What has *not* been done is a batch-3 pass over that work in the same style as
-batches 1 and 2 — verifying each figure against the repo, recording provenance,
-and surfacing decisions that were made silently. Two things are already known to
-be waiting for it:
+**Two existing entries were corrected.** D-07's subsampling arithmetic now
+carries a correction paragraph — it sized its budget against a sweep corner
+(13 qubits at reps = 4) at an optimistic 1 ms, while the reported runs use
+15 qubits at reps = 2 at a measured 6,97 ms. D-28's `Who` is answered: the
+PennyLane switch was mine, and Rafly did not make it.
 
-- **The twelve missing `Who` fields** (open question 20).
-- **Whatever else is in D-28's position.** The PennyLane switch was implemented,
-  benchmarked and left as a resolved open item under D-09 rather than written up
-  as a decision. It is unlikely to be the only one in that state.
+**Four discrepancies were added**, two of them code defects rather than
+documentation drift — `FEATURE_REDUCTION` declared and never read (O9), and
+`MODEL_LADDER` assigned twice (O10) — plus a deletion (O8) and a superseded
+benchmark contradicting D-28 in `config.py` (O11).
 
-**Do not treat D-01 to D-14 as having had the same scrutiny as D-15 to D-28.**
-They have not.
+**What batch 3 did not do.** It did not fill the twelve missing `Who` fields on
+D-01 to D-14 (open question 20), and it did not run any of the four outstanding
+sweeps, the `shots` check, or the D-39 comparison. Those are executions, not
+writing.
+
+**The record is now complete in coverage.** Every decision the project makes
+that a reader could reasonably have made differently has an ID, a reason where
+one exists, and an honest "not recorded" where one does not. What remains is
+execution and attribution, both tracked in the open questions.

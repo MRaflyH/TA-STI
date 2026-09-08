@@ -230,19 +230,12 @@ OBSERVABLE = "local_mean"
 # stock tutorial omits this because its toy target is already in range.
 OUTPUT_AFFINE_HEAD = True
 
-# MEASURED 2026-09-06, 13 qubits / 39 weights / StatevectorEstimator, minutes
-# per 10.000-row epoch:
-#     ParamShift  40,9    LinComb  104,2    SPSA  1,2
+# SUPERSEDED BENCHMARK REMOVED. An earlier 13-qubit / 39-weight measurement
+# recommended "SPSA explores, exact gradients confirm the finals". That
+# strategy was tested and REJECTED -- see DECISIONS.md D-28 for the cosine
+# result that killed it. The Aer re-benchmark it asked for was done; its
+# numbers are in the table below. Do not reinstate an SPSA path here.
 #
-# LinComb is SLOWER than ParamShift here, not faster: it builds a
-# controlled-gate circuit per parameter and circuit construction dominates in
-# the reference primitive. Exact gradients at ~41 min/epoch cannot carry a
-# sweep, so SPSA explores and exact gradients confirm the finals. Record this
-# split in Bab III rather than letting it surface in the results.
-#
-# RE-BENCHMARK AGAINST AER before accepting these. qiskit-aer batches through
-# compiled C++ instead of a Python loop and may move ParamShift back into
-# range, which would simplify the whole design.
 # MEASURED, 15 qubits / 45 weights / reps=2. ms per sample -> hours for the
 # 36-run final set:
 #   Qiskit Statevector + ParamShift   438,70  ->  526,5 h
@@ -260,17 +253,21 @@ SHOTS: int | None = None        # None = exact. Shot noise is a sweep axis.
 # --------------------------------------------------------------------------
 # D-09. Classical models -- the comparison ladder
 # --------------------------------------------------------------------------
-# Five entries reported together. The parameter-matched NN alone is not
-# enough: it is deliberately crippled to the QNN's weight count and a reviewer
-# will say so. The unconstrained NN is the ceiling the QNN is really measured
-# against, and the two trivial baselines are the floor without which no R2 on
-# a 94-97% zero target means anything.
+# D-09, D-34. SIX entries reported together, and this is the ONLY definition of
+# the ladder -- a second assignment lower in this file used to shadow it.
+# The parameter-matched NN alone is not enough: it is deliberately crippled to
+# the QNN's weight count and a reviewer will say so. The unconstrained NN is the
+# ceiling the QNN is really measured against, and the trivial baseline is the
+# floor without which no R2 on a 94-97% zero target means anything.
 MODEL_LADDER = (
     "baseline_trivial",     # predict the training mean / the majority class
     "ridge",                # linear reference
     "nn_matched",           # hidden width set to match the QNN weight count
     "qnn",
     "nn_large",
+    "nn_full",              # nn_large on EVERY row, not the QNN's subsample.
+                            # Breaks parity on purpose; reported separately.
+                            # Requires D-30's step cap to be a fair arm.
 )
 NN_LARGE_HIDDEN = (64, 64)
 NN_MATCHED_HIDDEN: tuple[int, ...] | None = None   # None -> solve for parity
@@ -332,10 +329,7 @@ SWEEPS = {
 # 4.000, run 100.000 ONCE at one seed at the end and report it as a single
 # point with that caveat.
 
-MODEL_LADDER = (
-    "baseline_trivial", "ridge", "nn_matched", "qnn", "nn_large",
-    "nn_full",          # nn_large on EVERY row, not the QNN's subsample.
-                        # Breaks parity on purpose; reported separately.
-)
+# MODEL_LADDER is defined ONCE, at the D-09 block above. It used to be
+# reassigned here, which silently shadowed the earlier definition.
 
 RANDOM_SEED = pcfg.RANDOM_SEED
