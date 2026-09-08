@@ -339,35 +339,29 @@ ERA5_VARIABLES: list[str] = [
 # Map the short names that appear inside the downloaded NetCDF onto the column
 # names used in the modelling table.
 #
-# KX IS MISSING FROM THE SUBTROPIS BUILD AND NOBODY KNOWS WHY. The build of
-# 2026-09-06 reports `!! absent features: ['KX']` for subtropis; tropis carries
-# all 14 predictors, subtropis 13. The column is not null -- it never arrives.
-# Both domains have the full 84 .nc files, so this is not a download shortfall
-# by file count.
+# KX is absent from every subtropis file. This is DIAGNOSED, not open --
+# see DROPPED_PREDICTORS below for the diagnosis and the decision.
 #
-# Three candidate causes, cheapest first: the subtropis files carry k_index
-# under a short name this map does not have (a one-line fix here), a subset of
-# subtropis files lack the variable, or the subtropis download requested a
-# different variable list (84 CDS requests to fix). Check with:
+# DO NOT ADD AN ALIAS HERE LOOKING FOR IT. Diagnosed 2026-09-06: the subtropis
+# NetCDFs genuinely lack the variable under any short name, so this is not a
+# short-name miss. A fresh six-variable request for the subtropis box returns
+# five variables; `k_index` requested ALONE for that same box returns `kx`
+# cleanly, twice, in 84 and 27 seconds. So the CDS will serve it -- what fails
+# is the six-variable request for this box specifically. The cause of that is
+# still unknown, but it is not this map.
 #
-#   python -c "
-#   import xarray as xr
-#   from gfd_data import config as cfg
-#   for dom in ['tropis','subtropis']:
-#       files = sorted(cfg.RAW_ERA5_DIR.glob(f'*{dom}*.nc'))
-#       seen = {}
-#       for f in files:
-#           with xr.open_dataset(f) as ds:
-#               for v in ds.data_vars: seen[v] = seen.get(v, 0) + 1
-#       print(dom, len(files), sorted(seen.items()))
-#   "
+# The build of 2026-09-06 reports `!! absent features: ['KX']` for subtropis:
+# tropis carries 14 predictors, subtropis 13. The column is not null, it never
+# arrives. Both domains have the full 84 .nc files, so it is not a download
+# shortfall by file count.
 #
 # This is not cosmetic. `run_cross` fits on one domain and applies that model
 # to the other, so a 14-feature source against a 13-feature target either
 # raises a shape error or gets silently intersected by the shared preprocessing
-# chain -- dropping KX from BOTH domains without recording it. K index is also
-# one of the fourteen predictors the predecessor study used. If KX is dropped,
-# drop it from both domains explicitly here and say so in Bab IV.
+# chain -- dropping KX from both domains WITHOUT recording it. That is why the
+# drop is explicit at DROPPED_PREDICTORS rather than left to emerge. K index is
+# also one of the fourteen predictors the predecessor study used, so dropping
+# it weakens that comparison; say so in Bab IV.
 ERA5_SHORTNAME_MAP: dict[str, str] = {
     "cape": "CAPE",
     "kx": "KX",
