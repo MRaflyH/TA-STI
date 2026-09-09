@@ -1,37 +1,377 @@
 % ============================================================================================
-% BAB III ANALISIS MASALAH
-% Pembagian subbab tidak rigid dan dapat bervariasi. Bab ini minimal berisi analisis kebutuhan
-% fungsional dan nonfungsional, analisis berbagai alternatif solusi yang dapat ditawarkan, dan
-% metode pemilihan solusi yang diusulkan.
+% BAB III ANALISIS MASALAH — KERANGKA (bullet), bukan prosa jadi.
+%
+% PEMETAAN. DECISIONS.md memakai skema lima bab dan menamai babnya
+% "Bab III — Analisis dan Metodologi", berisi tujuh seksi (§1 sampai §7).
+% Template TA memakai tujuh bab. Kesepakatan yang dipakai di sini:
+%
+%   DECISIONS §1 Sources and acquisition   -> Bab III (berkas ini)
+%   DECISIONS §2 Quality and exclusions    -> Bab III (berkas ini)
+%   DECISIONS §3 Shape of the dataset      -> Bab III (berkas ini)
+%   DECISIONS §7 Requirements              -> Bab III, subbab Kebutuhan Nonfungsional
+%   DECISIONS §4 Target and preprocessing  -> Bab IV Perancangan
+%   DECISIONS §5 Experimental protocol     -> Bab IV Perancangan
+%   DECISIONS §6 Implementation            -> Bab IV Perancangan (sebagian ke Pemilihan Solusi)
+%   DECISIONS "Bab IV — Hasil"             -> Bab VI Evaluasi
+%
+% Jadi "Bab IV" pada DECISIONS.md berarti HASIL, sedangkan Bab IV pada dokumen
+% ini adalah PERANCANGAN. Jangan membaca medan `Bab` di DECISIONS.md sebagai
+% tujuan berkas; ia label topik.
+%
+% PENYIMPANGAN DARI TEMPLATE (D-45). Template menyediakan tiga subbab
+% (Analisis Kondisi Saat Ini, Analisis Kebutuhan, Analisis Pemilihan Solusi) dan
+% menyatakan sendiri "Pembagian subbab tidak rigid dan dapat bervariasi". Tiga
+% subbab data ditambahkan di antaranya untuk menampung §1--§3. Subbab template
+% dipertahankan seluruhnya, beserta \label-nya.
+%
+% Dua sitasi template (\textcite{laudon2020} dan \autocite{pressman2019}) DIHAPUS.
+% daftar-pustaka.bib di paper/Rafly TA/ masih berkas dummy, sehingga kunci itu
+% teratasi ke entri dummy tanpa memberi peringatan — kegagalan senyap.
 % ============================================================================================
 \cleardoublepage
 \chapter{ANALISIS MASALAH}
 \label{chap:analisis-masalah}
-Bab ini membahas analisis masalah yang ada pada sistem saat ini, analisis kebutuhan yang diperlukan
-untuk menyelesaikan masalah tersebut, serta analisis pemilihan solusi yang diusulkan. Secara garis besar,
-bab ini membahas hal-hal berikut:
-\begin{enumerate}[1.]
-    \item Deskripsi hasil analisis dari persoalan yang sedang ditangani dalam TA;
-    \item Penjelasan tentang solusi yang ditawarkan (dapat berupa algoritma, konsep desain, formula, atau gabungannya) 
-    pada level konsep dan detail yang cukup untuk merealisasikan solusinya; dan
-    \item Penjelasan tentang pendekatan yang dipilih dalam menyelesaikan persoalan TA.
-\end{enumerate}
-Subbab-subbab dalam bab ini dapat disesuaikan dengan kebutuhan topik TA yang dibahas. Berikut adalah contoh pembagian subbab
-yang dapat digunakan sebagai referensi (judul subbab dapat diubah sesuai dengan hal yang hendak dibahas dalam subbab tersebut).
 
 \section{Analisis Kondisi Saat Ini}
-Menurut \textcite{laudon2020}, gambarkan terlebih dahulu model konseptual sistem yang ada saat ini. Model konseptual ini berisi berbagai komponen atau subsitem dan interaksi antarsubsistem tersebut. Setelah itu, berikan penjelasan tentang masalah yang ada pada sistem tersebut. Paragraf berikut berisi contoh penjabaran masalah sistem informasi fasilitas kesehatan untuk pasien \autocite{pressman2019}. 
+
+\begin{itemize}
+    \item Model konseptual saat ini: GFD diestimasi pada resolusi
+          \textbf{bulanan}, dari rekaman jaringan deteksi tunggal, untuk satu
+          domain iklim.
+          % CITE: studi predecessor — pemodelan GFD bulanan Jawa Barat
+    \item Tiga keterbatasan yang menjadi titik masuk TA ini:
+          \begin{itemize}
+              \item resolusi bulanan membuang resolusi yang sebenarnya dimiliki
+                    ERA5 dan NASA POWER, yang keduanya per jam;
+              \item satu domain iklim tidak memungkinkan generalisasi diukur;
+              \item indeks K (\texttt{KX}) yang dipakai studi terdahulu tidak
+                    tersedia di kedua domain (D-01), sehingga perbandingan
+                    langsung melemah dan hal itu harus dinyatakan.
+          \end{itemize}
+    \item Perpindahan ke sel-jam (D-21) adalah perubahan kategori, bukan
+          sekadar penghalusan: satu baris menjadi satu sel 0,5$^\circ$ untuk
+          satu jam, dan target berubah menjadi proses cacah yang 94--97\%
+          bernilai nol.
+          % TODO(open): Pertanyaan terbuka 7 — argumen positif untuk resolusi
+          %   jam HARUS DITULIS PENUH DI SINI, dan belum pernah ditulis di mana
+          %   pun. Yang ada di DECISIONS.md hanya recollection: "pemetaan
+          %   masukan-keluaran yang lebih akurat antara keadaan meteorologi dan
+          %   petir yang menyertainya". Karena resolusi jam menyimpang dari
+          %   mitigasi kelangkaan data yang disetujui pada proposal, argumen ini
+          %   harus disajikan BERSAMA tiga keberatan yang menyertainya, bukan
+          %   menggantikannya. Ini penulisan, bukan pencarian data.
+
+\end{itemize}
+
+\section{Analisis Sumber dan Akuisisi Data}
+\label{sec:sumber-data}
+
+% <- DECISIONS.md Bab III §1
+
+\begin{itemize}
+    \item \textbf{PLN Puslitbang LDS (tropis, Jawa Barat).} Seluruh
+          \textit{sheet} pada setiap \textit{workbook} dibaca, sehingga
+          reorganisasi ekspor oleh pemasok tidak merusak pemuat. Baris
+          dipertahankan bila \texttt{Discrimination} berawalan \texttt{CG};
+          polaritas diturunkan dari sufiks \texttt{+}/\texttt{-} pada medan yang
+          sama. Hasil: \textbf{2.242.100 sambaran CG}, 2018-01-01 sampai
+          2024-12-31 --- angka pasca-filter, bukan cacah baris mentah (D-22).
+    \item \textbf{NASA MERLIN (subtropis, Florida).} KSC Weather Archive tidak
+          memiliki API terdokumentasi, sehingga URL ekspor direkonstruksi:
+          setiap blok 7 karakter adalah satu \textit{datetime} basis-62.
+          \textbf{89 ekspor} berjendela \textbf{29 hari} (bukan 30), dan 89
+          jendela cocok dengan 89 berkas secara dua arah. Hasil:
+          \textbf{5.301.491 sambaran} (D-23).
+    \item \textbf{NASA POWER.} Titik, bukan regional, pada resolusi jam ---
+          \textit{endpoint} regional per jam tidak ada dan mengembalikan 404.
+          Permintaan mengikuti geometri MERRA-2 (lintang kelipatan
+          0,5, bujur kelipatan 0,625), dipotong per tahun
+          (\texttt{POWER\_HOURLY\_CHUNK = "Y"}). \textbf{84 titik native}, tropis
+          6~lintang $\times$ 5~bujur = 30 (D-24).
+    \item \textbf{ERA5.} Satu permintaan CDS per domain per bulan
+          (\texttt{ERA5\_HOURLY\_CHUNK = "M"}): $7 \times 12 \times 2 =
+          \textbf{168 permintaan}$, \textbf{168 berkas, 258 MB}. Enam peubah
+          aras tunggal: CAPE, indeks K, air es dan air cair kolom total, serta
+          dua divergensi fluks; seluruh 24 jam diminta. Pemotongan per
+          \textbf{tahun} sudah diuji tangan dan \textbf{ditolak} --- satu
+          domain-tahun kira-kira 53.000 medan, melewati batas biaya CDS
+          (D-25).
+\end{itemize}
+
+% CITE: dokumentasi ERA5 / Copernicus CDS
+% CITE: dokumentasi NASA POWER
+% CITE: KSC Weather Archive, produk MerlinCloudToGround
+
+\section{Analisis Kualitas dan Eksklusi Data}
+\label{sec:kualitas-data}
+
+% <- DECISIONS.md Bab III §2
+
+\begin{itemize}
+    \item \textbf{Tiga bulan MERLIN tanpa data, dikecualikan dan tidak diisi}
+          (D-26). Lima dari 89 ekspor tidak mengembalikan isi yang berguna,
+          sehingga \textbf{2021-03, 2022-12, dan 2024-02} tidak hadir sama
+          sekali pada tabel terproses --- bukan diisi nol. Akibatnya cakupan
+          subtropis \textbf{81 dari 84 bulan}, lawan \textbf{84 dari 84} pada
+          tropis. Ini isi yang hilang, bukan berkas yang hilang.
+          % TODO(open): Pertanyaan terbuka 12 — apakah 2022-12 dan 2024-02
+          %   merupakan pemadaman jaringan atau memang periode tenang? Belum
+          %   dipisahkan.
+    \item \textbf{Jam pada ekspor PLN adalah waktu lokal Jakarta, divalidasi}
+          (D-17). Tidak ada keterangan zona waktu pada ekspor, sehingga ini
+          awalnya asumsi dan kini hasil fisis: histogram atas 2.242.100
+          sambaran memuncak pada \textbf{16:00 lokal dengan 431.544 flash},
+          diapit 15:00 dan 17:00, dengan palung 08:00--10:00. Seandainya ekspor
+          bersatuan UTC, puncak lokal sesungguhnya jatuh pada 23:00 --- maksimum
+          tengah malam untuk konveksi tropis, yang tidak fisis.
+    \item \textbf{Gradien \textit{detection efficiency} subtropis terukur dan
+          terkonfound} (D-27). Jumlah \textit{flash} meluruh terhadap jarak dari
+          Cape dengan Spearman $-0,955$, melintasi empat orde besaran
+          (28,75/$-$80,75: 31 km, 444.193 flash; 26,75/$-$78,75: 267 km, 87
+          flash). Dilaporkan sebagai \textbf{konfound antara respons instrumen
+          dan klimatologi yang tidak dapat dipisahkan dengan MERLIN saja} ---
+          bukan artefak, dan bukan fisika.
+\end{itemize}
+
+% TODO(open): Pertanyaan terbuka 10 — KOMPOSISI CG/IC EKSPOR MERLIN.
+%   Status: setengah terselesaikan. Tidak ada kolom diskriminasi pada MERLIN.
+%   Bukti yang ada: MERLIN 5,7% positif lawan PLN 14,1% pada arus puncak
+%   bertanda atas seluruh rekaman; fraksi positif beramplitudo rendah berdekatan
+%   (3,1% lawan 2,6%). Kontaminasi IC MENAIKKAN fraksi positif, dan MERLIN
+%   berada jauh DI BAWAH rujukan CG-only, jadi arah buktinya mendukung CG-only.
+%   Sisi rujukan kini terverifikasi (pertanyaan terbuka 5: ekspor PLN CG-only di
+%   sumbernya untuk ketujuh tahun), sehingga hanya satu sisi perbandingan yang
+%   tak pasti — inferensinya lebih kuat, tetapi TETAP TIDAK KONKLUSIF.
+%   Settled by: dokumentasi KSC Weather Archive untuk produk
+%   MerlinCloudToGround. BUKAN dengan analisis lanjutan — data sudah memberi apa
+%   yang bisa diberikannya.
+%   DIBUTUHKAN SEBELUM BAB III SELESAI, karena menentukan target subtropis
+%   disebut apa. Sampai selesai: SETIAP hasil subtropis bersifat PROVISIONAL dan
+%   harus dinyatakan demikian, di Bab VI dan di Bab VII.
+
+\section{Analisis Bentuk Dataset}
+\label{sec:bentuk-dataset}
+
+% <- DECISIONS.md Bab III §3
+
+\begin{itemize}
+    \item \textbf{Resolusi temporal: satu baris adalah satu sel-jam} (D-21).
+          \texttt{TIME\_FREQ = "h"}. Jalur kode harian dan bulanan tetap
+          berfungsi; tidak ada yang dibangun di keduanya.
+    \item \textbf{Grid spasial 0,5$^\circ$, kotak dibulatkan ke luar} (D-15).
+          Pusat sel jatuh pada kelipatan 0,5$^\circ$ ditambah 0,25$^\circ$. Luas
+          sel dihitung dari kosinus lintang, sehingga sel Florida benar-benar
+          lebih kecil daripada sel Jawa Barat. Alasan angka 0,5$^\circ$: cocok
+          dengan studi terdahulu \textbf{dan} dengan resolusi lintang native
+          NASA POWER --- dua alasan sekaligus. Biayanya: pembulatan ke luar
+          itulah yang menghasilkan pelek nol pada tropis.
+    \item \textbf{Pelabelan bin: UTC, dipaksa} (D-16). Pada
+          \texttt{TIME\_FREQ = "h"} setelan \texttt{TZ\_MODE} diabaikan dan
+          dipaksa UTC. Pada resolusi jam persoalannya bukan badai mana masuk bin
+          mana --- satu jam adalah jam yang sama pada kedua jam dinding ---
+          melainkan bagaimana bin itu \textbf{dilabeli}; keempat sumber harus
+          sepakat atau \textit{join} diam-diam menghasilkan tabel kosong. Siklus
+          diurnal dibawa terpisah oleh kolom \texttt{hour\_of\_day\_local}.
+    \item \textbf{Gerbang cakupan dimatikan: \texttt{MIN\_COVERAGE = 0.0}}
+          (D-18). Tidak ada bulan yang dibuang atas dasar cakupan. Gerbang 0,9
+          akan menghapus \textbf{56 dari 81 bulan subtropis dan 26 dari 84
+          tropis} --- sekitar 70\% Florida --- dan menghapus \textbf{paruh tahun
+          yang berlawanan} pada kedua domain (tropis menipis pada musim kemarau
+          JJAS, subtropis pada musim dingin DJF). Kedua himpunan latih tidak lagi
+          merentang julat musiman yang sebanding, sehingga selisih lintas domain
+          yang diukur sesudahnya sebagian menjadi artefak filter.
+    \item \textbf{Sel kosong diisi nol eksplisit} (D-19). Membuangnya berarti
+          diam-diam melatih model pada "periode yang memang berpetir", yang
+          menaikkan rerata target dan membuat R\textsuperscript{2} tampak lebih
+          baik daripada sebenarnya.
+          \textit{Catatan yang harus dipatuhi:} pembenaran kedua yang pernah
+          diingat --- bahwa nol berarti "tidak ada galat sensor" --- \textbf{tidak
+          boleh dipakai}, karena D-18 membantahnya dengan pengukuran proyek ini
+          sendiri (cakupan hari minimum tropis 12,90\%).
+    \item \textbf{Inflasi nol dibawa dan dilaporkan, tidak direkayasa hilang}
+          (D-20). Terukur pada \textit{build} 2026-09-06: \textbf{94,30\%
+          tropis, 97,00\% subtropis}. Tidak ada penyeimbangan ulang saat
+          pembangunan. Dua konsekuensinya adalah kewajiban \textbf{pelaporan},
+          bukan masalah pemodelan: R\textsuperscript{2} nyaris tak bermakna
+          sehingga pangsa nol dilaporkan di sebelah setiapnya, dan setiap klaim
+          harus mengalahkan \textit{baseline} trivial lebih dahulu.
+    \item \textbf{Tidak ada nilai hilang} pada prediktor mana pun di kedua
+          tabel, sehingga \textbf{tidak ada langkah imputasi} di mana pun dalam
+          paket pemodelan. Nyatakan ini secara eksplisit.
+\end{itemize}
+
+% Tabel ringkas "build of record" (2026-09-06) yang harus masuk subbab ini —
+% angka-angka ini kanonik, ambil dari DECISIONS.md baris 86, jangan tulis ulang
+% dari ingatan:
+%   Sambaran            2.242.100      / 5.301.491
+%   Sel                 30             / 56
+%   Sel-jam             1.841.040      / 3.314.304
+%   Sel-jam tak nol     104.955        / 99.273
+%   Pangsa nol          94,30%         / 97,00%
+%   Julat tak nol       1..2.391       / 1..11.777
+%   Bulan tercakup      84 dari 84     / 81 dari 84
+%   Cakupan hari, rerata (min)  85% (13%) / 59% (3%)   <- BERBOBOT BARIS
+%   Prediktor           14, KX ada     / 13, KX absen
+%   Nilai hilang        nihil          / nihil
+% CATATAN: nyatakan pembobotannya. Versi lama tabel ini menulis tropis 86%,
+% yang mendahului pengukuran dan kemungkinan berbobot bulan. Angka berbobot
+% baris: tropis rerata 0,8549 min 0,1290; subtropis rerata 0,5921 min 0,0323.
+% Angka cakupan berasal dari kolom `coverage` pada parquet terbangun; .meta.json
+% TIDAK memuatnya.
+
 \section{Analisis Kebutuhan}
-\lipsum[4]
+
 \subsection{Identifikasi Masalah Pengguna}
-\lipsum[5]
+
+\begin{itemize}
+    \item Pengguna: perencana proteksi sistem tenaga listrik yang memerlukan
+          estimasi kerapatan sambaran pada wilayah dan periode tertentu.
+    \item Masalah 1: estimasi bulanan tidak menjawab pertanyaan pada skala
+          kejadian konvektif.
+    \item Masalah 2: estimasi yang dilatih pada satu domain iklim belum
+          diketahui keteralihannya ke domain lain.
+    \item Masalah 3: jaringan deteksi memiliki cakupan tidak seragam, dan
+          angka yang tidak menyertakan cakupannya tidak dapat dinilai
+          pembacanya (D-10).
+\end{itemize}
+
 \subsection{Kebutuhan Fungsional}
-\lipsum[6]
+
+\begin{itemize}
+    \item \textbf{F-01.} Sistem membangun tabel prediktor--target beresolusi
+          sel-jam dari empat sumber untuk kedua domain, 2018--2024.
+    \item \textbf{F-02.} Sistem melatih dua \textit{arm} model (kuantum dan
+          klasik) dalam satu \textit{loop} latih yang sama.
+    \item \textbf{F-03.} Sistem melaporkan metrik pada empat jendela pelaporan
+          1/3/6/24 jam (D-04).
+    \item \textbf{F-04.} Sistem mengevaluasi model lintas domain dengan
+          \textit{scaler} domain sumber (D-36).
+    \item \textbf{F-05.} Setiap hasil membawa \textit{snapshot} konfigurasi yang
+          memproduksinya (D-42).
+          % TODO(open): hasil sebelum 2026-09-08 TIDAK memuat `feature_reduction`
+          %   dan `n_qubits` pada snapshot-nya. Periksa provenance sebelum
+          %   mengutip metrik mana pun.
+\end{itemize}
+
 \subsection{Kebutuhan Nonfungsional}
-\lipsum[7]
+
+% <- DECISIONS.md Bab III §7
+
+\begin{itemize}
+    \item \textbf{NF-01: NRMSE $< 0,1$ dan R\textsuperscript{2} $> 0,9$.}
+          Dipertahankan \textbf{apa adanya}, dan dinyatakan di muka
+          \textbf{tidak akan terpenuhi} pada resolusi jam (D-12). Alasannya
+          perbedaan kategori, bukan kegagalan pemodelan: NF-01 ditulis terhadap
+          kerapatan GFD bulanan, sementara target pada resolusi jam adalah
+          proses cacah 94--97\% nol, dan R\textsuperscript{2} di atasnya nyaris
+          tak bermakna. NRMSE dinormalkan terhadap \textbf{julat} teramati ---
+          konvensi yang dipakai saat NF-01 ditulis --- sehingga pada target
+          sejarang ini ia didominasi nilai maksimum, dan dilaporkan
+          \textbf{di samping} RMSE, bukan menggantikannya.
+    \item \textbf{Apa yang diubah D-04, dan seberapa besar: lebih kecil dari
+          harapan.} Pada 24 jam pangsa nol tropis turun ke 64,63\%, sehingga
+          R\textsuperscript{2} menjadi dapat ditafsirkan, tetapi target tetap
+          didominasi nol. NF-01 dilaporkan terhadap \textbf{setiap} jendela pada
+          kurva D-04 --- jawaban yang jauh lebih kuat daripada meleset diam-diam
+          atau mendefinisikan ulang diam-diam.
+          % TODO(open): status NF-01. D-12 memerintahkan hal ini diangkat dengan
+          %   pembimbing SEBELUM Bab VII (Penutup), bukan di dalamnya. BELUM
+          %   DILAKUKAN. Yang sudah pasti: keputusannya adalah melaporkan
+          %   tidak-terpenuhi dan menjelaskannya. Yang belum: persetujuan
+          %   pembimbing atas cara pelaporan itu.
+    \item \textbf{NF-02: reprodusibilitas}, diperlakukan sebagai kebutuhan
+          \textbf{bukti} dengan artefak bernama, bukan sebagai satu baris pada
+          tabel (D-42). Empat mekanisme membawanya:
+          \begin{itemize}
+              \item satu \texttt{RANDOM\_SEED = 18222067} didefinisikan sekali
+                    pada konfigurasi pipeline dan \textbf{diimpor, bukan
+                    disalin} oleh konfigurasi pemodelan, sehingga "seed
+                    18222067" tidak dapat berarti dua hal; seed per-run
+                    $(0,1,2)$ terpisah dan merupakan sumbu replikasi (D-29);
+              \item \textit{snapshot} konfigurasi menyertai setiap hasil
+                    (\texttt{.meta.json} dan \texttt{\_config\_snapshot()});
+              \item satu lingkungan tersemat eksak di akar repositori
+                    (D-41), diverifikasi pada Python 3.13.7 dengan 3.10 sebagai
+                    lantai;
+              \item \texttt{data/processed/} dapat dibangun ulang dengan satu
+                    perintah.
+          \end{itemize}
+          % TODO(open): NF-02 terpenuhi SECARA MEKANISME dan BELUM DIUJI
+          %   ujung-ke-ujung (D-42; pertanyaan terbuka 28 — replay penuh belum
+          %   pernah dijalankan). Tulis persis kalimat itu, jangan lebih.
+    \item \textbf{Kendala redistribusi data PLN} (D-43): rekaman mentah datang
+          melalui pembimbing, tidak publik, dan tidak boleh diredistribusi.
+          Ini membatasi bentuk bukti reprodusibilitas yang dapat ditawarkan
+          kepada pihak luar, dan harus dinyatakan bersama NF-02.
+\end{itemize}
 
 \section{Analisis Pemilihan Solusi}
+
 \subsection{Alternatif Solusi}
-\lipsum[8]
+
+\begin{itemize}
+    \item \textbf{Alternatif 1 --- regresi cacah model tunggal.} Ditolak sebagai
+          bawaan: kurva jendela terukur pada D-04 mematahkan asumsi bahwa
+          jendela pelaporan yang lebar akan membuat regresi cacah model tunggal
+          terkondisikan baik. Pada 6 jam target masih 85,40\% / 91,35\% nol
+          (D-13).
+    \item \textbf{Alternatif 2 --- \textit{hurdle model} dua tahap.}
+          \textbf{Dipilih sebagai bawaan} (\texttt{TASK = "hurdle"}): tahap
+          okurensi biner, lalu regresi \texttt{log1p(flash\_count)} pada baris
+          tak nol saja (D-13). Rinciannya di Bab~\ref{chap:perancangan}.
+    \item \textbf{Alternatif 3 --- pustaka pemodelan siap pakai
+          (\texttt{MLPRegressor}).} Ditolak: estimator scikit-learn memiliki
+          \textit{loop} latihnya sendiri, sehingga optimizer, ukuran
+          \textit{batch}, aturan \textit{early stopping}, dan penanganan seed
+          tidak dapat disamakan. Setiap perbandingan yang ditarik terhadapnya
+          membawa konfound, dan "NN-nya dilatih dengan cara berbeda" adalah
+          keberatan pertama yang akan diajukan penguji (D-09).
+    \item \textbf{Alternatif 4 --- Qiskit sebagai jalur gradien produksi.}
+          Ditolak atas dasar biaya terukur (D-28). Lihat subbab berikutnya.
+\end{itemize}
+
 \subsection{Analisis Penentuan Solusi}
-\lipsum[9]
+
+\begin{itemize}
+    \item \textbf{Kedua model dilatih dalam satu \textit{loop} PyTorch}
+          (D-09): optimizer, ukuran \textit{batch}, objek \textit{loss}, aturan
+          \textit{early stopping}, dan penanganan seed yang sama. Satu-satunya
+          perbedaan antara kedua model harus \textbf{lapisannya}.
+    \item \textbf{Gradien dihitung PennyLane \texttt{lightning.qubit} dengan
+          metode \texttt{adjoint}, bukan Qiskit} (D-28). Sirkuit tetap
+          didefinisikan dan diverifikasi terhadap Qiskit; jalur
+          \textit{parameter-shift} milik \texttt{qiskit-machine-learning} tidak
+          dipakai untuk \textit{run} produksi. Dasarnya adalah tolok ukur per
+          sampel yang terukur, bukan preferensi.
+          % CITE: PennyLane
+          % CITE: Qiskit
+          % CITE: adjoint differentiation
+          % TODO(open): Pertanyaan terbuka 9 — konsekuensi keputusan ini bagi
+          %   frasa "Framework Qiskit" pada judul. Satu percakapan pembimbing,
+          %   digabung dengan pertanyaan 8.
+    \item \textbf{Bukti bahwa kedua jalur gradien menghasilkan model yang sama}
+          direncanakan sebagai satu \textit{run} Qiskit tereduksi (D-39):
+          \textbf{500 baris $\times$ 15 epoch, satu fold, satu seed, tahap
+          okurensi saja} --- sekitar 55 menit. Pasangan \textit{hurdle} penuh
+          pada ukuran penuh adalah 21,9 jam dan \textbf{tidak dijalankan}.
+          Alasannya: \texttt{verify\_against\_qiskit()} membuktikan kesepakatan
+          \textbf{forward pass} sampai 1e-10, dan itu menjawab pertanyaan
+          tentang \textit{sirkuit}; pertanyaan di sidang adalah tentang
+          \textit{pelatihan}.
+          % TODO(open): D-39 berstatus DECIDED, NOT YET RUN (pertanyaan terbuka
+          %   24). Jangan menuliskannya seolah sudah dijalankan.
+    \item \textbf{Batas yang dinyatakan di muka, bukan ditemukan penguji:}
+          \begin{itemize}
+              \item seluruh hasil subtropis provisional sampai pertanyaan
+                    terbuka 10 selesai;
+              \item jendela 6 jam adalah \textbf{nominasi demi keterbacaan},
+                    bukan optimum yang diturunkan --- tidak ada kriteria seleksi
+                    yang pernah diterapkan padanya (D-04);
+              \item \textit{sweep} memakai satu fold dan satu seed, sementara
+                    tabel utama memakai tiga (D-29, D-37);
+              \item tujuh hiperparameter tidak memiliki alasan tercatat
+                    (pertanyaan terbuka 22). Ini keterbatasan yang dinyatakan,
+                    \textbf{bukan lubang yang diisi} dengan pembenaran yang
+                    ditulis belakangan.
+          \end{itemize}
+\end{itemize}

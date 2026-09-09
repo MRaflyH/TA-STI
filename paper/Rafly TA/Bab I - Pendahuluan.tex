@@ -1,112 +1,194 @@
-\cleardoublepage % memastikan bab baru dimulai di halaman ganjil (kanan)
+% ============================================================================================
+% BAB I PENDAHULUAN — KERANGKA (bullet), bukan prosa jadi.
+%
+% Sumber: DECISIONS.md, bagian "Bab I — two questions about what the thesis claims to be"
+% (baris 226) dan tabel "Contents by chapter" (baris 113).
+%
+% Dua entri menyentuh bab ini, keduanya bersyarat: D-21 dan D-28. Keduanya hanya
+% mengubah Bab I bila kalimat ruang lingkup atau judul berubah — lihat TODO(open)
+% di bawah. DECISIONS.md menegaskan: SATU percakapan pembimbing, bukan dua.
+%
+% Catatan: Latar Belakang dan Tujuan di sini TIDAK menyalin proposal II4091.
+% Komentar penguji terhadap proposal adalah "isi Pendahuluan seharusnya ada di
+% bab lain dan sebaliknya", jadi kerangka ini dibangun ulang. Tujuan ditulis
+% sebagai sasaran terukur (angka, ambang, prosedur), bukan "lebih baik" atau
+% "lebih efisien".
+%
+% Tidak ada \autocite / \cite di berkas ini. daftar-pustaka.bib di paper/Rafly TA/
+% masih berkas dummy template, sehingga setiap kunci akan salah atau — lebih buruk —
+% diam-diam teratasi ke laudon2020. Kebutuhan sitasi ditulis sebagai "% CITE:".
+% ============================================================================================
+\cleardoublepage
 \chapter{PENDAHULUAN}
 \label{chap:pendahuluan}
-% --- Latar Belakang ---
+
 \section{Latar Belakang}
-Subbab ini menjelaskan dasar pemikiran, motivasi, kebutuhan, alasan, atau urgensi pemilihan masalah tugas akhir. Subbab ini berisi penjelasan ringkas tentang kondisi atau situasi yang ada saat ini terkait dengan topik yang dibahas. Tujuan utamanya adalah untuk memberikan informasi secukupnya kepada pembaca agar memahami topik yang akan dibahas. Dalam subbab ini, jelaskan hal-hal berikut ini:
-\begin{enumerate}
-\item	Kondisi atau situasi topik yang dibahas beserta permasalahannya, misalnya tentang pengelolaan informasi di fasilitas kesehatan daerah pedesaan saat ini dan masalah yang dihadapi, berdasarkan hasil survei atau wawancara dengan pihak terkait.
-\item	Urgensi atau pentingnya penyelesaian masalah tersebut, misalnya dampak negatif yang ditimbulkan jika masalah tersebut tidak diselesaikan.
-\item	Berbagai solusi yang telah diterapkan maupun solusi yang memungkinkan untuk diterapkan untuk menyelesaikan masalah tersebut, berdasarkan hasil studi literatur, wawancara dengan pihak terkait, atau kunjungan lapangan.
-\item   Kelemahan atau kekurangan dari solusi yang telah diterapkan atau yang memungkinkan untuk diterapkan tersebut, yang menjadi dasar pemikiran dalam merumuskan masalah tugas akhir.
-\end{enumerate}
-Latar belakang dapat ditulis dalam 2-3 halaman. Penulisan latar belakang masalah yang baik akan mengantarkan pembaca kepada pemahaman yang jelas tentang topik yang akan dibahas, 
-sehingga pembaca dapat mengikuti pembahasan pada subbab-subbab berikutnya dengan baik. Oleh karena itu, 
-penulis diharapkan melakukan investigasi yang mendalam untuk mengumpulkan fakta-fakta yang relevan dengan topik yang dibahas, 
-baik melalui studi literatur, wawancara dengan pihak terkait, maupun kunjungan lapangan. Hasil studi ini dijelaskan secara \emph{ringkas} di dalam subbab ini.
-Penjelasan hasil studi literatur yang komprehensif dapat dijabarkan di Bab II Studi Literatur secara sistematis.
 
-Dalam menulis latar belakang, hindari penulisan yang bersifat terlalu umum atau terlalu luas cakupannya sehingga sulit untuk dihubungkan dengan topik yang dibahas dalam tugas akhir,
-seperti:
-\begin{enumerate}
-    \item "Pentingnya teknologi informasi dalam kehidupan manusia."
-    \item "Perkembangan pesat teknologi \emph{artificial intelligence} di era digital."
-    \item "Tantangan dalam pengelolaan data besar (\emph{big data}) di berbagai sektor industri."
-    \item "Peran teknologi informasi dalam meningkatkan kualitas layanan kesehatan."
-\end{enumerate}
-Penulisan yang terlalu umum atau luas cakupannya akan menyulitkan penulis dalam merumuskan masalah, tujuan, metodologi, dan evaluasi tugas akhir.
+\begin{itemize}
+    \item Petir adalah penyebab gangguan yang signifikan pada sistem transmisi
+          dan distribusi tenaga listrik; kerapatan sambaran adalah masukan
+          langsung bagi perancangan proteksi.
+          % CITE: standar proteksi petir yang memakai GFD sebagai masukan (mis. IEC 62305 / SPLN)
+          % CITE: statistik gangguan saluran transmisi akibat petir di Indonesia
+    \item Kerapatan sambaran petir ke tanah (\textit{ground flash density}, GFD)
+          secara konvensional dinyatakan dalam sambaran per km\textsuperscript{2}
+          per tahun.
+          % CITE: definisi baku GFD dan satuannya
+    \item PLN Puslitbang mengoperasikan \textit{Lightning Detection System} (LDS)
+          yang merekam sambaran di Jawa Barat; data inilah yang menjadi sumber
+          domain tropis pada TA ini (D-22).
+    \item Studi terdahulu memodelkan GFD pada resolusi \textbf{bulanan}.
+          % CITE: studi predecessor — pemodelan GFD bulanan, wilayah Jawa Barat
+    \item Celah yang diisi TA ini: dua sumber prediktor utama (ERA5 dan NASA
+          POWER) tersedia \textbf{per jam}, sehingga agregasi ke bulanan membuang
+          resolusi yang sebenarnya dimiliki data. Satu baris pada TA ini adalah
+          satu sel 0,5$^\circ$ untuk satu jam (D-21).
+          % TODO(open): Pertanyaan terbuka 7 — argumen positif untuk resolusi jam
+          %   BELUM PERNAH DITULIS di mana pun. Dalam DECISIONS.md alasannya
+          %   tercatat hanya sebagai RECOLLECTION: "pemetaan masukan-keluaran yang
+          %   lebih akurat antara keadaan meteorologi dan petir yang menyertainya".
+          %   Karena resolusi jam menyimpang dari mitigasi kelangkaan data yang
+          %   sudah disetujui di proposal, argumen ini harus disusun penuh —
+          %   di Bab III, bukan di sini. Bab I hanya menyebut konsekuensinya.
+    \item Konsekuensi resolusi jam: target menjadi sangat didominasi nol —
+          \textbf{94,30\% tropis} dan \textbf{97,00\% subtropis} (D-20). Ini
+          dibawa apa adanya dan dilaporkan, tidak direkayasa hilang.
+    \item \textit{Quantum machine learning} (QML) diajukan sebagai kandidat model
+          karena klaim ekspresivitas sirkuit tervariasi pada jumlah parameter
+          kecil; klaim efisiensi sampel diuji, bukan diasumsikan (D-14).
+          % CITE: variational quantum circuit / QNN sebagai model regresi
+          % CITE: klaim efisiensi sampel pada QML
+          % CITE: barren plateau dan mitigasinya lewat fungsi biaya lokal
+    \item Dua domain iklim dipakai agar generalisasi dapat diukur, bukan
+          diklaim: tropis (Jawa Barat, PLN LDS) dan subtropis (Florida, NASA
+          MERLIN), keduanya 2018--2024.
+\end{itemize}
 
-Jika ada referensi yang digunakan dalam penulisan latar belakang, cantumkan referensi tersebut dengan benar menggunakan \texttt{biblatex} sesuai dengan contoh penulisan kutipan dan daftar pustaka yang telah disediakan dalam template ini.
-Sebagai contoh, pada paragraf berikut ini terdapat kutipan dari dua referensi yang berbeda \autocite{laudon2020, pressman2019}. 
-Ada dua format penulisan sitasi yang dapat digunakan, yaitu format naratif dan format parentetik.
-Contoh penulisan kutipan dengan format naratif adalah sebagai berikut:
-\begin{displayquote}
-Menurut \textcite{laudon2020}, sistem informasi adalah kombinasi dari teknologi informasi dan aktivitas orang yang menggunakan teknologi tersebut untuk mendukung operasi dan manajemen organisasi.
-\end{displayquote}
-Contoh penulisan kutipan dengan format parentetik adalah sebagai berikut:
-\begin{displayquote}
-    Sistem informasi merupakan kombinasi dari teknologi informasi dan aktivitas orang yang menggunakan teknologi tersebut untuk mendukung operasi dan manajemen organisasi \autocite{laudon2020}.
-\end{displayquote}
-% --- Rumusan Masalah ---
+% TODO(open): Pertanyaan terbuka 8 — apakah keluaran per sel-jam masih sah
+%   disebut "ground flash density"? GFD konvensional adalah flash/km2/tahun;
+%   hitungan per sel-jam adalah OKURENSI petir, yang punya literatur dan
+%   metriknya sendiri (POD, FAR, CSI, Brier). Bila build per jam yang
+%   dilaporkan, kalimat ruang lingkup di subbab ini — dan mungkin judul —
+%   harus menyatakannya.
+%   Settled by: percakapan pembimbing. GABUNG dengan pertanyaan 9 di bawah.
+% TODO(open): Pertanyaan terbuka 9 — apakah "Framework Qiskit" pada judul
+%   bertahan? Sirkuit dibangun dan diverifikasi terhadap Qiskit (sepakat
+%   sampai 1e-10 pada forward pass), tetapi SETIAP gradien pada hasil yang
+%   dilaporkan dihitung PennyLane lightning.qubit dengan metode adjoint
+%   (D-28). Posisi ini dapat dipertahankan, tetapi hanya bila dinyatakan.
+%   Settled by: percakapan pembimbing yang SAMA dengan pertanyaan 8.
+
 \section{Rumusan Masalah}
-Rumusan Masalah berisi masalah utama yang dibahas dalam tugas akhir. Rumusan masalah yang baik memiliki struktur sebagai berikut:
-\begin{enumerate}
-\item	Pokok persoalan dari kondisi atau situasi yang ada saat ini. Dengan kata lain, jelaskan kelemahan atau kekurangan dari kondisi, situasi, atau solusi yang dijelaskan pada latar belakang. Ini merupakan pokok rumusan masalah.
-\item	Elaborasi lebih lanjut urgensi penyelesaian masalah tersebut (mengapa penting untuk diselesaikan dan akibat yang dapat terjadi jika tidak diselesaikan).
-\item	Usulan singkat terkait dengan solusi yang ditawarkan untuk menyelesaikan persoalan.
-Penting untuk diperhatikan bahwa persoalan yang dideskripsikan pada subbab ini akan dipertanggungjawabkan di bab Evaluasi (apakah terselesaikan atau tidak).
-\end{enumerate}
-Hindari penulisan rumusan masalah yang terlalu umum atau terlalu luas cakupannya sehingga sulit untuk diselesaikan dalam jangka waktu pelaksanaan tugas akhir, 
-seperti:
-\begin{enumerate}
-    \item "Bagaimana cara meningkatkan kualitas layanan kesehatan di Indonesia?"
-    \item "Bagaimana cara mengoptimalkan penggunaan energi di perkotaan?"
-    \item "Bagaimana cara mengurangi kemacetan lalu lintas di kota besar?"
-    \item "Bagaimana cara membangun sistem irigasi sawah menggunakan \emph{AI}?"
-\end{enumerate}
-Rumusan masalah yang baik dan spesifik akan memudahkan penulis dalam menentukan tujuan, metodologi, dan evaluasi tugas akhir.
 
-Selain itu, hindari menuliskan pertanyaan yang merupakan sebuah keniscayaan yang harus dijawab atau dikerjakan 
-dalam pelaksanaan tugas akhir, seperti:
-\begin{enumerate}
-    \item "Bagaimana cara melakukan analisis kebutuhan sistem informasi rumah sakit?"
-    \item "Bagaimana cara merancang basis data untuk aplikasi X?"
-    \item "Bagaimana cara mengimplementasikan \textit{large language model} untuk deteksi penyakit Y?"
-    \item "Bagaimana cara menguji sistem penyiraman tanaman berbasis IoT yang akan dibuat?"
-\end{enumerate}
-Kegiatan analisis, perancangan, implementasi, dan pengujian merupakan tahapan yang harus dilakukan dalam pelaksanaan tugas akhir,
-sehingga pertanyaan-pertanyaan tersebut tidak perlu dimasukkan ke dalam rumusan masalah.
+\begin{itemize}
+    \item Bagaimana membangun tabel prediktor--target beresolusi sel-jam yang
+          konsisten untuk dua domain iklim dari empat sumber yang berbeda
+          resolusi dan konvensi waktunya (PLN/MERLIN, NASA POWER, ERA5)?
+    \item Bagaimana kinerja \textit{quantum neural network} (QNN) dibandingkan
+          tangga model klasik pada paritas parameter, untuk target yang
+          94--97\% bernilai nol?
+    \item Sejauh mana model yang dilatih pada satu domain iklim dapat
+          diterapkan pada domain lain, dan berapa besar selisih kinerjanya?
+    \item Pada resolusi pelaporan mana (1, 3, 6, atau 24 jam) kebutuhan
+          nonfungsional NF-01 dapat dievaluasi secara bermakna, dan apakah ia
+          terpenuhi?
+\end{itemize}
 
-% --- Tujuan ---
 \section{Tujuan}
-Tuliskan \textbf{tujuan utama} dan/atau tujuan detail yang akan dicapai dalam pelaksanaan tugas akhir. 
-Fokuskan isi subbab ini pada hasil akhir yang ingin diperoleh setelah tugas akhir diselesaikan 
-terkait dengan penyelesaian persoalan pada rumusan masalah. 
-Penting untuk diperhatikan bahwa tujuan yang dideskripsikan pada subbab ini akan dipertanggungjawabkan 
-di akhir pelaksanaan tugas akhir. Oleh karena itu, tuliskan juga \emph{kriteria keberhasilan} tugas akhir ini.
 
-% --- Batasan Masalah ---
+% Setiap tujuan di bawah punya kriteria lulus/gagal yang dapat diperiksa.
+% Hindari rumusan "lebih baik", "lebih efisien", "lebih optimal" — tidak ada
+% ambang yang bisa diuji di baliknya.
+
+\begin{itemize}
+    \item \textbf{T1.} Membangun dua tabel terproses beresolusi sel-jam untuk
+          2018--2024. \textit{Kriteria:} tropis 1.841.040 baris (30 sel) dan
+          subtropis 3.314.304 baris (56 sel), 13 prediktor dasar di kedua
+          domain (D-01), \textbf{tanpa satu pun nilai hilang}, sehingga tidak
+          ada langkah imputasi di mana pun.
+    \item \textbf{T2.} Mengukur QNN terhadap tangga enam \textit{rung}
+          (\texttt{baseline\_trivial}, \texttt{ridge}, \texttt{nn\_matched},
+          \texttt{qnn}, \texttt{nn\_large}, \texttt{nn\_full}) pada paritas
+          parameter \textbf{47 lawan 52} (D-34). \textit{Kriteria:} setiap
+          angka dilaporkan sebagai rerata $\pm$ simpangan baku atas
+          \textbf{3 fold} (D-06) $\times$ \textbf{3 seed} (D-29), dan setiap
+          tabel metrik memuat skor \textit{baseline} trivial dalam satuan yang
+          sama.
+    \item \textbf{T3.} Melaporkan NF-01 (NRMSE $< 0,1$ dan R\textsuperscript{2}
+          $> 0,9$) terhadap \textbf{setiap} jendela pelaporan 1/3/6/24 jam
+          (D-04). \textit{Kriteria:} kurva jendela lengkap, disertai pangsa nol
+          per jendela. NF-01 dinyatakan \textbf{di muka tidak akan terpenuhi}
+          pada resolusi jam (D-12) — ini pernyataan, bukan hasil yang ditunggu.
+    \item \textbf{T4.} Mengukur selisih kinerja lintas domain dengan
+          \textit{scaler} domain sumber, bukan domain target (D-36).
+          \textit{Kriteria:} empat kombinasi latih--uji dilaporkan pada metrik
+          yang sama.
+    \item \textbf{T5.} Memenuhi NF-02 (reprodusibilitas) dengan artefak yang
+          disebutkan namanya: satu \texttt{requirements.txt} tersemat eksak
+          (D-41), satu \texttt{RANDOM\_SEED = 18222067} yang diimpor dan tidak
+          disalin, serta \textit{config snapshot} yang menyertai setiap hasil
+          (D-42).
+          % TODO(open): status NF-02 — D-42 menyatakan NF-02 terpenuhi SECARA
+          %   MEKANISME tetapi BELUM DIUJI ujung-ke-ujung (pertanyaan terbuka
+          %   28: replay penuh belum pernah dijalankan). Tulis persis demikian.
+\end{itemize}
+
 \section{Batasan Masalah}
-Tuliskan batasan-batasan yang diambil dalam pelaksanaan tugas akhir. Batasan ini dapat dihindari (bersifat opsional, tidak perlu ada) jika topik atau judul tugas akhir dibuat cukup spesifik.
 
-% --- Metodologi Pengerjaan TA ---
+\begin{itemize}
+    \item Wilayah dan periode: Jawa Barat dan Florida, 2018-01-01 sampai
+          2024-12-31, grid 0,5$^\circ$ dengan kotak dibulatkan ke luar
+          (D-15).
+    \item Domain tropis memakai sambaran \textit{cloud-to-ground} saja,
+          terverifikasi di sumber untuk ketujuh tahun (D-22).
+          % TODO(open): Pertanyaan terbuka 10 — komposisi CG/IC ekspor MERLIN
+          %   BELUM diketahui; tidak ada kolom diskriminasi. Selama belum
+          %   selesai, SETIAP hasil subtropis bersifat provisional dan harus
+          %   dinyatakan demikian. Rinciannya di Bab III.
+    \item Eksekusi kuantum adalah \textbf{simulasi} \textit{statevector}
+          (\texttt{SHOTS = None}, nilai harap eksak), bukan perangkat keras
+          kuantum (D-33); gradien dihitung PennyLane \texttt{lightning.qubit}
+          (D-28).
+    \item Indeks K ERA5 (\texttt{KX}) tidak dipakai model mana pun, sehingga
+          kedua domain menyajikan 13 prediktor dasar yang identik (D-01).
+    \item Anggaran komputasi membatasi ukuran latih: \texttt{TRAIN\_ROWS}
+          = 3.000, \texttt{MAX\_EPOCHS} = 30, 3 seed. Lima seed tidak muat
+          dalam satu malam (D-29).
+    \item Data mentah PLN tidak boleh diredistribusi dan tidak disertakan dalam
+          repositori (D-43).
+\end{itemize}
+
 \section{Metodologi}
-Tuliskan semua tahapan yang akan dilalui selama pelaksanaan tugas akhir. 
-Tahapan ini spesifik untuk menyelesaikan persoalan tugas akhir. 
-Berikut adalah contoh metodologi pengerjaan tugas akhir yang dapat diikuti, yaitu meliputi tahapan, langkah-langkah, 
-atau tata cara melakukan:
-\begin{enumerate}
-\item	Investigasi pengumpulan fakta di latar belakang untuk merumuskan masalah.
-\item	Pencarian, pengelompokan, dan penapisan literatur atau sumber informasi untuk mengumpulkan informasi yang relevan tentang topik yang diangkat, termasuk teori (konsep atau teori apa saja yang perlu dicari), hal-hal yang telah dicapai oleh orang lain (cara mencari dan kata kuncinya), dan berbagai informasi pendukung, untuk mencari solusi terhadap masalah yang dibahas. Gunakan metodologi yang tepat dalam menggali informasi dan dokumentasikan prosesnya (termasuk rekaman wawancara atau survei) di dalam Lampiran, termasuk tautan ke video atau foto. Hasil penggalian informasi ini akan dijelaskan secara sistematis di Bab II Studi Literatur.
-\item   Analisis kebutuhan pengguna dan sistem berdasarkan hasil investigasi dan studi literatur. Jelaskan metode yang digunakan untuk melakukan analisis kebutuhan, misalnya wawancara, survei, observasi, atau studi kasus. Hasil analisis kebutuhan ini akan dijelaskan secara rinci di Bab III Analisis.
-\item   Perancangan solusi berdasarkan hasil analisis kebutuhan. Jelaskan metode yang digunakan untuk melakukan perancangan, misalnya menggunakan diagram UML, ERD, atau prototyping. Hasil perancangan ini akan dijelaskan secara rinci di Bab IV Perancangan.
-\item   Implementasi solusi berdasarkan hasil perancangan. Jelaskan teknologi, bahasa pemrograman, atau alat yang digunakan untuk mengimplementasikan solusi. Hasil implementasi ini akan dijelaskan secara rinci di Bab V Implementasi.
-\item   Evaluasi terhadap solusi yang telah diimplementasikan. Jelaskan metode pengujian, metrik evaluasi, atau studi kasus yang digunakan untuk menilai keberhasilan solusi. Hasil evaluasi ini akan dijelaskan secara rinci di Bab VI Evaluasi.
-\item   Penarikan kesimpulan dan saran berdasarkan hasil pelaksanaan tugas akhir. Hasil kesimpulan dan saran ini akan dijelaskan secara rinci di Bab VII Kesimpulan dan Saran. 
-\vfill % memaksa konten di atas untuk berada di bagian atas halaman dan menyisakan ruang kosong di bawah konten ini akibat berakhirnya section ini
-\end{enumerate}
 
-% --- Sistematika Penulisan ---
+\begin{itemize}
+    \item Studi literatur: GFD dan jaringan deteksi petir, pemodelan target
+          \textit{zero-inflated}, dan QML tervariasi (Bab~\ref{chap:studi-literatur}).
+    \item Akuisisi empat sumber data dan pembangunan tabel sel-jam untuk kedua
+          domain (Bab~\ref{chap:analisis-masalah}).
+    \item Analisis kualitas, eksklusi, dan bentuk dataset; perumusan kebutuhan
+          fungsional dan nonfungsional (Bab~\ref{chap:analisis-masalah}).
+    \item Perancangan target, prapemrosesan, protokol eksperimen, dan
+          implementasi kedua arm model (Bab~\ref{chap:perancangan}).
+    \item Implementasi paket \texttt{gfd\_data} dan \texttt{gfd\_model}
+          (Bab~\ref{chap:implementasi}).
+    \item Evaluasi: tangga model, kurva jendela, sweep OFAT, dan uji lintas
+          domain (Bab~\ref{chap:evaluasi}).
+\end{itemize}
+
 \section{Sistematika Penulisan}
-Tuliskan gambaran umum isi dari setiap bab yang ada dalam laporan tugas akhir. Sistematika penulisan ini memberikan panduan bagi pembaca tentang struktur dan alur pembahasan dalam laporan tugas akhir. Berikut adalah contoh sistematika penulisan yang dapat diikuti:
-\begin{enumerate}
-\item	Bab I Pendahuluan: Berisi latar belakang, rumusan masalah, tujuan, batasan masalah, metodologi, dan sistematika penulisan laporan tugas akhir       .
-\item	Bab II Studi Literatur: Berisi kajian pustaka yang relevan dengan topik tugas akhir, termasuk teori-teori, konsep-konsep, dan hasil-hasil penelitian sebelumnya yang                mendukung pelaksanaan tugas akhir.
-\item	Bab III Analisis: Berisi penjelasan tentang analisis masalah dan kebutuhan pengguna serta berbagai alternatif solusinya.
-\item   Bab IV Perancangan: Berisi penjelasan tentang perancangan solusi yang diusulkan, misalnya arsitektur sistem, desain basis data, antarmuka pengguna, dan sebagainya.
-\item	Bab V Implementasi: Berisi penjelasan tentang proses implementasi solusi yang diusulkan, termasuk langkah-langkah yang diambil, teknologi yang digunakan, dan hasil yang diperoleh.
-\item	Bab VI Evaluasi: Berisi analisis dan evaluasi terhadap solusi yang diimplementasikan, termasuk metode pengujian, hal-hal yang disiapkan sebelum pengujian, hasil pengujian, dan penilaian kinerja.                  
-\item   Bab VII Kesimpulan dan Saran: Berisi kesimpulan dari hasil pelaksanaan tugas akhir dan saran untuk pengembangan lebih lanjut.
-\item   Daftar Pustaka: Berisi daftar referensi yang digunakan dalam penyusunan laporan tugas akhir.
-\item   Lampiran: Berisi dokumen-dokumen pendukung seperti kode program, data lengkap hasil pengujian, rekaman wawancara, dan lain-lain. 
-\end{enumerate}
+
+\begin{itemize}
+    \item \textbf{Bab I Pendahuluan} --- latar belakang, rumusan masalah,
+          tujuan terukur, batasan, dan metodologi.
+    \item \textbf{Bab II Studi Literatur} --- petir dan GFD, jaringan deteksi,
+          sumber data meteorologi, pemodelan target jarang, dan QML.
+    \item \textbf{Bab III Analisis Masalah} --- kondisi saat ini, sumber dan
+          akuisisi data, kualitas dan eksklusi, bentuk dataset, kebutuhan, dan
+          pemilihan solusi.
+    \item \textbf{Bab IV Perancangan} --- target dan prapemrosesan, protokol
+          eksperimen, dan rancangan implementasi kedua model.
+    \item \textbf{Bab V Implementasi} --- realisasi paket \texttt{gfd\_data}
+          dan \texttt{gfd\_model}.
+    \item \textbf{Bab VI Evaluasi} --- metode evaluasi, hasil, dan pembahasan.
+    \item \textbf{Bab VII Penutup} --- kesimpulan dan saran.
+\end{itemize}

@@ -1,10 +1,267 @@
-% ==========================================
-% BAB IV PERANCANGAN
-% ==========================================
+% ============================================================================================
+% BAB IV PERANCANGAN — KERANGKA (bullet), bukan prosa jadi.
+%
+% Menampung DECISIONS.md Bab III §4 (Target and preprocessing), §5 (Experimental
+% protocol) dan §6 (Implementation). Lihat catatan pemetaan lengkap di kepala
+% berkas "Bab III - Analisis.tex".
+%
+% PENYIMPANGAN DARI TEMPLATE (D-45). Template tidak menyediakan satu pun \section
+% untuk bab ini — hanya \chapter dan satu paragraf pengarah yang berbicara kepada
+% penulis PROPOSAL ("karena masih berupa proposal, bab ini hanya berisi gambar
+% desain konsep solusi"). Paragraf itu tidak berlaku untuk laporan TA, sehingga
+% diganti. Tiga \section di bawah adalah tambahan.
+%
+% Tidak ada \autocite / \cite di berkas ini.
+% ============================================================================================
 \cleardoublepage
 \chapter{PERANCANGAN}
 \label{chap:perancangan}
-Ilustrasikan desain konsep solusi dalam bentuk model konseptual dan penjelasan secara ringkas, 
-beserta perbedaannya dengan sistem saat ini. Ilustrasi harus dapat dibandingkan (\textit{before} and \textit{after}). 
-Karena masih berupa proposal, bab ini hanya berisi gambar desain konsep solusi tersebut dan 
-penjelasan perbandingannya dengan gambar sistem yang ada saat ini (yang tergambar di awal Bab \ref{chap:analisis-masalah}).
+
+\section{Perancangan Target dan Prapemrosesan}
+
+% <- DECISIONS.md Bab III §4
+
+\begin{itemize}
+    \item \textbf{Dua kolom untuk dua pekerjaan berbeda} (D-03):
+          \begin{itemize}
+              \item \texttt{gfd\_per\_km2\_per\_year} --- satuan
+                    \textbf{pelaporan}, dipertahankan agar \textit{build} per
+                    jam, harian, dan bulanan berbagi skala dan agar angkanya
+                    dapat disandingkan dengan studi terdahulu;
+              \item \texttt{flash\_count} dengan
+                    \texttt{TARGET\_TRANSFORM = "log1p"} --- target
+                    \textbf{pemasangan} (\textit{fitting}).
+          \end{itemize}
+          \texttt{gfd\_per\_km2\_per\_year} \textbf{tidak pernah} menjadi target
+          pemasangan pada resolusi jam, karena menahunkan satu jam menggelembungkan
+          satu sambaran menjadi $\approx 8{,}766\times$ lajunya.
+    \item \textbf{Urutan inversi, dan mengapa ia tetap} (D-03): prediksi keluar
+          dalam ruang log terstandardisasi, harus di-\textit{un-standardise},
+          lalu di-\texttt{expm1}, \textbf{baru} dijumlahkan. Menjumlahkan di
+          ruang log memberi rerata geometrik --- jawaban salah yang senyap ---
+          sehingga \texttt{aggregate\_windows} menerima \textbf{cacah mentah}
+          dan menolak menebak.
+    \item \textbf{Statistik intensitas dibangun di pipeline, dipakai kemudian}
+          (D-08): \texttt{mean\_peak\_current\_ka}, \texttt{positive\_share},
+          \texttt{median\_abs\_peak\_current\_ka},
+          \texttt{max\_abs\_peak\_current\_ka},
+          \texttt{p95\_abs\_peak\_current\_ka}. Dibangun sekarang karena
+          memulihkannya kemudian berarti membangun ulang kedua parquet, sedangkan
+          biayanya puluhan detik. Rerata bertanda dipertahankan karena polaritas
+          bermakna fisis; statistik sebaran memakai nilai mutlak.
+          \textbf{Kelimanya ada pada \texttt{EXCLUDE\_COLUMNS} dan tidak boleh
+          diusulkan sebagai fitur.}
+    \item \textbf{Himpunan fitur: 13 prediktor dasar, penyandian jam sebagai
+          sumbu} (D-02). \texttt{FEATURE\_COLUMNS} dikurangi \texttt{KX} memberi
+          13; \texttt{hour\_of\_day\_local} disertakan secara bawaan dengan
+          penyandian siklik $\sin(2\pi h/24)$, $\cos(2\pi h/24)$, sehingga
+          konfigurasi berjalan bawaan adalah \textbf{15 kolom}. Alasannya: bin
+          waktu adalah UTC (D-16), dan tanpa fitur jam lokal model harus
+          mempelajari selisih UTC--lokal terpisah untuk setiap domain --- persis
+          kekhasan domain yang tidak ingin diukur eksperimen lintas domain.
+          Penyandian siklik dipakai karena jam 23 dan jam 0 bersebelahan.
+          13/14/15 adalah salah satu sumbu \textit{sweep} OFAT.
+    \item \textbf{\texttt{KX} dibuang dari kedua domain} (D-01). \texttt{KX} ada
+          pada \textit{build} tropis dan absen pada subtropis; eksperimen lintas
+          domain memasang model pada satu domain dan menerapkannya pada domain
+          lain, sehingga sumber 14 fitur terhadap target 13 fitur akan memicu
+          galat bentuk atau diam-diam diiriskan oleh rantai prapemrosesan
+          bersama --- membuang \texttt{KX} tanpa mencatatnya.
+          \textit{Kesalahan umum yang harus dihindari:} \texttt{KX} bukan medan
+          MERLIN. MERLIN hanya memasok sambaran petir; \texttt{KX} berasal dari
+          ERA5 dan hilang dari \textbf{unduhan ERA5 subtropis}.
+    \item \textbf{Sel semua-nol diidentifikasi sebelum pemisahan apa pun}
+          (D-11). Enam sel tropis --- 20\% dari grid 30 sel --- tidak memiliki
+          satu pun sambaran sepanjang rekaman. Di bawah pemisahan
+          \textit{cell-holdout} keenamnya bisa jatuh seluruhnya ke himpunan uji,
+          tempat model akan mendapat skor sempurna karena alasan yang salah.
+    \item \textbf{Penskalaan fitur: min-max ke $[0,\pi]$, dijepit, dipasang pada
+          baris latih saja} (D-35). \texttt{FEATURE\_RANGE = (0.0, π)},
+          \texttt{CLIP\_TEST\_FEATURES = True},
+          \texttt{STANDARDISE\_TARGET = True}. Satu \texttt{Scaler} melayani
+          kedua \textit{arm}.
+          \textbf{Penjepitan adalah tindakan kebenaran, bukan kenyamanan:} nilai
+          uji di atas maksimum latih memetakan melewati $\pi$, dan rotasi
+          melewati $\pi$ ber-\textbf{alias} kembali ke sudut lain. Model tidak
+          memunculkan galat, tidak memperingatkan, dan tidak menghasilkan angka
+          yang jelas-jelas buruk --- ia mengembalikan jawaban salah yang
+          meyakinkan. Julat $[0,\pi]$ dipilih demi \textit{arm} kuantum, dan
+          \textit{arm} klasik menerimanya --- arah kendala yang benar.
+    \item \textbf{Reduksi dimensi: standardisasi $\rightarrow$ PCA $\rightarrow$
+          min-max $\rightarrow$ jepit} (D-40). \texttt{FEATURE\_REDUCTION}
+          bernilai \texttt{None} (bawaan), \texttt{"pca8"} atau \texttt{"pca6"};
+          pada dua yang terakhir \textbf{sirkuit dibangun pada lebar itu}.
+          Sebelum perbaikan, setelan ini dideklarasikan, disapu, dan
+          \textbf{tidak dibaca oleh apa pun} --- \textit{sweep}-nya berjalan,
+          selesai, dan mengembalikan tiga himpunan hasil yang identik.
+          % TODO(open): hasil sebelum 2026-09-08 tidak membawa `feature_reduction`
+          %   dan `n_qubits` pada snapshot konfigurasinya. Periksa provenance.
+    \item \textbf{Tidak ada langkah imputasi}, karena tidak ada nilai hilang
+          (lihat Bab~\ref{chap:analisis-masalah}).
+\end{itemize}
+
+\section{Perancangan Protokol Eksperimen}
+
+% <- DECISIONS.md Bab III §5
+
+\begin{itemize}
+    \item \textbf{Latih per jam, agregasikan prediksinya ke jendela pelaporan}
+          (D-04). \texttt{REPORTING\_WINDOWS\_H = (1, 3, 6, 24)},
+          \texttt{PRIMARY\_WINDOW\_H = 6}. Jendela adalah pilihan
+          \textbf{pelaporan} yang diterapkan setelah inferensi, bukan perubahan
+          pada dataset; pelatihan tetap per jam. Pangsa nol teramati per jendela
+          (\textit{build} 2026-09-06): 1 jam 94,30/97,00; 3 jam 90,09/94,52;
+          6 jam 85,40/91,35; 24 jam 64,63/76,63 (tropis/subtropis).
+          \textbf{Tangganya adalah hasil; 6 jam adalah nominasi, bukan optimum
+          yang diturunkan.}
+    \item \textbf{Agregasi memakai \textit{floor-and-group}, bukan
+          \textit{resample}}: \textit{resample} akan mengarang baris di dalam
+          tiga bulan MERLIN yang dikecualikan dan menilainya sebagai nol.
+    \item \textbf{Validasi silang beringsut maju (\textit{rolling-origin}) antar
+          tahun} (D-06), selalu melatih pada masa lalu dan menguji pada masa
+          depan:
+          \begin{itemize}
+              \item Fold 1: latih 2018--2021, uji 2022;
+              \item Fold 2: latih 2018--2022, uji 2023;
+              \item Fold 3: latih 2018--2023, uji 2024.
+          \end{itemize}
+          Hasil dilaporkan sebagai rerata $\pm$ simpangan baku antar fold.
+          \textit{Rolling origin} dipakai untuk konfigurasi bawaan dan
+          perbandingan utama QNN lawan NN; \textit{sweep} OFAT memakai fold 3
+          saja. \textbf{Asimetri ini dinyatakan di Bab~\ref{chap:evaluasi}.}
+    \item \textbf{Baris latih boleh dibentuk ulang; baris uji tidak} (D-07).
+          Himpunan uji adalah tahun tertahan milik fold itu, utuh, pada rasio
+          kelas alaminya, tidak pernah di-\textit{resample}. Himpunan latih
+          disubsampel secara acak seragam, distratifikasi lintas sel dan bulan.
+          Rasio nol terhadap tak-nol pada himpunan \textbf{latih} (alami /
+          75\% / 50\%) adalah satu sumbu OFAT.
+    \item \textbf{Mekanika pencuplikan} (D-38), tiga pilihan yang masing-masing
+          pernah menjadi \textit{bug} sebelum menjadi keputusan:
+          \begin{itemize}
+              \item \texttt{STRATIFY\_BY = ("lat", "lon", "month\_of\_year")} ---
+                    cuplikan tak terstratifikasi dari tabel dengan siklus musiman
+                    kuat dan pelek mati 20\% bukanlah miniatur keseluruhannya;
+              \item alokasi \textit{largest-remainder}, sehingga cuplikan
+                    berjumlah \textbf{tepat} $n$, bukan $n \pm$ jumlah strata;
+              \item filter tahap diterapkan \textbf{sebelum} batas validasi,
+                    bukan sesudah.
+          \end{itemize}
+    \item \textbf{Tugas bawaan adalah \textit{hurdle model}} (D-13):
+          \begin{itemize}
+              \item Tahap 1, okurensi --- biner: adakah petir pada sel-jendela
+                    ini?
+              \item Tahap 2, intensitas bersyarat --- regresi
+                    \texttt{log1p(flash\_count)} pada baris tak nol saja;
+              \item Pelaporan --- cacah harapan $=$
+                    $P(\text{okurensi}) \times E[\text{cacah} \mid \text{okurensi}]$,
+                    dikonversi ke satuan GFD per D-03.
+          \end{itemize}
+    \item \textbf{Setiap model membawa \textit{scaler}-nya sendiri, dan lintas
+          domain memakai milik domain sumber} (D-36). Memasang ulang pada domain
+          target akan membocorkan statistik target ke model yang seharusnya tidak
+          pernah melihatnya --- hasil lintas domain yang dihitung begitu mengukur
+          model yang sudah diberi tahu julat jawabannya.
+    \item \textbf{Anggaran komputasi, dan pemisahan dua tingkat yang
+          dipaksakannya} (D-29): \texttt{TRAIN\_ROWS = 3.000},
+          \texttt{MAX\_EPOCHS = 30}, \texttt{EARLY\_STOPPING\_PATIENCE = 6},
+          \texttt{SEEDS = (0, 1, 2)}, \texttt{MAX\_VAL\_ROWS = 1.000},
+          \texttt{VAL\_FRACTION = 0.15}, \texttt{TEST\_DAYS = 30}.
+          Anggarannya satu malam, dan angka-angkanya diselesaikan mundur dari
+          situ: 36 \textit{run} QNN (2 tahap $\times$ 2 domain $\times$ 3 fold
+          $\times$ 3 seed) pada $\approx$18 menit masing-masing adalah
+          $\approx$11 jam. \textbf{Lima seed tidak muat.} 4.000 baris $\times$ 30
+          epoch menghabiskan $\approx$70\% seluruh anggaran.
+    \item \textbf{Langkah optimizer per epoch disamakan} (D-30) ---
+          \textbf{keputusan paling penting pada protokol ini}.
+          \texttt{training.fit} membatasi langkah optimizer per epoch pada
+          $\lceil \texttt{TRAIN\_ROWS}/\texttt{BATCH\_SIZE} \rceil$, sekitar
+          \textbf{47 langkah}, untuk \textbf{setiap} \textit{arm}, berapa pun
+          besar himpunan latihnya. Tanpa batas ini \texttt{nn\_full} yang dilatih
+          pada $\approx$2,4 juta baris menjalankan sekitar 28.000--38.000 langkah
+          dalam satu epoch, lawan $\approx$47 pada \textit{arm} 3.000 baris:
+          \textbf{perbandingannya rusak, dan kerusakannya tampak seperti
+          temuan.}
+    \item \textbf{Protokol \textit{sweep}} (D-37): satu faktor pada satu waktu di
+          sekitar bawaan, \texttt{SWEEP\_FOLD = 2} (fold 3, uji 2024),
+          \textbf{satu seed}, \texttt{max\_epochs = 15},
+          \texttt{train\_rows = 1.000} kecuali pada sumbu \texttt{train\_rows}
+          sendiri, dan \texttt{TEST\_DAYS = 20}. Sumbu yang diuji dituliskan ke
+          konfigurasi modul selama \textit{run} dan dipulihkan pada blok
+          \texttt{finally}. Sumbu yang dideklarasikan: \texttt{train\_rows},
+          \texttt{hour\_encoding}, \texttt{ansatz\_reps}, \texttt{feature\_map},
+          \texttt{observable}, \texttt{train\_zero\_ratio}, \texttt{shots},
+          \texttt{feature\_reduction}.
+          % TODO(open): pertanyaan terbuka 21 — sumbu `shots` DICURIGAI TIDAK
+          %   BEKERJA dan BELUM DIUJI. Jangan melaporkannya sebagai sumbu yang
+          %   berjalan.
+          % TODO(open): pertanyaan terbuka 23 — EMPAT sweep OFAT dideklarasikan
+          %   dan BELUM DIJALANKAN. Sebutkan mana yang dijalankan dan mana yang
+          %   tidak, jangan menyamarkan keduanya.
+\end{itemize}
+
+\section{Perancangan Implementasi}
+
+% <- DECISIONS.md Bab III §6
+
+\begin{itemize}
+    \item \textbf{PyTorch untuk kedua model} (D-09). QNN dibungkus sebagai
+          \texttt{torch.nn.Module}; NN klasik adalah \texttt{torch.nn.Module}
+          biasa. Keduanya berlatih dalam satu \textit{loop} yang sama.
+          % TODO(open): register O15 — judul D-09 masih menyebut `TorchConnector`,
+          %   sedangkan jalur produksi memakai PennyLane (D-28). Periksa istilah
+          %   yang dipakai di sini sebelum menulis prosa.
+    \item \textbf{Arsitektur kuantum} (D-33): satu qubit per fitur, 15 secara
+          bawaan. \texttt{FEATURE\_MAP = "z"} pada
+          \texttt{FEATURE\_MAP\_REPS = 1}; \texttt{ANSATZ = "real\_amplitudes"}
+          pada \texttt{ANSATZ\_REPS = 2} dengan
+          \texttt{ANSATZ\_ENTANGLEMENT = "linear"};
+          \texttt{OBSERVABLE = "local\_mean"}; \texttt{SHOTS = None} (nilai harap
+          eksak). Jumlah bobot $(\text{reps}+1)\times n = \textbf{45}$, ditambah
+          kepala D-32 menjadi \textbf{47 parameter terlatih}.
+          \textbf{Alasan \texttt{local\_mean}:} \texttt{global\_z} bawaan
+          template menjenuh buruk melewati segelintir qubit dan merupakan
+          pemercepat \textit{barren plateau} yang dikenal. Menjaga setiap suku
+          tetap satu-qubit menjaga fungsi biaya tetap lokal, sehingga gradien
+          tidak meluruh eksponensial terhadap $n$ --- \textbf{proposal sudah
+          berkomitmen pada fungsi biaya lokal sebagai mitigasi barren plateau},
+          jadi konfigurasi ini memenuhi komitmen yang sudah ada.
+    \item \textbf{Kepala afin terlatih pada keluaran kuantum} (D-32).
+          \texttt{OUTPUT\_AFFINE\_HEAD = True}: nilai harap sirkuit dibungkus
+          $a \cdot y + b$. \textbf{Ini struktural, bukan hiasan} --- nilai harap
+          Pauli hidup pada $[-1,1]$ sedangkan target \texttt{log1p} terstandardisasi
+          tidak, sehingga tanpa kepala ini model \textbf{secara struktural tidak
+          mampu mencapai julat target}, dan kegagalannya menampilkan diri sebagai
+          "QNN tidak belajar" --- kesimpulan tentang pembelajaran mesin kuantum,
+          padahal yang hilang adalah lapisan dua parameter. Pada tahap okurensi
+          keluarannya adalah \textbf{logit}, dipasangkan dengan
+          \texttt{BCEWithLogitsLoss}.
+    \item \textbf{Inisialisasi bias keluaran dan kalibrasi lapisan, diberikan
+          identik kepada kedua \textit{arm}} (D-31).
+          \texttt{initial\_bias(y\_train, stage)} menyetel bias keluaran agar
+          model tak terlatih memprediksi laju dasar; \texttt{calibrate\_output()}
+          menskalakan ulang kepala agar sebaran marginalnya cocok. Tanpa bias,
+          model pada target 5,79\% positif menghabiskan seluruh anggarannya
+          menyeret \textit{intercept} dari 0 ke $-2,79$.
+    \item \textbf{Tangga model enam \textit{rung}} (D-34):
+          \texttt{baseline\_trivial}, \texttt{ridge}, \texttt{nn\_matched},
+          \texttt{qnn}, \texttt{nn\_large}, \texttt{nn\_full}.
+          \texttt{NN\_ACTIVATION = "tanh"}, \texttt{NN\_LARGE\_HIDDEN = (64,64)},
+          dan lebar \texttt{nn\_matched} \textbf{diselesaikan} oleh
+          \texttt{solve\_matched\_hidden}, bukan dipilih tangan. Paritas
+          parameter: \textbf{47 lawan 52}. \texttt{nn\_full} adalah
+          \texttt{nn\_large} yang dilatih pada seluruh baris dan
+          \textbf{sengaja mematahkan paritas}.
+          % TODO(open): register O10 — `MODEL_LADDER` pernah didefinisikan dua
+          %   kali di config.py; versi enam rung adalah yang hidup. Register
+          %   mencatat item ini SUDAH DITERAPKAN; verifikasi ulang sebelum
+          %   menyebutnya sebagai cacat yang masih ada.
+    \item \textbf{Satu lingkungan tersemat di akar repositori} (D-41). Satu
+          \texttt{requirements.txt} untuk pipeline dan pemodelan,
+          \textbf{semuanya tersemat eksak}, dengan
+          \texttt{environment-lock.txt} sebagai \texttt{pip freeze}-nya.
+          Diverifikasi pada \textbf{Python 3.13.7}; \textbf{3.10 adalah
+          lantainya}. Bukti NF-02, bukan kerapian.
+    \item \textbf{Satu \textit{run} Qiskit tereduksi} (D-39) sebagai bukti kedua
+          jalur gradien menyatu --- rincian dan status di
+          Bab~\ref{chap:analisis-masalah}.
+\end{itemize}
