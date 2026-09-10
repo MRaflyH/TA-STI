@@ -48,6 +48,7 @@ VARIABLE_SHORTNAME = {
     "cloud_base_height": "cbh",
     "total_column_water_vapour": "tcwv",
     "2m_dewpoint_temperature": "d2m",
+    "convective_rain_rate": "crr",
 }
 
 # What a full fetch requests. Deliberately not all of VARIABLE_SHORTNAME: the
@@ -77,6 +78,7 @@ SHORTNAME_MAP = {
     "cbh": "CBH",
     "tcwv": "TCWV",
     "d2m": "D2M",
+    "crr": "CRR",
 }
 
 HOURS = [f"{h:02d}:00" for h in range(24)]
