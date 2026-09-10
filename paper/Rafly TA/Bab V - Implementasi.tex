@@ -106,15 +106,12 @@ Isi kolomnya dapat dilihat pada Tabel~\ref{tab:kolom-pln}.
     Longitude & Koordinat bujur sambaran, dalam derajat \\
     Discrimination & Jenis sambaran, misalnya CG$-$ untuk sambaran awan ke tanah bermuatan negatif \\
     Signal (kA) & Arus puncak sambaran dalam kiloampere; tandanya menunjukkan polaritas \\
-    % BELUM DIVERIFIKASI -- keterangan sementara, tunggu konfirmasi pembimbing
-    Chi square & Ukuran kecocokan penyelesaian lokasi; nilai yang lebih kecil berarti lokasi lebih konsisten \\
+    Chi square & \textcolor{red}{[PERLU KONFIRMASI: ukuran kecocokan penyelesaian lokasi]} \\
     Ell. smaj & Sumbu panjang elips galat lokasi \\
     Ell. smin & Sumbu pendek elips galat lokasi \\
     Ell. angle & Sudut orientasi elips galat lokasi, dalam derajat \\
-    % BELUM DIVERIFIKASI -- keterangan sementara, tunggu konfirmasi pembimbing
-    Freedom & Derajat kebebasan penyelesaian lokasi \\
-    % BELUM DIVERIFIKASI -- keterangan sementara, tunggu konfirmasi pembimbing
-    Multi. & Jumlah sambaran susulan dalam satu kilat \\
+    Freedom & \textcolor{red}{[PERLU KONFIRMASI: derajat kebebasan penyelesaian lokasi]} \\
+    Multi. & \textcolor{red}{[PERLU KONFIRMASI: jumlah sambaran dalam satu kilat]} \\
     Sensors nb. & Jumlah sensor yang mendeteksi sambaran \\
     \hline
   \end{tabular}
@@ -234,3 +231,30 @@ Satu parameter POWER yang dipakai penelitian pendahulu tidak diminta pada tugas 
 POWER menerbitkan parameter itu pada resolusi bulanan dan tidak lebih halus.
 Pada resolusi per jam nilainya tetap sepanjang satu bulan penuh, sehingga tidak dapat menjelaskan ragam antarjam pada target.
 Alasan penggugurannya dibahas pada Subbab~\ref{subsec:parameter-meteorologis}.
+
+\section{Pemuatan, Penyelarasan, dan Penggabungan}
+\label{sec:penggabungan}
+Keempat sumber memakai satuan ruang dan waktu yang berbeda, sehingga tidak dapat langsung digabungkan.
+Subbab ini menjelaskan penyelarasan yang dilakukan lebih dahulu, lalu cara keempatnya disatukan menjadi satu tabel.
+
+Penyelarasan dilakukan terhadap satu kunci yang sama, yaitu lintang sel, bujur sel, dan jam.
+Rekaman sambaran dihitung jumlahnya per sel per jam.
+Nilai ERA5 dirata-ratakan dari titik aslinya yang berukuran 0,25\textdegree{} ke sel proyek yang berukuran 0,5\textdegree.
+Nilai POWER dipetakan dari titik gridnya ke setiap sel yang memakai titik tersebut.
+Waktu dari semua sumber diubah ke UTC lebih dahulu, kemudian penandanya dilepas, sehingga seluruh sumber memakai kalender yang sama.
+
+Rangka tabel dibentuk lebih dahulu, dan pada tahap itu belum memuat data apa pun.
+Rangka tersebut adalah hasil perkalian setiap sel grid dengan setiap jam pada rentang yang dikonfigurasi.
+Jumlah sambaran per sel-jam kemudian ditempelkan ke rangka itu dengan \textit{left join}, dan sel-jam yang tidak memiliki sambaran diisi nol.
+Dengan cara ini, sel-jam tanpa sambaran tetap ada sebagai baris yang lengkap, bukan menghilang dari tabel.
+Nilai POWER dan ERA5 ditempelkan ke tabel yang sama dengan cara yang sama.
+
+Penggabungan semacam ini punya satu kegagalan yang tidak bersuara.
+Penggabungan yang tidak mencocokkan satu kunci pun tidak memunculkan galat, melainkan menghasilkan tabel utuh yang seluruh prediktornya kosong.
+Karena itu pemeriksaan kunci dijalankan sebelum tiap penggabungan, dan pemeriksaan berhenti dengan galat bila tipe data kunci berbeda atau irisan kunci sama sekali kosong.
+
+Terdapat tiga hal yang dapat membuat irisan kunci kosong, dan tidak satu pun memunculkan galat dengan sendirinya.
+Pertama, tipe data pada kunci waktu berbeda antara sumber dan rangka.
+Kedua, sumber memakai acuan jam yang berbeda, sehingga jamnya bergeser.
+Ketiga, bujur ERA5 datang pada rentang 0 sampai 360 derajat, sedangkan data sambaran memakai rentang $-$180 sampai 180 derajat.
+Sebab ketiga hanya menimpa domain subtropis, karena bujur Jawa Barat bernilai positif pada kedua rentang tersebut.
