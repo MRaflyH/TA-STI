@@ -24,14 +24,13 @@ from .. import config as cfg
 
 SPATIAL = ["lat", "lon"]
 
+# AOD_55_ADJ dropped, D-5. Its two files are still in data/raw/power/.
 POWER = [
     "PS",            # surface pressure, kPa
     "PRECTOTCORR",   # precipitation, mm/hour
     "T2M",           # 2 m air temperature, degC
     "RH2M",          # 2 m relative humidity, %
     "WS2M",          # 2 m wind speed, m/s
-    "AOD_55_ADJ",    # aerosol optical depth 550 nm. Monthly at source, so
-                     # constant across ~730 hourly rows.
 ]
 
 ERA5 = ["CAPE", "KX", "TCIW", "TCLW", "VIIWD", "VILWD"]
