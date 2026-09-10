@@ -42,3 +42,11 @@ code/modelling/data/
 # Python
 __pycache__/
 *.pyc
+
+*.bcf
+*.bbl
+*.aux
+*.blg
+*.log
+*.out
+*.toc
