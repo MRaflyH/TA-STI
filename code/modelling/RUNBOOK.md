@@ -28,6 +28,24 @@ Commands in this file run from `code/modelling/src/`.
 
 ## 2. Why PennyLane, when the thesis says "Qiskit templates"
 
+> **SUPERSEDED BY D-N4, 10 September 2026.** The reasoning in this section
+> settled the backend question by argument from a single round of measurement
+> on a MacBook Air. **D-N4 re-opens it and decides it by measurement on equal
+> wall-clock** — Run A (Qiskit Aer + parameter-shift, reduced config, one
+> night) against Run C (PennyLane adjoint, full config, one night), with Run B
+> as the ~15-minute equivalence check between them. Until those runs report,
+> the backend is not decided.
+>
+> **The measured tables below stay.** So do the SPSA and LinComb results, and
+> the ParamShift cost surface. Those are the expensive part of this file: they
+> are negative results, and deleting them means someone re-runs them. What is
+> superseded is the *conclusion drawn from them* — "so we use PennyLane" — not
+> the numbers themselves.
+>
+> Every figure in this section is `[repo]`, measured on a MacBook Air. The
+> 9600X will land elsewhere. Do not quote these as the project's costs once
+> Run A has reported; quote both, and say which machine each came from.
+
 The architecture IS the Qiskit template: `z_feature_map` composed with
 `real_amplitudes`, read out through a local Z observable. Only the
 differentiation backend changed, and only because the measured cost left no

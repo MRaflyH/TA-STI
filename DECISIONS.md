@@ -46,8 +46,9 @@ one-to-one.
 
 ## Status
 
-**Ten entries, all from the restructure conversation of 10 September 2026.**
-The record grows through the week as each component reports back.
+**Twelve entries.** D-N1 to D-N10 from the restructure conversation of
+10 September 2026; D-N11 and D-N12 from day-1 execution the same day. The
+record grows through the week as each component reports back.
 
 Every entry below carries a real attribution. That is a change from v1, where
 twelve entries could not be attributed at all.
@@ -64,6 +65,13 @@ twelve entries could not be attributed at all.
 | D-N8 | Feature selection is Spearman + MI + ablation, never Pearson | D-02 |
 | D-N9 | Two freezes: raw on day 3, modelled features on day 4–5 | — |
 | D-N10 | Record v2 policy: archive, carry-forward, scoped review | — |
+| D-N11 | v1 frozen as `v1-frozen-20260910` — **verification pending** | — |
+| D-N12 | Bibliography ported; provenance is not uniform | — |
+
+**Next free ID: `D-N13`.**
+
+**Open verification.** D-N11 carries an explicit unverified block. Nothing that
+depends on the freeze should be claimed in Bab V until it is checked and dated.
 
 ---
 
@@ -108,6 +116,84 @@ is his: the meteorological inputs are themselves predicted by another system,
 so the model consumes predicted fields rather than producing a lead time
 itself. The withdrawn lead-time proposal was the assistant's and was correctly
 rejected.
+
+---
+
+# Bab II — Studi
+
+## D-N12 — The bibliography is ported from the proposal, and its provenance is not uniform
+
+**Decided.** `paper/Rafly TA/daftar-pustaka.bib` is replaced with the proposal's
+bibliography. It was byte-identical to the Template Baskara dummy, so every
+`\autocite` written against it either failed or silently resolved to
+`laudon2020` — and silent resolution is the worse failure.
+
+**60 entries [measured, 10 September 2026].** 61 were ported; `nag2023LAP` was
+then deleted as an exact duplicate of `nag2023`, which carries the volume and
+article number the duplicate lacked.
+
+Repairs, each verified against a published source rather than filled in from
+memory:
+
+| Citekey | Defect | Resolution |
+|---|---|---|
+| `haywardTBD` | three of four author surnames wrong | Hayward, Whitworth, Pepin & Dorling, NHESS 20(9), 2463–2482, 2020 |
+| `shanTBDMLI` | two surnames wrong, one author missing, title truncated | Shan, Allen, Li, Pickering & Lapierre, ACP 23(22), 14547–14560, 2023 |
+| `dualGOES_TBD` | no author, all fields empty | Rudlosky & Virts, Mon. Wea. Rev. 149(4), 979–998, 2021 |
+| `schultz2021DLNWP` | author `{M. G. S. et al.}`; **year wrong** | Schultz et al. (eight authors), Phil. Trans. R. Soc. A 379(2194), 20200097, **2021**. Citekey renamed from `mgstbd2020DLNWP` |
+| `lightningcast2022` | no author — **not in the brief's list** | Cintineo, Pavolonis & Sieglaff, Wea. Forecasting 37(7), 1239–1257, 2022 |
+
+Six further entries had an empty `journal`: `silva2025` (Brazilian Journal of
+Physics), `pandey2025QIML` (Sci. Rep. 15, art. 28443), `munasinghe2024`
+(**retyped `@inproceedings`** — IEEE BigData 2024, it was never an article),
+`mitarai2018QCL` (**Phys. Rev. A 98(3), 032309 — not a preprint**),
+`kyriienko2020SNDE` (Phys. Rev. A 103(5), 052416, **year corrected to 2021**),
+`sahin2025QiskitML` (a genuine arXiv preprint, 2505.17756).
+
+**The finding, and it is a limitation rather than a tidy-up.** Two of the four
+entries flagged as having *empty* fields turned out to carry **plausible but
+wrong author surnames** — correct initials attached to the wrong names.
+`haywardTBD` read Hayward/Watson/Pucik/Davila against the real
+Hayward/Whitworth/Pepin/Dorling; `shanTBDMLI` read Shan/Adams/Li/Prein against
+Shan/Allen/Li/Pickering. Correct initials on wrong surnames is the signature of
+generated metadata, not of a broken reference-manager export. An empty field
+announces itself; a wrong name does not, and would have reached the sidang as a
+citation to people who did not write the paper.
+
+**So the rule for Bab II is: verify an entry when a chapter cites it.** The
+other 55 entries are **not** bulk-verified, and this entry is the record that
+they are not. That is the same scoping logic as the v2 record review (D-N10) —
+a full pass does not fit in the week, and an unverified thing labelled
+unverified is honest and cheap, while an unverified thing labelled verified is
+neither.
+
+`pandey2025QIML` shows the milder version of the same problem and is worth
+keeping visible: the published paper's byline reads *Ravalekar* while its own
+author-contributions paragraph reads *Rajasekar*. The byline spelling is used.
+The source itself is inconsistent, so no amount of care here resolves it.
+
+**What it costs.** Roughly the thirty minutes budgeted, plus verification time
+for eleven entries. And a standing obligation: every new citation in Bab II
+costs a source check that would otherwise have been assumed.
+
+**How to reverse it.** The proposal's `.bib` is untouched at
+`paper/Rafly Final Proposal/daftar-pustaka.bib`. Every repair is recorded in a
+header comment block in the ported file, so the port is auditable without this
+record. `Template Baskara/daftar-pustaka.bib` is dummy data and is never cited
+(non-negotiable 1).
+
+**Bab.** **II.** Not the port — that is process — but the verification rule and
+the reason for it. One or two sentences: references carried forward from the
+proposal are verified against the published source at the point of citation,
+because spot-checking found author lists that were wrong rather than merely
+incomplete.
+
+**Who.** **The assistant's**, 10 September 2026, executing the port specified
+in `components/05-paper.md` §5.1. The four target entries are Rafly's list; the
+wrong-surname finding, `lightningcast2022`, and the `nag2023` duplicate came out
+of the port itself. Rafly's calls: delete rather than keep the duplicate, rename
+the citekey to match the corrected year, leave the non-ASCII key
+`füllekrugey2021` alone, and scope verification to what gets cited.
 
 ---
 
@@ -338,22 +424,46 @@ benchmark of the *then-current* configuration and reported the Qiskit cost as
 526,5 h for the 36-run set — a sweep that does not happen. That figure is
 correct for that config and **was wrongly treated as a floor**. It is not.
 Reducing qubits cuts weights, which cuts circuits per sample linearly and the
-statevector exponentially:
+statevector exponentially.
 
-| Change | Factor | Running total |
-|---|---|---|
-| Aer + parameter-shift, v1 config | — | ~236 h |
-| 1 fold, 1 seed (4 fits, not 36) | 9× | ~26 h |
-| 6 qubits → 18 weights → 36 circuits/sample | ~2,5× | ~10,5 h |
-| `TRAIN_ROWS` 3.000 → 1.000 | 3× | ~3,5 h |
+**Two bases, because the record carries two and they measure different things.**
+Stating only one is what produced the discrepancy this entry now records.
 
-**[derived]** from the `[repo]` figure of ~305 ms/sample for Aer +
-parameter-shift, measured on a MacBook Air M4. Three seeds at 6 qubits and
-1.000 rows lands near 10,5 h — one night, not an impossibility.
+| Basis | What it is |
+|---|---|
+| **~236 h** | **[derived]** from the *actual* 5,4 h of QNN time in the 2026-09-08 final run **[repo]**, scaled by 305 / 6,97. `TRAIN_ROWS = 3.000`, early stopping active, so effective epochs were below 30. |
+| **~366 h** | **[derived]** from the ms/sample projection the RUNBOOK itself prints: 305 ms × 4.000 rows × 30 epochs × 36 fits / 3,6e6. Full epoch budget, no early stopping. An upper bound. |
 
-**Benchmark before booking the night.** The ~305 ms/sample figure is from the
-MacBook Air; the Ryzen 5 9600X may land elsewhere. Ten minutes of measurement
-decides whether Run A is real. **[unverified]** until that benchmark runs.
+Both are `[repo]`-sourced at ~305 ms/sample for Aer + parameter-shift, measured
+on a MacBook Air M4. Neither is wrong; they are different quantities.
+
+**Run A's reduction, computed on both bases:**
+
+| Step | Factor | from 236 h | from 366 h |
+|---|---|---|---|
+| 12 fits (1 fold × 3 seeds), not 36 | ÷3 | ~79 h | ~122 h |
+| 6 qubits → 18 weights → 36 circuits/sample | ÷2,5 | ~31 h | ~49 h |
+| `TRAIN_ROWS` to 1.000 | ÷3 / ÷4 | **~10,5 h** | **~12,2 h** |
+
+**So Run A at three seeds lands between 10,5 and 12,2 h** — at or just over the
+one-night threshold, on both bases. That convergence is worth noting: the two
+derivations disagree by about 15%, not by a factor.
+
+**The fallback if the benchmark lands high: two seeds, not one.** Eight fits
+instead of twelve brings it to ~7–8 h with room to spare, and mean ± sd over
+two seeds is still reportable. Dropping to one seed loses the spread entirely
+and should be the last cut, not the first.
+
+**Note on the reduction factor.** An earlier version of this table read "1 fold,
+1 seed (4 fits, not 36), 9×", which does not match Run A's specification of
+three seeds. Twelve fits is ÷3. Corrected 10 September 2026.
+
+**Benchmark before booking the night.** Both figures are from the MacBook Air;
+the Ryzen 5 9600X may land elsewhere. Ten minutes of measurement settles which
+basis is closer and whether three seeds fit. **[unverified]** until that
+benchmark runs — and the benchmark's own projection must charge validation rows
+the *forward* cost only, since validation drives early stopping and computes no
+gradient.
 
 **What Run A buys beyond speed.** A result computed by Qiskit end to end
 retires the "does *Framework Qiskit* survive the backend switch" question
@@ -468,6 +578,70 @@ proposals, accepted.
 
 ---
 
+## D-N11 — v1 is frozen as `v1-frozen-20260910` and kept as a fallback thesis
+
+**Decided.** The complete v1 state is tagged **`v1-frozen-20260910`** before any
+day-1 change lands. The tag covers the artifacts D-N6 names:
+
+- `data/processed/gfd_tropis_hourly.parquet` and its `.meta.json`
+- `data/processed/gfd_subtropis_hourly.parquet` and its `.meta.json`
+- `results/final_20260908_024452.jsonl` — the 7,7 h, **432-run** final set
+  **[repo, modelling RUNBOOK §4]**
+- `results/final_20260908_131242.jsonl` — the valid `nn_full` rerun
+
+and the decision record is preserved by renaming rather than deletion:
+`DECISIONS.md` (v1, 46 entries, 8 September 2026) becomes
+`DECISIONS-v1-archive.md`, and a new `DECISIONS.md` opens at `D-N1`.
+
+**Why.** Every planned change this week invalidates the existing result set:
+new meteorological parameters, a feature count that moves from 13, a backend
+decided by Runs A/B/C. That set cost 7,7 h of compute across 432 runs and 36
+QNN fits **[repo]**. Tagging it means that if the `KX` re-pull stalls at the
+day-2 cutoff or Run A overruns its night, **a complete and defensible thesis
+still exists**. The tag costs minutes; not having it costs the project.
+
+The rename rather than deletion is the same argument one level down. Twelve of
+the 46 v1 entries carry an honest "not recorded" attribution that cannot be
+rebuilt from the code — that is the whole reason the `Who` field exists. A
+deleted record destroys them; an archived one does not, and it lets a v2 entry
+cite an old ID as superseded rather than silently replacing it.
+
+**What it costs.** Two records to keep straight instead of one, and a standing
+risk that a chapter draft cites a v1 D-number that a reader then looks up in
+v2. The `D-N` prefix exists to make that collision impossible rather than
+merely unlikely (D-N10).
+
+**How to reverse it.** Nothing here is reversible and nothing should be. **The
+tag is never deleted.** `data/processed/` is one command away and safe to lose;
+`data/raw/` is not, and this tag does not protect it.
+
+**Verification status — UNVERIFIED as of this entry.** The tag, the four
+preserved files and the archive rename have not been confirmed against the
+repository. Confirm each and date this line before Bab V cites reproducibility:
+
+```bash
+git tag -l v1-frozen-20260910
+ls data/processed/*.parquet data/processed/*.meta.json
+ls code/modelling/results/final_20260908_024452.jsonl
+ls code/modelling/results/final_20260908_131242.jsonl
+ls DECISIONS-v1-archive.md
+```
+
+What *is* confirmed is that a file named `DECISIONS-v1-archive.md` containing
+the 46-entry v1 record is present in project knowledge, and that the current
+`DECISIONS.md` opens at `D-N1` **[measured, 10 September 2026]**. Presence in
+project knowledge is not presence in a committed working tree.
+
+**Bab.** None. Process. The existence of a frozen fallback is worth one
+sentence in Bab V under reproducibility, but it is not a research decision.
+
+**Who.** **Rafly**, 10 September 2026, accepting the freeze proposed under
+D-N6. **The tag string `v1-frozen-20260910` was the assistant's suggestion**,
+relayed and accepted by Rafly rather than chosen by him. Recorded precisely
+because this field is the one that cannot be reconstructed later.
+
+---
+
 ## D-N10 — Record v2 policy: archive rather than delete, carry-forward verdicts, review scoped to cited entries
 
 **Decided.** `DECISIONS.md` v1 is archived as `DECISIONS-v1-archive.md`, not
@@ -557,3 +731,4 @@ September 2026.*
   record exists to prevent.** They stay unrecorded, and the pattern is recorded
   instead: the hyperparameters that shape the comparison are the ones with the
   least justification behind them.
+  
