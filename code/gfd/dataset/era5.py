@@ -171,9 +171,8 @@ def fetch_supplement_domain(domain: cfg.Domain, variable: str, **kw) -> list[Pat
 def _open_members(path: Path) -> list:
     """Open a CDS download as one or more xarray Datasets.
 
-    Instantaneous fields (CAPE, KX, TCIW, TCLW) and flux fields (VIIWD, VILWD)
-    have different stepTypes, so the CDS sends a ZIP with one NetCDF each --
-    still named .nc. Same axes on both, so they merge afterwards.
+    Mixed GRIB stepTypes come back as a ZIP with one NetCDF each, still named
+    .nc. Same axes on both, so they merge afterwards.
     """
     import xarray as xr
 
