@@ -351,7 +351,43 @@ need to quote. All `[measured]`, 2026-09-10.
   against tropis's 2 242 100, yet 99 273 non-zero cell-hours against 104 955.
   Subtropical lightning is more concentrated in space and time.
 - **MERLIN export overlap is negligible**: 3 duplicate strikes dropped across
-  89 overlapping windows.
+  89 windows. All three come from the *same* file each time, so the cause is
+  repeated rows in the archive, not window overlap.
+- **ERA5 variables are all instantaneous.** 14 distinct short names checked
+  against `GRIB_stepType` across every file on disk; 13 are `instant`. The one
+  exception, `avg_cpr`, was dropped (O-4). The configured feature map is
+  `FEATURE_MAP = "z"`, encoding data as `RZ(2x)`.
+- **Two ERA5 short names were wrong in the request map.**
+  `vertical_integral_of_divergence_of_moisture_flux` arrives as `vimdf`, not
+  `viwvd`; `mean_convective_precipitation_rate` as `avg_cpr`, not `mcpr`. Both
+  were dropped silently until `--check` surfaced them.
+- **`total_totals_index` is the second variable absent from a multi-variable
+  subtropis request**, after KX. Requested alone for the same box, it arrives.
+  Same behaviour, different variable — a property of the CDS for this box, not
+  a one-off.
+- **`crr` and `avg_cpr` are not interchangeable**: Spearman 0,684, Pearson
+  0,533 over one tropis month. Medians differ by a factor of nine and `crr`'s
+  25th percentile is exactly zero. The instantaneous rate frequently samples a
+  dry moment inside an hour that produced rain.
+- **`log1p` is validated, not assumed.** Non-zero target skew falls from 8,35
+  to 0,92 (tropis) and 12,99 to 0,87 (subtropis). Non-zero counts reach 2 391
+  and 11 777; the top 1% of rows hold 20,0% and 26,9% of all flashes.
+- **Coverage is a weather filter, not a data-quality filter.** Spearman between
+  monthly coverage and mean flash count is 0,838 (tropis) and 0,915
+  (subtropis). Months below 25% coverage average 0,008 flashes; months above
+  90% average 1,72. A coverage gate would remove quiet months.
+- **Dry spells are long enough to be switch-like.** Median consecutive
+  zero-flash run within a live cell: 15 hours (tropis), 20 (subtropis). p90:
+  50 and 164 hours. 40,6% and 66,6% of zero rows sit inside runs longer than
+  seven days. Never-flashing cells excluded from these figures.
+- **Zeros are structured in time.** Tropis zero share ranges 83,52% at 16:00
+  local to 99,43% at 09:00, a 15,9-point spread; subtropis 93,67% at 15:00 to
+  98,71% at 02:00. By month, tropis spans 8,5 points and subtropis 7,3.
+- **Most predictors squash badly under plain min-max.** Share of [0, π] the
+  middle 98% would occupy: `PRECTOTCORR` 7,4%/3,2%, `VIIWD` 3,8%/6,8%,
+  `VILWD` 6,9%/4,3%, `TCIW` 19,9%/20,2%, `TCLW` 20,7%/19,0%, `CAPE`
+  35,0%/17,3% (tropis/subtropis). Six of thirteen predictors fall below 25% in
+  tropis, seven in subtropis.
 
 ---
 
@@ -389,7 +425,7 @@ comments — which has already happened once. The alternative is a
 generated-only `environment-lock.txt` beside it. v1's D-41 was caused by two
 files disagreeing after one was hand-edited, not by there being two.
 
-**O-3 — Permanently dead cells, and the asymmetry is one-sided.** 6 of 30
+**O-3 — Permanently dead cells, and `lat`/`lon` cannot transfer at all.** 6 of 30
 tropis cells never flash in 61 368 hours; **0 of 56 subtropis cells**
 **[measured]**. All six sit in the two extreme latitude rows, none in the
 interior — consistent with `snapped_bbox` rounding the box outward past the
@@ -401,6 +437,22 @@ is always zero" and score well on tropis without learning any meteorology:
 rule to transfer to Florida, so it inflates one side of the comparison and does
 nothing for the other — and the cross-domain gap is the number this thesis
 reports.
+
+**The wrapping measurement makes this sharper.** Tropis latitude spans −7,75
+to −5,75; subtropis 26,75 to 30,25. They do not overlap at all, so a
+source-fitted min-max scaler maps **100% of the target domain's `lat` and `lon`
+outside [0, π]** in both directions, where a rotation wraps rather than clips.
+In the cross-domain arms those two features carry noise.
+
+So dropping `lat` and `lon` as predictors addresses both problems at once: the
+dead-cell shortcut and the fact that a coordinate cannot mean anything in the
+other hemisphere. `gow2021ELSF` uses a binary land/sea flag alongside
+coordinates, which captures what the coordinates proxy for in a form that does
+transfer.
+
+Other predictors also wrap, less severely: `PS` at 36,37% of subtropis rows
+outside the tropis range and 25,92% the other way, `T2M` 2,62%, `KX` 1,11%.
+Everything else is under 1%.
 
 Distinct from the zero-hour question §4 settles: a quiet hour in an active cell
 is a real observation; a cell with no flash in seven years probably is not
@@ -416,3 +468,23 @@ request to mix analysis and forecast variables, and therefore the first to
 exercise the ZIP branch. `mean_convective_precipitation_rate` is a mean rate
 and would need a one-hour realignment; `convective_rain_rate` is the
 instantaneous alternative and would not. Undecided.
+
+**O-5 — `PRECTOTCORR` may have a unit or data problem. Unresolved.**
+Maximum is 1076 (tropis) and 1194 (subtropis) against a column documented as
+mm/hour. The world record for one-hour rainfall is roughly 305 mm, so these are
+not possible as hourly rates. Either the unit annotation in `features.py` is
+wrong — it was copied from the v1 archive and never verified against the NASA
+POWER parameter definition — or the values are not what they appear. **Settle
+this before the column appears in any chapter.** Check whether the extreme
+values are a handful of rows or a smooth tail.
+
+**O-6 — One model or two stages.** The dry-spell measurement supports v1's
+`occurrence`/`count` split: median runs of 15–20 hours and two thirds of
+subtropis zero rows inside week-long runs is switch-like behaviour rather than
+a continuous process with many small values. No QML literature on zero-inflated
+targets was found; the hurdle approach is classical. Undecided.
+
+**O-7 — Skew must be fixed before min-max, for some predictors.** See the
+squashing measurements. Under plain min-max the worst predictors are nearly
+constant to the circuit. The likely order is: fix skew, z-score, then min-max
+to [0, π]. Which transform, and which predictors need it, is undecided.
