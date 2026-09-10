@@ -6,6 +6,7 @@ dataset specifically. Requests queue server-side.
     python3 -m gfd.dataset.era5                          # all variables
     python3 -m gfd.dataset.era5 --check                  # disk vs mapping
     python3 -m gfd.dataset.era5 --supplement k_index --domain subtropis
+    python3 -m gfd.dataset.era5 --supplement a,b,c --tag tier1 --year 2018 --month 1
 
 One request per domain-month, 168 files. A whole year in one request exceeds
 the CDS cost limit -- tried, refused, don't.
@@ -38,9 +39,27 @@ VARIABLE_SHORTNAME = {
     "total_column_cloud_liquid_water": "tclw",
     "vertical_integral_of_divergence_of_cloud_frozen_water_flux": "viiwd",
     "vertical_integral_of_divergence_of_cloud_liquid_water_flux": "vilwd",
+    # Tier 1 candidates. Short names unverified against a real file -- --check
+    # reports anything that lands under a different name.
+    "vertical_integral_of_divergence_of_moisture_flux": "viwvd",
+    "mean_convective_precipitation_rate": "mcpr",
+    "total_totals_index": "totalx",
+    "convective_inhibition": "cin",
+    "cloud_base_height": "cbh",
+    "total_column_water_vapour": "tcwv",
+    "2m_dewpoint_temperature": "d2m",
 }
 
-VARIABLES = list(VARIABLE_SHORTNAME)
+# What a full fetch requests. Deliberately not all of VARIABLE_SHORTNAME: the
+# Tier 1 entries above are known short names, not yet part of the main request.
+VARIABLES = [
+    "convective_available_potential_energy",
+    "k_index",
+    "total_column_cloud_ice_water",
+    "total_column_cloud_liquid_water",
+    "vertical_integral_of_divergence_of_cloud_frozen_water_flux",
+    "vertical_integral_of_divergence_of_cloud_liquid_water_flux",
+]
 
 # Short name -> column name. Anything missing here is dropped silently;
 # check_variables() catches it.
@@ -51,6 +70,13 @@ SHORTNAME_MAP = {
     "tclw": "TCLW",
     "viiwd": "VIIWD",
     "vilwd": "VILWD",
+    "viwvd": "VIWVD",
+    "mcpr": "MCPR",
+    "totalx": "TOTALX",
+    "cin": "CIN",
+    "cbh": "CBH",
+    "tcwv": "TCWV",
+    "d2m": "D2M",
 }
 
 HOURS = [f"{h:02d}:00" for h in range(24)]
@@ -118,34 +144,41 @@ def fetch_supplement(
     domain: cfg.Domain,
     year: int,
     month: int,
-    variable: str,
+    variables: str | list[str],
+    tag: str | None = None,
     out_dir: str | Path = cfg.RAW_ERA5_DIR,
     overwrite: bool = False,
 ) -> Path:
-    """One single-variable request, suffixed so the main glob ignores it.
+    """A request for a subset of variables, suffixed so the main glob skips it.
 
-    Two uses. The six-variable request for the subtropis box comes back without
-    kx, but k_index alone for the same box works. And adding a variable later
-    shouldn't mean re-requesting all of them across 168 domain-months.
+    Two uses: recovering a variable the main request didn't return (kx for
+    subtropis), and adding variables later without re-requesting everything.
+
+    `tag` names the file. Defaults to the short name for a single variable, and
+    is required for a batch.
     """
-    if variable not in VARIABLE_SHORTNAME:
-        raise KeyError(
-            f"{variable!r} has no entry in VARIABLE_SHORTNAME. Add it -- the "
-            f"short name is what names the file and finds the column later."
-        )
-    short = VARIABLE_SHORTNAME[variable]
+    if isinstance(variables, str):
+        variables = [variables]
+    unknown = [v for v in variables if v not in VARIABLE_SHORTNAME]
+    if unknown:
+        raise KeyError(f"no VARIABLE_SHORTNAME entry for {unknown}. Add them first.")
+
+    if tag is None:
+        if len(variables) > 1:
+            raise ValueError("a multi-variable supplement needs an explicit tag")
+        tag = VARIABLE_SHORTNAME[variables[0]]
 
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
-    dest = out_dir / f"era5_{domain.name}_hourly_{_stamp(year, month)}_{short}.nc"
+    dest = out_dir / f"era5_{domain.name}_hourly_{_stamp(year, month)}_{tag}.nc"
 
     if dest.exists() and not overwrite:
         print(f"[era5] cached {dest.name}")
         return dest
     return _submit(
-        _request(domain, year, month, [variable]),
+        _request(domain, year, month, variables),
         dest,
-        f"{domain.name} {_stamp(year, month)} {short} only",
+        f"{domain.name} {_stamp(year, month)} [{tag}] {len(variables)} variable(s)",
     )
 
 
@@ -157,9 +190,11 @@ def fetch_domain(domain: cfg.Domain, **kw) -> list[Path]:
     ]
 
 
-def fetch_supplement_domain(domain: cfg.Domain, variable: str, **kw) -> list[Path]:
+def fetch_supplement_domain(
+    domain: cfg.Domain, variables: str | list[str], tag: str | None = None, **kw
+) -> list[Path]:
     return [
-        fetch_supplement(domain, y, m, variable, **kw)
+        fetch_supplement(domain, y, m, variables, tag, **kw)
         for y in range(domain.year_start, domain.year_end + 1)
         for m in range(1, 13)
     ]
@@ -264,18 +299,17 @@ def _main_files(domain: cfg.Domain, directory: Path) -> list[Path]:
     return sorted(directory.glob(f"era5_{domain.name}_hourly_[0-9][0-9][0-9][0-9][0-9][0-9].nc"))
 
 
-def _supplement_files(domain: cfg.Domain, directory: Path, short: str) -> list[Path]:
-    return sorted(directory.glob(f"era5_{domain.name}_hourly_[0-9]*_{short}.nc"))
+def _supplement_files(domain: cfg.Domain, directory: Path) -> dict[str, list[Path]]:
+    """Supplement files on disk, grouped by tag.
 
-
-def _available_supplements(domain: cfg.Domain, directory: Path) -> dict[str, list[Path]]:
-    """Every short name that has supplementary files on disk."""
-    found = {}
-    for short in VARIABLE_SHORTNAME.values():
-        files = _supplement_files(domain, directory, short)
-        if files:
-            found[short] = files
-    return found
+    Grouped by filename, but the columns each group carries are read from the
+    files themselves -- a tag says which batch, not which variables.
+    """
+    groups: dict[str, list[Path]] = {}
+    for f in sorted(directory.glob(f"era5_{domain.name}_hourly_[0-9]*_*.nc")):
+        tag = f.stem.split("_", 4)[-1]
+        groups.setdefault(tag, []).append(f)
+    return groups
 
 
 def _reduce(files: list[Path]) -> pd.DataFrame:
@@ -299,17 +333,23 @@ def load_era5(
     print(f"[era5] reading {len(files)} files for {domain.name} ...")
     out = _reduce(files)
 
-    for short, files in _available_supplements(domain, directory).items():
-        if short in out.columns and out[short].notna().any():
+    for tag, files in _supplement_files(domain, directory).items():
+        extra = _reduce(files)
+        cols = [c for c in extra.columns if c in SHORTNAME_MAP]
+        already = [c for c in cols if c in out.columns and out[c].notna().any()]
+        wanted = [c for c in cols if c not in already]
+
+        if already:
             print(
-                f"[era5] {len(files)} supplementary {short} files present, but {short} "
-                f"is already in the main files -- ignoring the supplement rather than "
-                f"producing a duplicate column. Delete one set or the other."
+                f"[era5] [{tag}] {already} already in the main files -- not merged. "
+                f"Delete one set or the other."
             )
+        if not wanted:
             continue
-        print(f"[era5] merging {len(files)} supplementary {short} files")
-        out = out.drop(columns=[short], errors="ignore").merge(
-            _reduce(files)[["lat", "lon", cfg.TIME_COL, short]],
+
+        print(f"[era5] merging {len(files)} [{tag}] files: {wanted}")
+        out = out.drop(columns=wanted, errors="ignore").merge(
+            extra[["lat", "lon", cfg.TIME_COL] + wanted],
             on=["lat", "lon", cfg.TIME_COL],
             how="left",
         )
@@ -347,8 +387,9 @@ def check_variables(domain: cfg.Domain, directory: str | Path = cfg.RAW_ERA5_DIR
     if found - mapped:
         print(f"  !! found but unmapped (dropped silently): {sorted(found - mapped)}")
 
-    for short, files in _available_supplements(domain, directory).items():
-        print(f"  {len(files)} supplementary {short} files")
+    for tag, files in _supplement_files(domain, directory).items():
+        cols = [c for c in parse_netcdf(files[0]).columns if c in SHORTNAME_MAP]
+        print(f"  [{tag}] {len(files)} files, carrying {cols}")
 
 
 def main() -> None:
@@ -356,9 +397,12 @@ def main() -> None:
     ap.add_argument("--domain", choices=sorted(cfg.DOMAINS), default=None)
     ap.add_argument(
         "--supplement",
-        metavar="VARIABLE",
-        help="fetch one CDS variable on its own, e.g. --supplement k_index",
+        metavar="VARS",
+        help="comma-separated CDS variables to fetch on their own",
     )
+    ap.add_argument("--tag", help="filename tag, required for more than one variable")
+    ap.add_argument("--year", type=int, help="restrict to one year (for a trial)")
+    ap.add_argument("--month", type=int, help="restrict to one month (for a trial)")
     ap.add_argument("--check", action="store_true", help="inspect what's on disk")
     ap.add_argument("--overwrite", action="store_true")
     args = ap.parse_args()
@@ -369,7 +413,16 @@ def main() -> None:
         if args.check:
             check_variables(d)
         elif args.supplement:
-            fetch_supplement_domain(d, args.supplement, overwrite=args.overwrite)
+            variables = [v.strip() for v in args.supplement.split(",")]
+            if args.year and args.month:
+                fetch_supplement(
+                    d, args.year, args.month, variables, args.tag,
+                    overwrite=args.overwrite,
+                )
+            else:
+                fetch_supplement_domain(
+                    d, variables, args.tag, overwrite=args.overwrite
+                )
         else:
             fetch_domain(d, overwrite=args.overwrite)
 
