@@ -1,289 +1,80 @@
-% ============================================================================================
-% BAB VI EVALUASI — KERANGKA (bullet), bukan prosa jadi.
-%
-% Menampung DECISIONS.md "Bab IV — Hasil dan Pembahasan". Lihat catatan pemetaan
-% di kepala berkas "Bab III - Analisis.tex": "Bab IV" pada DECISIONS.md berarti
-% HASIL, dan berlabuh di sini.
-%
-% ATURAN YANG DIPATUHI BERKAS INI: TIDAK ADA ANGKA HASIL YANG DIKARANG.
-% Keluaran run final BELUM DIBACA. Karena itu:
-%   - tabel dan gambar DISEBUTKAN NAMANYA beserta kolom/sumbunya, tetapi belum
-%     ditulis sebagai float. Menuliskannya sebagai \begin{table} berisi angka
-%     penampung akan memasukkan entri palsu ke Daftar Tabel dan Daftar Gambar,
-%     dan angka penampung punya kebiasaan bertahan sampai cetak;
-%   - angka yang MUNCUL di bawah ini seluruhnya berasal dari DECISIONS.md sebagai
-%     hasil TERUKUR yang sudah tercatat (D-14, D-27, D-20, D-04, D-03), bukan
-%     dari run final. Provenance-nya ditandai di tempat.
-%
-% PENYIMPANGAN DARI TEMPLATE (D-45). Subbab template "Evaluasi Kesalahan
-% Penulisan yang Sering Terjadi" beserta enam anak-subbabnya adalah instruksi
-% gaya penulisan, bukan isi tesis, sehingga dihapus. Aturannya tetap berlaku dan
-% ada pada Template Baskara serta pada skill itb-sti-thesis.
-%
-% Tidak ada \autocite / \cite di berkas ini.
-% ============================================================================================
+% ==========================================
+% BAB VI EVALUASI
+% ==========================================
 \cleardoublepage
 \chapter{EVALUASI}
 \label{chap:evaluasi}
-
+asdfasdf
 \section{Metode Evaluasi}
-
-\begin{itemize}
-    \item \textbf{Satuan pelaporan.} Seluruh metrik dilaporkan dalam satuan GFD
-          (sambaran per km\textsuperscript{2} per tahun) setelah inversi dan
-          agregasi, mengikuti urutan yang dikunci D-03: \textit{un-standardise}
-          $\rightarrow$ \texttt{expm1} $\rightarrow$ jumlahkan.
-    \item \textbf{Metrik regresi:} RMSE, MAE, R\textsuperscript{2}, NRMSE, dan
-          \textbf{bias} $=$ rerata(prediksi) $-$ rerata(observasi). NRMSE
-          dinormalkan terhadap \textbf{julat} teramati --- konvensi yang dipakai
-          saat NF-01 ditulis --- sehingga dilaporkan di samping RMSE, bukan
-          menggantikannya. Bias lebih penting di sini daripada biasanya: D-04
-          menjumlahkan prediksi per jam menjadi jendela, dan bias per jam yang
-          sistematis \textbf{tidak saling meniadakan di bawah penjumlahan,
-          melainkan berlipat}.
-    \item \textbf{Metrik klasifikasi} (tahap okurensi): \textit{log loss},
-          AUC, \textit{average precision}, Brier, dan F1 pada satu ambang.
-          AUC dan \textit{average precision} bebas ambang, yang penting pada
-          laju dasar 5,7\%; \textbf{\textit{average precision} adalah headline
-          yang lebih jujur}, karena AUC menyanjung masalah dengan positif jarang.
-          Ambang bawaan adalah \textbf{laju dasar teramati}, bukan 0,5.
-    \item \textbf{Lantai (\textit{baseline}) menyertai setiap tabel.} Setiap
-          tabel metrik memuat skor \textit{baseline} trivial dalam satuan yang
-          sama, karena R\textsuperscript{2} tanpa lantai bukan sekadar tidak
-          lengkap melainkan tidak dapat ditafsirkan (D-07, D-12, D-20).
-          \texttt{skill\_score} $= 1 - \text{RMSE}/\text{RMSE}_{\text{baseline}}$.
-    \item \textbf{Faktor \textit{smearing}} (D-03): koreksi multiplikatif satu
-          parameter atas bias retransformasi, versi satu parameter dari
-          \textit{estimator} Duan. \textbf{Dipasang pada validasi, tidak pernah
-          pada uji} --- faktor yang dipasang pada baris uji adalah kebocoran
-          target yang menyamar sebagai kalibrasi.
-          % CITE: Duan, smearing estimator
-    \item \textbf{Kalibrasi per jendela}: rerata prediksi terhadap rerata
-          observasi, dengan \texttt{ratio} $<1$ berarti prediksi terlalu rendah.
-          Dilaporkan \textbf{di samping setiap hasil berjendela}.
-    \item \textbf{Replikasi.} Tabel utama: 3 fold (D-06) $\times$ 3 seed (D-29),
-          dilaporkan rerata $\pm$ simpangan baku. \textit{Sweep}: satu fold, satu
-          seed (D-37). \textbf{Asimetri ini dinyatakan di sini, bukan ditemukan
-          pembaca.}
-\end{itemize}
-
+asdfasdf
 \section{Hasil Evaluasi}
-
-\subsection{Batasan yang Membingkai Setiap Hasil}
-
-% Subbab ini mendahului hasil, bukan mengikutinya. Setiap butir di bawah adalah
-% hal yang harus dinyatakan SEBELUM angka dibaca.
-
-\begin{itemize}
-    \item \textbf{Seluruh hasil subtropis bersifat provisional.}
-          % TODO(open): pertanyaan terbuka 10 — komposisi CG/IC MERLIN. Selama
-          %   belum diselesaikan lewat dokumentasi KSC untuk produk
-          %   MerlinCloudToGround, setiap angka subtropis di bab ini harus
-          %   membawa pernyataan itu. Rinciannya di Bab III.
-    \item \textbf{Gradien \textit{detection efficiency} subtropis} (D-27):
-          Spearman $-0,955$ terhadap jarak dari Cape, melintasi empat orde
-          besaran [terukur, tercatat --- bukan dari run final]. Dilaporkan
-          sebagai konfound antara respons instrumen dan klimatologi yang tidak
-          dapat dipisahkan dengan MERLIN saja.
-    \item \textbf{Distribusi \texttt{coverage} atas baris yang benar-benar
-          dilatih} (D-10, D-18), dilaporkan di samping pangsa nol.
-          \texttt{coverage} \textbf{tidak pernah} dipakai sebagai filter maupun
-          bobot sampel, karena ia berkorelasi dengan target melalui aktivitas
-          petir itu sendiri --- bulan yang benar-benar tenang dan detektor yang
-          mati terlihat identik.
-          % TODO: nyatakan PEMBOBOTAN angka cakupan — berbobot BARIS atau
-          %   berbobot BULAN. Angka berbobot baris: tropis rerata 0,8549 min
-          %   0,1290; subtropis rerata 0,5921 min 0,0323. Versi lama menulis
-          %   tropis 86%, yang kemungkinan berbobot bulan.
-    \item \textbf{Pangsa nol di samping setiap metrik} (D-20): 94,30\% tropis,
-          97,00\% subtropis pada resolusi jam.
-    \item \textbf{Asimetri cakupan antar domain} (D-26): 84 dari 84 bulan tropis
-          lawan 81 dari 84 subtropis; tiga bulan absen, bukan diisi nol.
-    \item \textbf{Siaran AOD} (D-24): batasan cara parameter harian/bulanan
-          disebarkan ke baris per jam --- nyatakan bagaimana, karena ia
-          memengaruhi tafsir kepentingan fitur.
-    \item \textbf{Sel semua-nol di bawah pemisahan sel} (D-11): enam sel tropis,
-          20\% dari grid, tanpa satu pun sambaran sepanjang rekaman.
-    \item \textbf{Tujuh hiperparameter tanpa alasan tercatat} (pertanyaan
-          terbuka 22) --- keterbatasan yang dinyatakan, bukan lubang yang diisi
-          dengan pembenaran yang ditulis sekarang.
-\end{itemize}
-
-\subsection{Hasil Tangga Model}
-
-\begin{itemize}
-    \item \textbf{Tabel: tangga enam \textit{rung} per domain per tahap}
-          (D-34). Baris: \texttt{baseline\_trivial}, \texttt{ridge},
-          \texttt{nn\_matched}, \texttt{qnn}, \texttt{nn\_large},
-          \texttt{nn\_full}. Kolom: jumlah parameter, metrik tahap okurensi
-          (\textit{log loss}, AP, AUC, Brier), metrik tahap cacah (RMSE, MAE,
-          R\textsuperscript{2}, bias), dan \texttt{skill\_score}. Nilai sebagai
-          rerata $\pm$ simpangan baku atas 3 fold $\times$ 3 seed.
-          % TODO: isi setelah keluaran run final dibaca.
-    \item \textbf{Paritas parameter 47 lawan 52} dinyatakan di badan tabel, dan
-          \texttt{nn\_full} ditandai sebagai \textbf{sengaja mematahkan paritas}.
-    \item \textbf{\texttt{nn\_full} di bawah anggaran langkah yang disamakan}
-          (D-30): anggaran sama, data lebih banyak. Inilah pembacaan yang benar
-          atas \textit{rung} tersebut, dan ia berbeda dari versi pra-perbaikan
-          yang menghasilkan sesuatu yang \textbf{tampak} seperti temuan.
-          % TODO: isi setelah run final dibaca.
-\end{itemize}
-
-\subsection{Kurva Jendela Pelaporan}
-
-\begin{itemize}
-    \item \textbf{Gambar: kurva keterampilan terhadap resolusi pelaporan}
-          (D-04), satu titik per jendela 1/3/6/24 jam, per domain, per model.
-    \item \textbf{Tabel: metrik per jendela}, membawa pangsa nol teramati per
-          jendela agar pembaca melihat target berubah bentuk saat jendela
-          melebar --- 94,30/97,00 pada 1 jam, 90,09/94,52 pada 3 jam,
-          85,40/91,35 pada 6 jam, 64,63/76,63 pada 24 jam
-          [terukur, \textit{build} 2026-09-06].
-    \item \textbf{NF-01 dievaluasi terhadap setiap jendela} (D-12), bukan hanya
-          terhadap jendela primer. Dinyatakan \textbf{tidak terpenuhi} pada
-          resolusi jam, dengan alasannya.
-    \item \textbf{Jendela 6 jam adalah nominasi demi keterbacaan, bukan optimum
-          yang diturunkan} --- tidak ada kriteria seleksi yang pernah
-          diterapkan padanya (D-04). Nyatakan begitu.
-    \item \textbf{Kalibrasi di samping setiap baris berjendela}: rasio rerata
-          prediksi terhadap rerata observasi. Terukur pada tropis fold 2,
-          rerata GFD prediksi 6 jam adalah \textbf{0,37 sampai 0,45} dari rerata
-          observasi \textbf{di seluruh tangga} --- setiap model, sehingga ini
-          sifat transformasinya dan bukan sifat modelnya (D-03)
-          [terukur, tercatat].
-\end{itemize}
-
-\subsection{Hasil per Tahap Hurdle}
-
-\begin{itemize}
-    \item \textbf{Tabel: hasil tahap okurensi dan tahap cacah secara terpisah}
-          (D-13), lalu cacah harapan gabungan
-          $P(\text{okurensi}) \times E[\text{cacah}\mid\text{okurensi}]$.
-    \item Membaca kedua tahap terpisah adalah cara melihat di mana kesalahan
-          berada --- kesalahan pemeringkatan okurensi dan kesalahan intensitas
-          punya obat yang berbeda.
-          % TODO: isi setelah run final dibaca.
-\end{itemize}
-
-\subsection{Hasil Sweep Satu Faktor}
-
-\begin{itemize}
-    \item \textbf{Sweep \texttt{train\_rows} --- efisiensi sampel} (D-14).
-          \textbf{Sudah diukur dan hasilnya tidak mendukung klaim keunggulan
-          data-sedikit untuk QNN.} \texttt{train\_rows} pada 500/1.000/3.000,
-          tiga seed, fold 2. QNN dikurangi NN berparameter-cocok, positif
-          berarti lebih buruk [terukur, tercatat]:
-          \begin{itemize}
-              \item 500 baris: okurensi $+0,0237$ (sd $0,0191$); cacah
-                    $+0,0054$ (sd $0,0513$);
-              \item 1.000 baris: okurensi $+0,0274$ (sd $0,0142$); cacah
-                    $+0,0067$ (sd $0,0287$);
-              \item 3.000 baris: okurensi $+0,0269$ (sd $0,0082$); cacah
-                    $+0,0208$ (sd $0,0173$).
-          \end{itemize}
-          Pada okurensi selisihnya melampaui simpangan baku terkumpul di setiap
-          anak tangga dan \textbf{tidak menyusut} sepanjang julat data 6$\times$.
-          Tesis melaporkan bahwa keunggulan \textbf{dicari dengan replikasi yang
-          memadai dan tidak ditemukan} --- bukan bahwa ia tidak ada.
-    \item \textbf{Sweep \texttt{hour\_encoding} --- 13/14/15 fitur} (D-02).
-          % TODO: isi setelah run dibaca.
-    \item \textbf{Sweep \texttt{train\_zero\_ratio} --- alami/75\%/50\%} (D-07).
-          % TODO: isi setelah run dibaca.
-    \item \textbf{Sweep \texttt{feature\_reduction} --- None/pca8/pca6} (D-40),
-          disertai \textbf{di sisi mana pembalikan paritas} sebuah hasil berada,
-          karena sirkuit dibangun pada lebar tereduksi sehingga jumlah
-          parameternya ikut berubah.
-          % TODO: isi setelah run dibaca.
-    % TODO(open): pertanyaan terbuka 23 — EMPAT sweep OFAT dideklarasikan dan
-    %   BELUM DIJALANKAN. Sebutkan secara eksplisit mana yang dijalankan dan
-    %   mana yang tidak; jangan menyajikan daftar sumbu seolah semuanya berjalan.
-    % TODO(open): pertanyaan terbuka 21 — sumbu `shots` DICURIGAI TIDAK BEKERJA
-    %   dan BELUM DIUJI. Jangan melaporkan hasil apa pun darinya.
-\end{itemize}
-
-\subsection{Variabilitas Antar Fold}
-
-\begin{itemize}
-    \item \textbf{Tabel: hasil per fold} (D-06), fold 1--3, agar pembaca melihat
-          sebaran dan bukan hanya reratanya.
-    \item \textbf{Keterbatasan siklus surya}: tiga fold merentang 2022--2024,
-          jauh lebih pendek daripada siklus aktivitas matahari, sehingga
-          variabilitas antar fold tidak boleh dibaca sebagai variabilitas
-          antar tahun secara umum.
-          % TODO(open): pertanyaan terbuka 25 — apakah spektrum varians yang datar
-          %   bertahan di luar satu fold satu domain? Belum diuji.
-\end{itemize}
-
-\subsection{Hasil Lintas Domain}
-
-\begin{itemize}
-    \item \textbf{Tabel: empat kombinasi latih--uji} (tropis$\rightarrow$tropis,
-          tropis$\rightarrow$subtropis, subtropis$\rightarrow$subtropis,
-          subtropis$\rightarrow$tropis), dengan \textit{scaler} domain
-          \textbf{sumber} (D-36).
-    \item \textbf{Selisih lintas domain yang tersisa dibaca sebagai temuan
-          transfer}, bukan sebagai kegagalan --- dan hanya sah dibaca begitu
-          karena \texttt{KX} sudah dibuang dari kedua domain (D-01) sehingga
-          keduanya menyajikan 13 prediktor yang sama.
-    \item \textbf{Biaya membuang \texttt{KX}} (D-01) dilaporkan terpisah:
-          perbandingan terhadap studi terdahulu melemah karena prediktor yang
-          dipakainya tidak tersedia di kedua domain. Nyatakan.
-          % TODO: isi setelah run dibaca.
-\end{itemize}
-
-\subsection{Agregasi Spasial}
-
-\begin{itemize}
-    \item \textbf{Hasil pelengkap, bukan sumbu utama kedua} (D-05). Prediksi
-          diagregasikan atas blok $2\times2$ sel pada kedua domain.
-    \item \textbf{Aritmetikanya penting}: GFD adalah kerapatan, sehingga
-          agregasi sel adalah $\sum(\text{cacah}) / \sum(\text{luas})$,
-          \textbf{tidak pernah} rerata kerapatan per sel --- luas sel berbeda
-          menurut lintang.
-    \item Tropis hanya 30 sel, sehingga blok $5\times5$ nyaris seluruh domain
-          dan $2\times2$ adalah batasnya.
-          % TODO(open): pertanyaan terbuka 19 — dimensi lintang $\times$ bujur
-          %   subtropis belum dikonfirmasi (56 sel, bukan 54 titik NASA POWER).
-          %   Konfirmasi sebelum mengklaim $3\times3$ tersedia di subtropis.
-\end{itemize}
-
-\subsection{Kesetaraan Dua Jalur Gradien}
-
-\begin{itemize}
-    \item \textbf{Verifikasi \textit{forward pass}}: sirkuit PennyLane dan
-          Qiskit sepakat sampai $10^{-10}$ (D-28) --- ini menjawab pertanyaan
-          tentang \textbf{sirkuit}.
-    \item \textbf{\textit{Run} Qiskit tereduksi} (D-39): 500 baris $\times$ 15
-          epoch, satu fold, satu seed, tahap okurensi saja --- menjawab
-          pertanyaan tentang \textbf{pelatihan}. Ruang lingkupnya dinyatakan
-          agar tidak ada pembaca yang mengasumsikan lebih; pasangan
-          \textit{hurdle} penuh adalah 21,9 jam dan tidak dijalankan.
-          % TODO(open): pertanyaan terbuka 24 — D-39 berstatus DIPUTUSKAN, BELUM
-          %   DIJALANKAN. Jangan menulis hasilnya sebelum ada.
-\end{itemize}
-
+asdfasdf
 \section{Pembahasan Hasil Evaluasi}
+\section{Evaluasi Kesalahan Penulisan yang Sering Terjadi}
+\subsection{Penggunaan Kata "di mana" atau "dimana"}
+Banyak yang menuliskan kata "di mana" atau "dimana" sebagai pengganti kata "which" dalam bahasa Inggris. 
+Padahal, penggunaan kata "di mana" atau "dimana" tidak tepat dalam konteks tersebut. Demikian juga untuk kata serupa, misalnya "yang mana".
+Kata "di mana" atau "dimana" ini harus diganti dengan kata lain, seperti "dengan", "tempat", "yang", dan sebagainya tergantung kalimatnya.
+Penjelasan lengkap dapat dilihat pada \autocite{BPBI}.
 
-\begin{itemize}
-    \item \textbf{Terhadap NF-01}: dinyatakan tidak terpenuhi pada resolusi jam
-          dan dijelaskan sebagai perbedaan kategori --- NF-01 ditulis terhadap
-          kerapatan bulanan, sedangkan target di sini adalah proses cacah
-          94--97\% nol (D-12). Dievaluasi terhadap setiap jendela, dan pada 24
-          jam pangsa nol tropis 64,63\% membuat R\textsuperscript{2} dapat
-          ditafsirkan meski target tetap didominasi nol.
-    \item \textbf{Terhadap NF-02}: terpenuhi secara mekanisme, \textbf{belum
-          diuji ujung-ke-ujung} (D-42, pertanyaan terbuka 28). Kalimat itu
-          persis, tidak lebih.
-    \item \textbf{Terhadap klaim QML}: efisiensi sampel dicari dan tidak
-          ditemukan (D-14); paritas parameter adalah mata uang yang lemah dan
-          harus dikatakan begitu (D-34).
-    \item \textbf{Terhadap studi terdahulu}: perbandingan melemah oleh
-          pembuangan \texttt{KX} (D-01) dan oleh perbedaan resolusi
-          (D-21) --- keduanya dinyatakan, bukan diselipkan.
-    \item \textbf{Ancaman terhadap validitas, seluruhnya dinyatakan di muka:}
-          komposisi CG/IC subtropis (pertanyaan terbuka 10), konvensi
-          \textit{flash} lawan \textit{stroke} (pertanyaan terbuka 11), konfound
-          \textit{detection efficiency} (D-27), asimetri \textit{sweep}
-          (D-29, D-37), dan tujuh hiperparameter tanpa alasan tercatat
-          (pertanyaan terbuka 22).
-\end{itemize}
+\subsection{Penggunaan Kata "sedangkan" dan "sehingga"}
+
+\begin{table}[t]
+  \begin{tabular}{|c|l|l|}
+  \hline
+  Kata & Salah & Benar \\ \hline
+  sedangkan & \begin{tabular}[c]{@{}c@{}}Sedangkan sistem lama masih\\ digunakan oleh banyak pengguna.\end{tabular} & \begin{tabular}[c]{@{}c@{}}Sistem lama masih digunakan\\ oleh banyak pengguna,\\ sedangkan sistem baru belum siap.\end{tabular} \\ \hline
+  sehingga & \begin{tabular}[c]{@{}c@{}}Sehingga sistem lama masih\\ digunakan oleh banyak pengguna.\end{tabular} & \begin{tabular}[c]{@{}c@{}}Sistem lama masih digunakan\\ oleh banyak pengguna sehingga\\ sistem baru belum siap.\end{tabular} \\ \hline
+  \end{tabular}
+  \caption{Contoh penggunaan kata "sedangkan" dan "sehingga"}
+  \label{tbl:sedangkan_sehingga}
+\end{table}
+
+Kata "sedangkan" dan "sehingga" adalah kata hubung atau konjungsi. 
+Konjungsi adalah kata atau ungkapan yang menghubungkan satuan bahasa 
+(kata, frasa, klausa, dan kalimat). 
+Konjungsi dapat dibagi menjadi konjungsi intrakalimat dan antarkalimat.  
+Kata "sedangkan" menghubungkan dua klausa yang bersifat kontrasif, 
+sedangkan "sehingga" menghubungkan dua klausa yang bersifat kausal. 
+Dalam ragam formal, kata hubung “sedangkan” dan “sehingga” hanya dapat digunakan 
+sebagai konjungsi intrakalimat sehingga kedua konjungsi itu \textbf{tidak dapat diletakkan pada awal kalimat}.
+Selain itu, penggunaan kata "sedangkan" harus didahului oleh koma (,), sedangkan kata "sehingga" tidak perlu didahului oleh koma (,).
+Contoh penggunaan yang benar dan salah dapat dilihat pada Tabel \ref{tbl:sedangkan_sehingga}.
+
+
+\subsection{Penggunaan Istilah yang Tidak Baku}
+Ada beberapa istilah yang sering digunakan dalam pembicaraan sehari-hari, tetapi tidak baku dalam penulisan ilmiah.
+Beberapa istilah tersebut antara lain:
+\begin{enumerate}
+  \item analisa $\rightarrow$ analisis
+  \item eksisting atau existing $\rightarrow$ yang ada atau saat ini
+  \item bisnis proses $\rightarrow$ proses bisnis
+  \item user $\rightarrow$ pengguna
+  \item system $\rightarrow$ sistem
+  \item database $\rightarrow$ basis data
+  \item aktifitas $\rightarrow$ aktivitas
+  \item efektifitas $\rightarrow$ efektivitas
+  \item sosial media $\rightarrow$ media sosial
+\end{enumerate}
+
+\subsection{Pemisah Desimal dan Ribuan}
+Tanda pemisah desimal dalam bahasa Indonesia adalah tanda koma, contoh:
+\begin{enumerate}
+  \item (Salah) Akurasi naik menjadi 50.6\% 
+  \item (Benar) Akurasi naik menjadi 50,6\% 
+\end{enumerate}
+
+\subsection{Daftar atau \textit{List}}
+Ada beberapa aturan penulisan daftar atau \textit{list} yang perlu diperhatikan, antara lain:
+\begin{enumerate}[a)]
+\item Jika memungkinkan, hindari penggunaan “bullet points” atau sejenisnya. Sebaiknya, gunakan angka (1, 2, 3, ...) atau huruf (a, b, c, …). Dengan demikian, pembaca dapat dengan mudah melihat jumlah \textit{item} atau \textit{list}. 
+\item Jika dalam daftar hanya ada satu item, tidak perlu menggunakan nomor urut.
+\item Penjelasan atau deskripsi suatu item sebaiknya menyatu dengan judul item tersebut, tidak berbeda halaman. Contoh yang salah: judul item ada di halaman 10, namun deskripsinya di halaman 11. Sebaiknya pindahkan judul tersebut ke halaman 11.
+\item Jika penjelasan atau deskripsi suatu item cukup panjang, misalnya lebih dari 1 halaman atau terdiri atas beberapa paragraf, sebaiknya setiap item tersebut dijadikan judul subbab, kecuali jika level subbab sudah mencapai level 4. 
+\end{enumerate}
+
+\subsection{Penggunaan Kata "masing-masing" dan "setiap"}
+Kata “masing-masing” digunakan di belakang kata yang diterangkan, misalnya 
+"Setiap proses menggunakan algoritma masing-masing". Kata “tiap-tiap” atau “setiap”
+ditempatkan di depan kata yang diterangkan, misalnya
+"Setiap proses menggunakan algoritma tertentu".
