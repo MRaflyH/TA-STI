@@ -41,8 +41,7 @@ VARIABLE_SHORTNAME = {
     "vertical_integral_of_divergence_of_cloud_liquid_water_flux": "vilwd",
     # Tier 1 candidates. Short names unverified against a real file -- --check
     # reports anything that lands under a different name.
-    "vertical_integral_of_divergence_of_moisture_flux": "viwvd",
-    "mean_convective_precipitation_rate": "mcpr",
+    "vertical_integral_of_divergence_of_moisture_flux": "vimdf",
     "total_totals_index": "totalx",
     "convective_inhibition": "cin",
     "cloud_base_height": "cbh",
@@ -71,8 +70,7 @@ SHORTNAME_MAP = {
     "tclw": "TCLW",
     "viiwd": "VIIWD",
     "vilwd": "VILWD",
-    "viwvd": "VIWVD",
-    "mcpr": "MCPR",
+    "vimdf": "VIMDF",
     "totalx": "TOTALX",
     "cin": "CIN",
     "cbh": "CBH",
