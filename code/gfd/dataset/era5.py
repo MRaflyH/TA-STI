@@ -378,14 +378,17 @@ def check_variables(domain: cfg.Domain, directory: str | Path = cfg.RAW_ERA5_DIR
 
     df = parse_netcdf(files[0])
     found = {c for c in df.columns if c not in ("lat", "lon", "time")}
-    mapped = set(SHORTNAME_MAP)
+    # Against what a fetch asks for, not against every name the code knows --
+    # SHORTNAME_MAP also holds candidates that were never requested.
+    requested = {VARIABLE_SHORTNAME[v] for v in VARIABLES}
 
     print(f"\n[era5] {domain.name}: {len(files)} files, sampled {files[0].name}")
     print(f"  requested {len(VARIABLES)}, found {sorted(found)}")
-    if mapped - found:
-        print(f"  !! mapped but absent: {sorted(mapped - found)}")
-    if found - mapped:
-        print(f"  !! found but unmapped (dropped silently): {sorted(found - mapped)}")
+    if requested - found:
+        print(f"  !! requested but absent: {sorted(requested - found)}")
+    if found - set(SHORTNAME_MAP):
+        print(f"  !! found but unmapped (dropped silently): "
+              f"{sorted(found - set(SHORTNAME_MAP))}")
 
     for tag, files in _supplement_files(domain, directory).items():
         cols = [c for c in parse_netcdf(files[0]).columns if c in SHORTNAME_MAP]
