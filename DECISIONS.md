@@ -39,11 +39,11 @@ where the data preparation is described.
 
 **Decided by.** Rafly, 2026-09-10.
 
-**Status.** Layout decided 2026-09-10 when no file under `code/` existed.
-Since then `config.py`, `dataset/features.py`, `dataset/lightning.py` and
-`dataset/era5.py` are written and the package installs. `dataset/power.py` and
-`dataset/build.py` are not. `selection/`, `models/`, `training/`,
-`evaluation/` and `experiments/` are still names only.
+**Status.** `dataset/` is complete: `features.py`, `lightning.py`, `merlin.py`,
+`era5.py`, `power.py`, `build.py`, plus the root `config.py`. The package
+installs and tropis builds end to end. `selection/`, `models/`, `training/`,
+`evaluation/` and `experiments/` are still names only — no file exists in any
+of them.
 
 ---
 
@@ -133,8 +133,11 @@ symmetric across domains).
 
 **Decided by.** Rafly, 2026-09-10.
 
-**Status.** Download running at the time of writing. **Not yet verified that
-the supplementary files actually contain `kx`.**
+**Status.** The mechanism is verified: `era5_subtropis_hourly_201801_kx.nc`
+parses to `['kx', 'lat', 'lon', 'time']` **[measured]**. The rest are still
+downloading — 38 of 84 at the last check. Subtropis must not be built until all
+84 land, or `KX` arrives ~55% NaN for reasons that have nothing to do with the
+data.
 
 ---
 
@@ -147,21 +150,27 @@ The two already-downloaded regional files stay on disk.
 it is held constant across roughly 730 consecutive rows. A feature that cannot
 vary hour to hour cannot explain hour-to-hour variance in the target.
 
+**Not** because the data is thin. v1's config called it "(sparse!)" and never
+checked; it is complete — 756 records, 9 points × 84 months, zero missing,
+2018-01 to 2024-12 **[measured]**. Bab II should say resolution and not repeat
+the sparsity claim.
+
 **Cost.** One fewer aerosol-related variable, in a literature where aerosol
 loading is argued to affect lightning. Bab II should say the variable was
 considered and rejected on resolution grounds rather than omit it — a reviewer
-who knows the aerosol literature will look for it.
+who knows that literature will look for it.
 
-**Reversal.** Add it back to the POWER parameter list; the raw files are
-already there, so no re-download. The broadcast machinery is deliberately kept
-for this reason and for whatever the literature step turns up.
+**Reversal.** Add it back to `power.PARAM_FREQ` and to `features.POWER`; the
+raw files are already there, so no re-download. The broadcast machinery is
+deliberately kept for this reason and for whatever the literature step turns
+up.
 
 **Bab.** II (considered and rejected), IV.
 
 **Decided by.** Rafly, 2026-09-10.
 
-**Status.** **Decided, not implemented.** `features.POWER` still lists it and
-`power.py` does not exist yet.
+**Status.** Implemented. `power.PARAMS` and `features.POWER` both hold the same
+five parameters.
 
 ---
 
@@ -194,21 +203,23 @@ separately ratified.
 
 ## D-7 — Two of v1's four smoke modules survive, as validations
 
-**Decided.** The diurnal check becomes `lightning.check_diurnal`, and the
-ERA5 variable check becomes `era5.check_variables`. `smoke_power` and
-`smoke_build` are not carried over. No module is named `smoke_*`; each check
-lives in the module that owns the concern, per INSTRUCTIONS §3.
+**Decided.** The diurnal check becomes `lightning.check_diurnal`, the ERA5
+variable check becomes `era5.check_variables`, and the POWER file inventory
+becomes `power.check_files`. `smoke_power` and `smoke_build` are not carried
+over as modules. Nothing is named `smoke_*`; each check lives in the module
+that owns the concern, per INSTRUCTIONS §3.
 
 **Why.** `smoke_power` and `smoke_build` existed to protect a download before
 it happened. All four acquisitions are complete, so that job is finished. The
-other two are not tests — the diurnal histogram is the evidence that settled
-the PLN clock and belongs in Bab III, and `check_variables` is what caught the
-KX absence.
+others are not tests — the diurnal histogram is the evidence that settled the
+PLN clock and belongs in Bab III, and `check_variables` is what caught the KX
+absence.
 
-**Cost.** `smoke_build`'s key-overlap check is lost, and it guarded a real
-failure: a left join whose right side has no matching keys returns an all-NaN
-block without raising. That check should be rebuilt inside `build.py` rather
-than left out.
+**Cost.** None outstanding. `smoke_build`'s key-overlap check was the one real
+loss and it is rebuilt as `build._check_keys`, which **raises** on a dtype
+mismatch or zero overlap and warns below 50%. It guards the failure v1
+recorded: a left join whose right side has no matching keys returns an all-NaN
+predictor block without raising.
 
 **Reversal.** The v1 modules are in `code archive/`.
 
@@ -219,18 +230,149 @@ separately ratified.
 
 ---
 
+## D-8 — `dataset/` keeps every month. Row and column selection is `selection/`
+
+**Decided.** The built table is a complete grid: every configured month for
+every cell, including months holding no strike records at all. Empty months
+carry `observed_days = 0` and `coverage = 0`. `MIN_COVERAGE` stays at 0.0 and
+`dataset/` never drops a row on coverage grounds. Removing months, filtering
+rows and choosing columns are `selection/`'s job and get narrated there.
+
+**Why.** A dropped row cannot be examined. Keeping it with `coverage = 0`
+attached means the zero says of itself that it is an absence of observation
+rather than an observation of absence — nothing is manufactured and nothing is
+lost, and the filter becomes a decision made on a labelled column, on evidence,
+in the place that owns row and feature selection.
+
+It also makes the domains structurally comparable: both tables span the same 84
+months whatever their detectors were doing.
+
+**Cost.** The reported zero share now mixes observed zeros with unobserved
+ones, so **zero share must be reported beside mean coverage**, or beside the
+zero share over `coverage > 0` rows. Tropis is 94.30% zeros with all 84 months
+observed; a subtropis figure computed the same way may not mean the same thing.
+Rows at `coverage = 0` also carry real ERA5 and POWER values against a target
+that was never observed — exactly the kind of row a model will happily fit.
+
+**Reversal.** Raise `cfg.MIN_COVERAGE` above 0. That reinstates dropping inside
+`dataset/` and requires a rebuild.
+
+**Bab.** III (what the table contains), IV (how coverage is handled and
+reported).
+
+**Decided by.** Rafly, 2026-09-10. Stated as final.
+
+---
+
+## D-9 — One module per source
+
+**Decided.** `dataset/` holds `merlin.py`, `era5.py` and `power.py`, each
+owning acquisition and loading for its source. `lightning.py` keeps the grid,
+the target construction, the PLN loader and the diurnal check. v1's
+`merlin_download.py` is ported into `merlin.py` along with the MERLIN loaders
+that used to live in `lightning.py`.
+
+**Why.** Reproducibility, not need — the MERLIN files are already on disk. But
+they are *obtainable*, and a replay from a clean checkout could not obtain them
+without this. PLN has no downloader because those records came through the
+supervisors and are not public: a hole by circumstance, and one the RUNBOOK
+should state rather than leave to be discovered.
+
+**Cost.** `lightning.py` no longer defines `load_merlin`; `LOADERS` points at
+`merlin.load`. Anything importing the old name breaks.
+
+**Reversal.** A file move. §3 makes module layout inside a subpackage an
+ordinary edit, so this is recorded for the convention it sets rather than
+because it needed permission.
+
+**Bab.** V.
+
+**Decided by.** Not recorded — proposed during implementation.
+
+**Status.** The token codec reproduces all seven captured tokens **[measured]**
+and 89 windows cover 2018–2024. The HTTP path has never run in this codebase;
+the existing files came from v1. Same for `power.fetch_point` and
+`power.fetch_regional`. Say so in Bab V rather than claiming the acquisition
+code "works".
+
+---
+
+## Measured
+
+Findings that correct something the archive asserts, or that the thesis will
+need to quote. All `[measured]`, 2026-09-10.
+
+- **The PLN export is entirely cloud-to-ground.** 2 242 100 CG strikes, 0
+  non-CG dropped, and `Discrimination` is present in the workbook so the
+  loader's `"CG"` fallback never fired. `positive_share` spans 0 to 1, so
+  polarity reads correctly from the same field. v1 left this uncounted and
+  warned against generalising from 2024 alone.
+- **All six ERA5 variables are `instant`**, checked against `GRIB_stepType`.
+  Downloads are not ZIPs, so `_open_members`' archive branch has never
+  executed. The archive's claim that VIIWD and VILWD are time-averaged is
+  wrong, and no one-hour realignment is owed on the existing six.
+- **POWER hourly has no missing values.** 0 of 8 760 hours are sentinel across
+  all five parameters in the sampled point-year, and `load_power` reports 0%
+  empty across all 211 tropis files. The `-999` in the file is the header's
+  declared `fill_value`, not data.
+- **POWER's longitude grid is coarser than the project grid in both domains.**
+  One collision each — tropis 6 cells on 5 POWER points, subtropis 7 on 6.
+  Roughly symmetric, so it is a resolution limitation for Bab IV rather than a
+  cross-domain asymmetry.
+- **Tropis: 1 841 040 rows, 30 cells × 61 368 hours, 94.30% zeros**, 104 955
+  cell-hours with at least one flash. Matches v1's figure exactly.
+- **Tropis coverage**: mean 0.855, median 0.967, min 0.129; 31.2% of rows below
+  0.9. A 0.9 gate would delete nearly a third of the tropical dataset.
+- **6 of 30 tropis cells have zero flashes in all 61 368 hours** — 368 208 rows
+  of guaranteed zero, 20% of the domain. See O-3.
+- **The intensity target is complete where defined**: all 104 955 non-zero
+  cell-hours carry all five statistics.
+
+---
+
 ## Open
 
-**O-1 — The calendar columns.** `hour_of_day_local` has a clear physical
-reading and points the same way in both domains. `month_of_year` and
-`day_of_year` carry seasonal phase, which is inverted between the domains and
-could inject a domain artefact into the cross-domain transfer number.
-`hour_of_day_utc` is `hour_of_day_local` shifted by a constant. Deferred until
-the literature step; `build.py` emits all of them regardless, so the decision
-is a `features.py` edit with no rebuild.
+**O-1 — The calendar columns.** A proposal exists and is not yet written into
+`features.py`: `hour_of_day_local` as a candidate, encoded sin/cos rather than
+as an integer; `cos_sza` as a new candidate, computed from lat, longitude, day
+of year and hour rather than downloaded, carrying season with the correct sign
+in both hemispheres; `month_of_year` and `day_of_year` tested against `cos_sza`
+rather than assumed; `hour_of_day_utc` as bookkeeping.
 
-**O-2 — Whether the lock is one file or two.** `requirements.txt` currently
-holds both the pins and the reasoning, so regenerating it with `pip freeze`
-destroys the comments — which has already happened once. The alternative is a
+`cos_sza` does not replace `hour_of_day_local`. SZA is symmetric about solar
+noon, so 09:00 and 15:00 are near-identical (0.724 against 0.681
+**[measured]**) while lightning peaks in the afternoon. Both are needed.
+
+Surface shortwave radiation (ERA5 `ssrd`, POWER `ALLSKY_SFC_SW_DWN`) is **not**
+a substitute: its value is suppressed by the storm clouds that are the
+prediction target, making it an observation of the outcome rather than a
+predictor of the conditions.
+
+`build.py` already emits all seven columns, so this is a `features.py` edit
+with no rebuild. Blocked on the literature step.
+
+**O-2 — Whether the lock is one file or two.** `requirements.txt` holds both
+the pins and the reasoning, so regenerating it with `pip freeze` destroys the
+comments — which has already happened once. The alternative is a
 generated-only `environment-lock.txt` beside it. v1's D-41 was caused by two
 files disagreeing after one was hand-edited, not by there being two.
+
+**O-3 — Permanently dead cells.** 6 of 30 tropis cells never flash. `lat` and
+`lon` are candidate predictors, so a model can learn "this coordinate is always
+zero" and score well without learning any meteorology — and that rule cannot
+transfer to Florida, so it inflates within-domain performance and depresses
+cross-domain, which is the number this thesis reports. Distinct from the
+zero-hour question §4 settles: a quiet hour in an active cell is a real
+observation; a cell with no flash in seven years probably is not observed at
+all. Likely sea, or outside LDS range. Options: exclude such cells, exclude
+`lat`/`lon` as predictors, or keep both and declare the effect. Subtropis will
+have its own version along the Florida coastline.
+
+**O-4 — Tier 1 ERA5 additions.** Seven candidate variables are drafted and
+their short names are in `era5.VARIABLE_SHORTNAME`, but `VARIABLES` still
+requests six and `features.CANDIDATES` holds none of them. A one-month,
+one-domain trial is written and waiting on the KX queue; it is also the first
+request to mix analysis and forecast variables, and therefore the first to
+exercise the ZIP branch. `mean_convective_precipitation_rate` is a mean rate
+and would need a one-hour realignment; `convective_rain_rate` is the
+instantaneous alternative and would not. Undecided.
