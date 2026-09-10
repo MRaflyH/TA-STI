@@ -4,4 +4,85 @@
 \cleardoublepage
 \chapter{IMPLEMENTASI}
 \label{chap:implementasi}
-asdfasdf
+
+\section{Struktur Kode dan Lingkungan}
+\label{sec:struktur-kode}
+Seluruh kode berada dalam satu paket bernama \texttt{gfd}. Paket ini dipasang
+sekali dengan \texttt{pip install -e code/}, lalu tiap bagiannya dipanggil
+sebagai modul. Susunan paket dapat dilihat pada
+Listing~\ref{lst:struktur-gfd}.
+
+\begin{minipage}{\textwidth}
+\begin{lstlisting}[caption={Susunan paket gfd}, label={lst:struktur-gfd}, frame=single, captionpos=t, language=]
+gfd/
+    config.py
+    dataset/
+    selection/
+    models/
+    training/
+    evaluation/
+    experiments/
+\end{lstlisting}
+\end{minipage}
+
+Berkas \texttt{config.py} memegang hal yang harus disepakati semua subpaket.
+Subpaket \texttt{dataset/} mengambil data dari tiap sumber dan menggabungkannya
+menjadi tabel per jam. Subpaket \texttt{selection/} memilih fitur yang dipakai
+model. Subpaket \texttt{models/} hanya memuat definisi estimator, sedangkan
+pelatihannya ada di \texttt{training/}. Subpaket \texttt{evaluation/}
+menghitung metrik dan menyusun tabel hasil, dan \texttt{experiments/}
+menjalankan matriks eksperimen. Pembagian ini memisahkan bagian yang berubah
+karena sebab berbeda: definisi model, prosedur pelatihan, dan tabel hasil.
+
+Lingkungan yang dipakai adalah Python 3.13.7, dengan batas bawah 3.12 karena
+numpy 2.5.2 tidak dapat dipasang di bawahnya. Seluruh versi pustaka dipatok
+tepat pada satu berkas \texttt{requirements.txt}. Versi yang dipatok adalah
+versi yang menghasilkan tabel dan hasil pada tugas akhir ini, jadi
+pemutakhiran pustaka tidak dilakukan tanpa alasan yang dicatat. Daftar
+lengkapnya dapat dilihat pada Tabel~\ref{tab:pustaka}.
+
+\begin{table}[!t]
+  \caption{Pustaka Python yang dipakai beserta versinya}
+  \label{tab:pustaka}
+  \small
+  \begin{tabular}{ | l | l | p{0.42\textwidth} | }
+    \hline
+    Pustaka & Versi & Kegunaan \\
+    \hline
+    \multicolumn{3}{|l|}{\textit{Pengolahan data}} \\
+    \hline
+    pandas & 3.0.5 & Tabel data \\
+    numpy & 2.5.2 & Operasi larik numerik \\
+    scipy & 1.17.1 & Fungsi statistik \\
+    pyarrow & 25.0.1 & Membaca dan menulis berkas \textit{parquet} \\
+    scikit-learn & 1.8.0 & Model klasik pembanding, penskalaan, dan metrik \\
+    matplotlib & 3.10.8 & Gambar \\
+    \hline
+    \multicolumn{3}{|l|}{\textit{Akuisisi dan pembacaan berkas sumber}} \\
+    \hline
+    requests & 2.34.2 & Permintaan HTTP ke arsip MERLIN dan NASA POWER \\
+    truststore & 0.10.4 & Sertifikat sistem, tanpa ini unduhan MERLIN gagal \\
+    cdsapi & 0.7.7 & Permintaan ke \textit{Climate Data Store} untuk ERA5 \\
+    xarray & 2026.7.0 & Membaca berkas keluaran ERA5 \\
+    netCDF4 & 1.7.4 & Pembaca berkas NetCDF \\
+    openpyxl & 3.1.5 & Membaca berkas Excel data PLN \\
+    \hline
+    \multicolumn{3}{|l|}{\textit{Kuantum dan optimasi}} \\
+    \hline
+    qiskit & 2.5.2 & Pembangunan sirkuit kuantum \\
+    qiskit-machine-learning & 0.9.1 & Komponen pembelajaran mesin kuantum \\
+    qiskit-aer & 0.17.2 & Simulator sirkuit Qiskit \\
+    pennylane & 0.45.1 & Kerangka kerja QNN \\
+    pennylane-lightning & 0.45.0 & Simulator cepat untuk PennyLane \\
+    torch & 2.14.0 & Perhitungan gradien untuk PennyLane \\
+    \hline
+  \end{tabular}
+\end{table}
+
+Terdapat dua pustaka kuantum, dan ini disengaja. Qiskit hanya menyediakan
+\mbox{\textit{parameter-shift}} untuk perhitungan gradien, dan cara itu terlalu
+lambat untuk pelatihan. PennyLane dipakai untuk pelatihan, sedangkan Qiskit
+dipertahankan sebagai pembanding untuk memeriksa kedua sirkuit menghasilkan
+hal yang sama. Keduanya sudah dipatok versinya, tetapi belum terpakai. Dari
+tujuh nama pada Listing~\ref{lst:struktur-gfd}, baru \texttt{config.py} dan
+\texttt{dataset/} yang ada berkasnya. Lima subpaket sisanya masih kosong.
