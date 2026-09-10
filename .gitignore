@@ -1,27 +1,25 @@
-# ---------------------------------------------------------------------------
-# Data is NEVER committed.
+# Data is never committed. data/raw/ is irreplaceable and the PLN records are
+# not public; data/processed/ is one command away.
 #
-#   data/raw/       irreplaceable. The PLN records came through the
-#                   supervisors, are not public, and MUST NOT be redistributed.
-#   data/processed/ regenerable by one command.
-#
-# No leading slash, so `data/` matches a directory named data at ANY depth.
-# That is deliberate: the previous rule was anchored to code/pipeline/data/
-# and silently stopped matching the moment the folder moved. This one
-# survives a rename.
-# ---------------------------------------------------------------------------
+# No leading slash, so this matches a data/ at any depth. The old rule was
+# anchored to code/pipeline/data/ and stopped matching the moment the folder
+# moved.
 data/
 
-# The archive keeps its own data in place and it never moves. Covered by the
-# rule above, but spelled out so a future edit to `data/` cannot quietly
-# expose the archived raw records.
+# Spelled out so an edit to the rule above can't quietly expose the archive's
+# copy of the raw records.
 code archive/data/
 code archive/pipeline/data/
 code archive/modelling/data/
 
-# Belt and braces: the raw formats themselves, wherever they end up.
+# Second line, for anything that ends up outside data/ by accident. .xlsx is
+# the one that matters -- that's PLN. .nc and .parquet are here because they're
+# large, not because they're sensitive; ERA5 is public and re-requestable.
+#
+# Not *.csv or *.json: modelled.json and results tables need committing.
 *.nc
 *.parquet
+*.xlsx
 
 # Python
 __pycache__/
@@ -29,19 +27,22 @@ __pycache__/
 *.pyo
 .venv/
 venv/
+*.egg-info/
+build/
+dist/
 .pytest_cache/
 .ipynb_checkpoints/
 
-# macOS
+# macOS. Finder scatters these through data/raw/ and they show up in file
+# listings as if they were data.
 .DS_Store
 
 # Editors
 .vscode/
 .idea/
 
-# LaTeX build artifacts.
-# A committed .bcf or .bbl lets biber succeed against a stale file while
-# xelatex has already died before \addbibresource. Keep these out of git.
+# LaTeX build artifacts. A committed .bcf or .bbl lets biber succeed against a
+# stale file after xelatex has already died before \addbibresource.
 *.aux
 *.bbl
 *.bcf

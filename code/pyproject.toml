@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gfd"
+version = "2.0.0"
+description = "Ground flash density prediction, tropical and subtropical domains"
+requires-python = ">=3.12"
+
+# Deliberately empty. requirements.txt at the repo root is the one pinned
+# environment; listing dependencies here too would give two places to
+# disagree, which is the D-41 failure all over again.
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["gfd*"]
