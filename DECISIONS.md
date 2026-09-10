@@ -133,11 +133,9 @@ symmetric across domains).
 
 **Decided by.** Rafly, 2026-09-10.
 
-**Status.** The mechanism is verified: `era5_subtropis_hourly_201801_kx.nc`
-parses to `['kx', 'lat', 'lon', 'time']` **[measured]**. The rest are still
-downloading — 38 of 84 at the last check. Subtropis must not be built until all
-84 land, or `KX` arrives ~55% NaN for reasons that have nothing to do with the
-data.
+**Status.** Done. All 84 supplementary files present and merged; the subtropis
+build reports `merging 84 [kx] files` and carries all six ERA5 columns
+**[measured]**. Both domains now hold the same 13 predictors.
 
 ---
 
@@ -262,6 +260,12 @@ reported).
 
 **Decided by.** Rafly, 2026-09-10. Stated as final.
 
+**Measured cost.** Subtropis zero share moves from 97,00% to 97,11%. The
+difference is exactly the three retained months: 56 cells x ~2 190 hours
+removed from the denominator reproduces v1's 97,00% to two decimals. Same data,
+same code, different figure — so any comparison against a v1 number has to say
+which convention it used.
+
 ---
 
 ## D-9 — One module per source
@@ -326,7 +330,28 @@ need to quote. All `[measured]`, 2026-09-10.
 - **6 of 30 tropis cells have zero flashes in all 61 368 hours** — 368 208 rows
   of guaranteed zero, 20% of the domain. See O-3.
 - **The intensity target is complete where defined**: all 104 955 non-zero
-  cell-hours carry all five statistics.
+  tropis cell-hours and all 99 273 subtropis cell-hours carry all five
+  statistics.
+- **Subtropis: 3 436 608 rows, 56 cells x 61 368 hours, 97,11% zeros**,
+  99 273 cell-hours with at least one flash.
+- **The MERLIN record is complete; three months are genuinely empty.** All 89
+  download windows covering 2018–2024 are present, and 2021-03, 2022-12 and
+  2024-02 contain no CG flashes. Those are the three quietest calendar slots
+  (December 2 734, February 4 440, March 8 495 strikes on the seven-year mean,
+  against 209 597 in July). Not a gap — a climatological absence.
+- **`coverage` is not comparable across domains.** Tropis mean 0,855, median
+  0,967, 31,2% of rows below 0,9. Subtropis mean 0,571, median 0,567, **70,1%
+  below 0,9**. The proxy counts a day with no lightning anywhere in the box as
+  unobserved, and Florida's winter is far quieter than West Java's dry season,
+  so the gap is climatology rather than instrumentation. A uniform threshold
+  would delete 70% of Florida and 31% of West Java for reasons unrelated to
+  detector uptime. This is the measurement that makes D-8's "reported, never
+  acted on" the only defensible position.
+- **Florida has more strikes but fewer active cell-hours.** 5 301 491 strikes
+  against tropis's 2 242 100, yet 99 273 non-zero cell-hours against 104 955.
+  Subtropical lightning is more concentrated in space and time.
+- **MERLIN export overlap is negligible**: 3 duplicate strikes dropped across
+  89 overlapping windows.
 
 ---
 
@@ -348,6 +373,13 @@ a substitute: its value is suppressed by the storm clouds that are the
 prediction target, making it an observation of the outcome rather than a
 predictor of the conditions.
 
+The seasonal argument against `month_of_year` and `day_of_year` is now
+measured rather than assumed: subtropis strikes by calendar month average
+209 597 in July against 2 704 in January, a factor of ~78, peaking in JJA;
+tropis peaks in the wet season. The two cycles are close to antiphase, so a
+model trained on one domain learns a month-to-activity mapping that is wrong in
+the other.
+
 `build.py` already emits all seven columns, so this is a `features.py` edit
 with no rebuild. Blocked on the literature step.
 
@@ -357,16 +389,24 @@ comments — which has already happened once. The alternative is a
 generated-only `environment-lock.txt` beside it. v1's D-41 was caused by two
 files disagreeing after one was hand-edited, not by there being two.
 
-**O-3 — Permanently dead cells.** 6 of 30 tropis cells never flash. `lat` and
-`lon` are candidate predictors, so a model can learn "this coordinate is always
-zero" and score well without learning any meteorology — and that rule cannot
-transfer to Florida, so it inflates within-domain performance and depresses
-cross-domain, which is the number this thesis reports. Distinct from the
-zero-hour question §4 settles: a quiet hour in an active cell is a real
-observation; a cell with no flash in seven years probably is not observed at
-all. Likely sea, or outside LDS range. Options: exclude such cells, exclude
-`lat`/`lon` as predictors, or keep both and declare the effect. Subtropis will
-have its own version along the Florida coastline.
+**O-3 — Permanently dead cells, and the asymmetry is one-sided.** 6 of 30
+tropis cells never flash in 61 368 hours; **0 of 56 subtropis cells**
+**[measured]**. All six sit in the two extreme latitude rows, none in the
+interior — consistent with `snapped_bbox` rounding the box outward past the
+extent the strike data covers.
+
+`lat` and `lon` are candidate predictors, so a model can learn "this coordinate
+is always zero" and score well on tropis without learning any meteorology:
+368 208 rows, 20% of the domain, guaranteed correct. There is no equivalent
+rule to transfer to Florida, so it inflates one side of the comparison and does
+nothing for the other — and the cross-domain gap is the number this thesis
+reports.
+
+Distinct from the zero-hour question §4 settles: a quiet hour in an active cell
+is a real observation; a cell with no flash in seven years probably is not
+observed at all. Options: exclude such cells, exclude `lat`/`lon` as
+predictors, or keep both and declare the effect. This is a `selection/`
+decision, not a `dataset/` one.
 
 **O-4 — Tier 1 ERA5 additions.** Seven candidate variables are drafted and
 their short names are in `era5.VARIABLE_SHORTNAME`, but `VARIABLES` still
