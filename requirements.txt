@@ -1,0 +1,41 @@
+# One environment for everything. Built on Python 3.13.7.
+# Won't install below 3.12 -- numpy 2.5.2 requires it.
+#
+#     python3.13 -m venv .venv && source .venv/bin/activate
+#     pip install -r requirements.txt
+#     pip install -e code/
+#
+# These are the exact versions that produced the 6 Sept build and the
+# 8 Sept runs, so don't upgrade anything casually -- if you do, write down
+# why in DECISIONS.md.
+#
+# To re-lock: pip freeze --exclude-editable
+
+pandas==3.0.5
+numpy==2.5.2
+scipy==1.17.1
+pyarrow==25.0.1        # not optional -- everything is written as parquet
+scikit-learn==1.8.0
+matplotlib==3.10.8
+
+openpyxl==3.1.5
+requests==2.34.2
+truststore==0.10.4     # without this the MERLIN download dies on a cert
+                       # error, even though curl fetches the same URL fine
+cdsapi==0.7.7
+xarray==2026.7.0
+netCDF4==1.7.4
+
+qiskit==2.5.2
+qiskit-machine-learning==0.9.1
+qiskit-aer==0.17.2
+
+# Two quantum libraries on purpose. Training runs on PennyLane because
+# Qiskit only has parameter-shift and it's far too slow; Qiskit is kept
+# to check the two circuits agree. D-28 has the numbers.
+pennylane==0.45.1
+pennylane-lightning==0.45.0
+
+# On Linux grab the CPU build or pip pulls ~2.5 GB of CUDA:
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch==2.14.0
