@@ -13,24 +13,19 @@ not a rule.
 
 ## 1. Layout
 
-One repository, two halves.
+One repository. The code is one installable package; the data and the paper
+sit beside it.
 
 ```
 .
 ├── INSTRUCTIONS.md       this file
 ├── DECISIONS.md          the record
 ├── requirements.txt      ONE environment, pinned exactly
-├── data/                 NOT in git. Shared by both halves.
+├── data/                 NOT in git
 │   ├── raw/              irreplaceable — see below
 │   └── processed/        one command away, safe to delete
 ├── code archive/         v1. READ-ONLY. Reference only.
-│   ├── INSTRUCTIONS.md   superseded — the six-document version
-│   ├── DECISIONS.md      superseded — D-N1..D-N12
-│   ├── DECISIONS-v1-archive.md   46 entries, 8 September 2026
-│   ├── components/       superseded — the five briefs
-│   ├── pipeline/         acquisition + build
-│   └── modelling/        the experiment
-├── code/                 the new code
+├── code/                 the new code — one package, see §3
 └── paper/
     ├── Rafly TA/             the thesis being written (II4092)
     ├── Rafly Final Proposal/ submitted proposal (II4091) — 60 real bib entries
@@ -42,8 +37,8 @@ It holds a working pipeline, two built tables, and 432 runs of real results
 from 8 September 2026. If this week fails, that is what gets submitted. Read it
 to see how something was done; retype what you need into `code/`.
 
-**`data/` sits at the repo root, not inside either half**, so the two share one
-copy and no folder rename can move it out from under its gitignore rule.
+**`data/` sits at the repo root, not inside `code/`**, so no package rename can
+move it out from under its gitignore rule.
 
 - `data/raw/` is **irreplaceable.** The PLN records came through the
   supervisors, are not public, and must not be redistributed. Back it up
@@ -52,16 +47,10 @@ copy and no folder rename can move it out from under its gitignore rule.
 
 **What carries over from the archive:** the proposal's `daftar-pustaka.bib`
 (60 verified entries), and the **measured findings and negative results** from
-the old RUNBOOKs and the old decision records. Not their reasoning paragraphs.
+the old RUNBOOKs. Not their reasoning paragraphs.
 
-**What does not:** the old `INSTRUCTIONS.md`, the old `DECISIONS.md`,
-`components/`, the README, RUNBOOK prose, or any loose script. They live in the
-archive so a finding can be looked up, not so a rule can be inherited. **A rule
-is only a rule if it is in this file.**
-
-**The root `DECISIONS.md` starts empty** and is written as decisions are made.
-Nothing is migrated into it. Where an archived entry still holds, it is
-re-decided and re-recorded, not carried across.
+**What does not:** the old decision record, README, RUNBOOK prose, or any loose
+script.
 
 ---
 
@@ -89,30 +78,58 @@ set freezes after the ablation, and is a config change with no rebuild.
 
 ## 3. Code
 
+**One installable package.** `code/` holds one package, `gfd`, with one
+`pyproject.toml`. Install it once with `pip install -e code/`. Every command is
+`python3 -m gfd.<subpackage>` and runs from anywhere in the repo — no directory
+is special, and a replay from a clean checkout is install-then-run.
+
+```
+gfd/
+├── config.py      shared truths: paths, domains, grid, time key, target
+├── dataset/       acquisition, gridding, the join, the column contract
+├── selection/     step 4 — screening and ablation
+├── models/        estimator definitions only — never fits, never scores
+├── training/      folds, subsampling, scaling, the one shared loop
+├── evaluation/    metrics, aggregation, the thesis tables
+└── experiments/   the matrix runner
+```
+
+**The seven names are fixed. The files inside them are not.** A new module
+inside a subpackage is an ordinary edit. A new subpackage, a rename, or moving
+a concern from one subpackage to another is a `DECISIONS.md` entry. See D-1.
+
 **No loose scripts at any level.** A new capability is a function in the module
-that owns the concern, reachable through that package's entry point. A
-supplementary ERA5 request belongs inside `era5.py`, not in a file beside it.
-Anything invisible to `python3 -m <package>.<module>` is invisible to a replay
-from a clean checkout.
+that owns the concern, reachable through its subpackage's entry point. A
+supplementary ERA5 request belongs inside `dataset/era5.py`, not in a file
+beside it. Anything invisible to `python3 -m` is invisible to a replay.
+
+**A constant lives in `gfd/config.py` if two subpackages disagreeing about it
+would be silent; otherwise it lives beside the code that uses it.** CDS request
+shapes and ansatz reps are local. Paths, the grid, the time key and the target
+are not.
+
+**`dataset/features.py` owns the column contract, and nothing else defines
+one.** Three lists: `EXCLUDE`, never a predictor, covering the target and its
+deterministic functions, the intensity statistics, `year`, `days_in_month` and
+`coverage`; `CANDIDATES`, everything acquired, frozen at the raw freeze;
+`MODELLED`, what survives the ablation. `selection/` writes `MODELLED`,
+`models/` reads it, nothing counts it. The leakage assertion raises rather than
+warns, and is never bypassed.
+
+**The built table is wider than the model.** `dataset/` may emit any number of
+columns; the model reads `MODELLED`. **Nothing hardcodes a feature count** —
+not 13, not 14, not 20. Read the length from the contract or from the table.
+
+**A fitted model carries its own scaler.** `training/` returns the model and
+the scaler it was fitted with, together. `evaluation/` scores what it is handed
+and has no way to reach for a different one.
 
 **Never rebuild something the package already defines.** A benchmark that
 constructs its own circuit can measure a different circuit from the one that
 trains. Import the real builder.
 
-**Nothing hardcodes a feature count.** Not 13, not 14, not 20. Read the length
-from the config or from the table.
-
-**The raw table is wider than the model.** The pipeline may emit any number of
-columns; the model reads a subset. One half owns the list, the other imports
-it — they never define a feature set separately.
-
-**The exclusion list is owned by the pipeline and never bypassed.** It covers
-the target and its deterministic functions, the intensity statistics, `year`,
-`days_in_month`, and `coverage`. The leakage assertion raises rather than
-warns.
-
 **One environment.** `requirements.txt` at the root, Python 3.13.7, pinned
-exactly. Regenerate the lock after any change.
+exactly, plus `pip install -e code/`. Regenerate the lock after any change.
 
 ---
 
