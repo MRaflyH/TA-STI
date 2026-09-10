@@ -1,52 +1,65 @@
-# macOS
-.DS_Store
+# ---------------------------------------------------------------------------
+# Data is NEVER committed.
+#
+#   data/raw/       irreplaceable. The PLN records came through the
+#                   supervisors, are not public, and MUST NOT be redistributed.
+#   data/processed/ regenerable by one command.
+#
+# No leading slash, so `data/` matches a directory named data at ANY depth.
+# That is deliberate: the previous rule was anchored to code/pipeline/data/
+# and silently stopped matching the moment the folder moved. This one
+# survives a rename.
+# ---------------------------------------------------------------------------
+data/
 
-# LaTeX build artifacts
-*.aux
-*.log
-*.bbl
-*.bcf
-*.blg
-*.out
-*.toc
-*.lot
-*.lof
-*.fls
-*.fdb_latexmk
-*.run.xml
-*.synctex.gz
-*.nav
-*.snm
-*.vrb
-*.xdv
+# The archive keeps its own data in place and it never moves. Covered by the
+# rule above, but spelled out so a future edit to `data/` cannot quietly
+# expose the archived raw records.
+code archive/data/
+code archive/pipeline/data/
+code archive/modelling/data/
 
-# Editor
-.vscode/
-*.loa
-*.lol
-*.bbl-SAVE-ERROR
-*.bcf-SAVE-ERROR
-
-# --- added with the code/ restructure ---
-# Single environment at the repo root now, so this cannot live in
-# code/pipeline/ or code/modelling/ any more.
-.venv/
-
-# Data is never committed.
-#   raw/       irreplaceable -- the PLN records came through the supervisors
-#              and are not public
-#   processed/ regenerable by one command
-code/pipeline/data/
-code/modelling/data/
+# Belt and braces: the raw formats themselves, wherever they end up.
+*.nc
+*.parquet
 
 # Python
 __pycache__/
 *.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+.ipynb_checkpoints/
 
-*.bcf
-*.bbl
+# macOS
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# LaTeX build artifacts.
+# A committed .bcf or .bbl lets biber succeed against a stale file while
+# xelatex has already died before \addbibresource. Keep these out of git.
 *.aux
+*.bbl
+*.bcf
 *.blg
+*.fdb_latexmk
+*.fls
+*.lof
+*.loa
+*.lol
+*.lot
 *.log
+*.nav
 *.out
+*.run.xml
+*.snm
+*.synctex.gz
 *.toc
+*.vrb
+*.xdv
+*.bbl-SAVE-ERROR
+*.bcf-SAVE-ERROR
