@@ -1,10 +1,8 @@
 """Raw strike records in, gridded hourly flash counts out.
 
-    PLN Puslitbang LDS   .xlsx, Vaisala/TLS export layout
-    NASA MERLIN          many small .csv exports, one per archive window
-
-Both normalise to timestamp (UTC), lat, lon, peak_current_ka, polarity, source,
-then grid to one row per (0.5 deg cell, clock hour).
+PLN (.xlsx, Vaisala/TLS layout) is loaded here; MERLIN lives in merlin.py with
+its downloader. Both normalise to timestamp (UTC), lat, lon, peak_current_ka,
+polarity, source, then grid to one row per (0.5 deg cell, clock hour).
 
 This module owns the grid. era5.py and power.py import assign_grid and
 full_cell_index from here so a cell is defined in one place.
@@ -19,6 +17,7 @@ import numpy as np
 import pandas as pd
 
 from .. import config as cfg
+from . import merlin
 
 STRIKE_COLUMNS = ["timestamp", "lat", "lon", "peak_current_ka", "polarity", "source"]
 
@@ -91,61 +90,7 @@ def load_pln(directory: str | Path = cfg.RAW_PLN_DIR, pattern: str = "*.xlsx") -
     return pd.concat([load_pln_workbook(f) for f in files], ignore_index=True)
 
 
-# ==========================================================================
-# NASA MERLIN (subtropis)
-# ==========================================================================
-def load_merlin_file(path: str | Path) -> pd.DataFrame:
-    path = Path(path)
-    df = pd.read_csv(path, dtype=str)
-    df = df.rename(columns=lambda c: str(c).strip())
-
-    missing = {"Date", "Time", "Latitude", "Longitude"} - set(df.columns)
-    if missing:
-        raise ValueError(f"{path.name}: missing columns {sorted(missing)}")
-
-    # 7 fractional digits; pandas stops at microseconds.
-    time_str = df["Time"].str.replace(r"(\.\d{6})\d+", r"\1", regex=True)
-    ts = pd.to_datetime(
-        df["Date"].str.strip() + " " + time_str.str.strip(),
-        format="%m/%d/%Y %H:%M:%S.%f",
-        errors="coerce",
-    )
-
-    signal = pd.to_numeric(df.get("Signal Strength"), errors="coerce")
-    out = pd.DataFrame(
-        {
-            "timestamp": ts,
-            "lat": pd.to_numeric(df["Latitude"], errors="coerce"),
-            "lon": pd.to_numeric(df["Longitude"], errors="coerce"),
-            "peak_current_ka": signal,
-            "polarity": np.where(signal >= 0, "positive", "negative"),
-            "source": f"merlin:{path.name}",
-        }
-    )
-    out = out.dropna(subset=["timestamp", "lat", "lon"])
-    out["timestamp"] = out["timestamp"].dt.tz_localize("UTC")
-    return out[STRIKE_COLUMNS].reset_index(drop=True)
-
-
-def load_merlin(
-    directory: str | Path = cfg.RAW_MERLIN_DIR, pattern: str = "*.csv"
-) -> pd.DataFrame:
-    """Every MERLIN export. Windows overlap, so exact duplicates are dropped."""
-    files = sorted(Path(directory).glob(pattern))
-    if not files:
-        raise FileNotFoundError(f"no MERLIN exports matching {pattern!r} under {directory}")
-
-    strikes = pd.concat([load_merlin_file(f) for f in files], ignore_index=True)
-
-    before = len(strikes)
-    strikes = strikes.drop_duplicates(subset=["timestamp", "lat", "lon", "peak_current_ka"])
-    if before - len(strikes):
-        print(f"[merlin] dropped {before - len(strikes):,} duplicates across overlapping exports")
-
-    return strikes.sort_values("timestamp").reset_index(drop=True)
-
-
-LOADERS = {"tropis": load_pln, "subtropis": load_merlin}
+LOADERS = {"tropis": load_pln, "subtropis": merlin.load}
 
 
 # ==========================================================================
@@ -184,8 +129,13 @@ def to_utc_naive(ts: pd.Series) -> pd.Series:
 # ==========================================================================
 # Coverage
 # ==========================================================================
-def observed_months(strikes: pd.DataFrame) -> pd.DataFrame:
+def observed_months(strikes: pd.DataFrame, domain: cfg.Domain) -> pd.DataFrame:
     """Distinct calendar days present in the raw data, per month.
+
+    Every configured month is returned, including ones with no records at all.
+    Those get observed_days = 0 and coverage = 0, so the row says of itself
+    that its zero is an absence of observation rather than an observation of
+    absence. Dropping them is selection's job, not this module's.
 
     An absent record is ambiguous: detector up and seeing nothing, or no data
     at all. The proxy is that a day with some strike anywhere in the domain is
@@ -194,11 +144,17 @@ def observed_months(strikes: pd.DataFrame) -> pd.DataFrame:
     Monthly on purpose -- see aggregate_gfd.
     """
     day = to_utc_naive(strikes["timestamp"])
-    per_month = (
+    counted = (
         pd.DataFrame({"month": day.dt.to_period("M"), "day": day.dt.normalize()})
         .groupby("month")["day"]
         .nunique()
         .rename("observed_days")
+    )
+
+    configured = pd.period_range(f"{domain.year_start}-01", f"{domain.year_end}-12", freq="M")
+    per_month = (
+        counted.reindex(configured, fill_value=0)
+        .rename_axis("month")
         .reset_index()
     )
     per_month["days_in_month"] = per_month["month"].dt.days_in_month
@@ -229,9 +185,10 @@ def aggregate_gfd(
 ) -> pd.DataFrame:
     """Strikes to one row per (cell, hour).
 
-    `fill_empty_cells` adds zero-flash rows, but only for months the raw data
-    covers. Filling the configured range would invent zeros for stretches with
-    no data at all.
+    `fill_empty_cells` adds zero-flash rows across the whole configured range.
+    Months with no records are kept at coverage 0 rather than dropped, so the
+    dataset stays a complete grid and every exclusion is a selection decision
+    made on a labelled column.
 
     Coverage is judged monthly because the proxy can't work at hourly
     resolution: a quiet 3 a.m. and an offline detector look identical, and
@@ -250,14 +207,14 @@ def aggregate_gfd(
 
     # From `strikes`, not the clipped `df`: the proxy is "was the network up
     # anywhere", so a strike outside the box is still evidence. Don't "fix".
-    coverage = observed_months(strikes)
+    coverage = observed_months(strikes, domain)
 
-    configured = pd.period_range(f"{domain.year_start}-01", f"{domain.year_end}-12", freq="M")
-    absent = [str(m) for m in configured if m not in set(coverage["month"])]
-    if absent:
+    empty = coverage.loc[coverage["observed_days"] == 0, "month"]
+    if len(empty):
         print(
-            f"[{domain.name}] NO DATA for {len(absent)} of {len(configured)} configured "
-            f"months -- excluded, not zero-filled ({absent[0]} .. {absent[-1]})"
+            f"[{domain.name}] {len(empty)} of {len(coverage)} months hold no records. "
+            f"KEPT, at coverage 0 ({empty.iloc[0]} .. {empty.iloc[-1]}) -- their zeros "
+            f"are unobserved, not observed. Filter on coverage in selection/."
         )
 
     if min_coverage > 0:
