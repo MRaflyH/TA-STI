@@ -7,10 +7,9 @@
 
 \section{Struktur Kode dan Lingkungan}
 \label{sec:struktur-kode}
-Seluruh kode berada dalam satu paket bernama \texttt{gfd}. Paket ini dipasang
-sekali dengan \texttt{pip install -e code/}, lalu tiap bagiannya dipanggil
-sebagai modul. Susunan paket dapat dilihat pada
-Listing~\ref{lst:struktur-gfd}.
+Seluruh kode berada dalam satu paket bernama \texttt{gfd}.
+Paket ini dipasang sekali dengan \texttt{pip install -e code/}, lalu tiap bagiannya dipanggil sebagai modul.
+Susunan paket dapat dilihat pada Listing~\ref{lst:struktur-gfd}.
 
 \begin{minipage}{\textwidth}
 \begin{lstlisting}[caption={Susunan paket gfd}, label={lst:struktur-gfd}, frame=single, captionpos=t, language=]
@@ -26,20 +25,16 @@ gfd/
 \end{minipage}
 
 Berkas \texttt{config.py} memegang hal yang harus disepakati semua subpaket.
-Subpaket \texttt{dataset/} mengambil data dari tiap sumber dan menggabungkannya
-menjadi tabel per jam. Subpaket \texttt{selection/} memilih fitur yang dipakai
-model. Subpaket \texttt{models/} hanya memuat definisi estimator, sedangkan
-pelatihannya ada di \texttt{training/}. Subpaket \texttt{evaluation/}
-menghitung metrik dan menyusun tabel hasil, dan \texttt{experiments/}
-menjalankan matriks eksperimen. Pembagian ini memisahkan bagian yang berubah
-karena sebab berbeda: definisi model, prosedur pelatihan, dan tabel hasil.
+Subpaket \texttt{dataset/} mengambil data dari tiap sumber dan menggabungkannya menjadi tabel per jam.
+Subpaket \texttt{selection/} memilih fitur yang dipakai model.
+Subpaket \texttt{models/} hanya memuat definisi estimator, sedangkan pelatihannya ada di \texttt{training/}.
+Subpaket \texttt{evaluation/} menghitung metrik dan menyusun tabel hasil, dan \texttt{experiments/} menjalankan matriks eksperimen.
+Pembagian ini memisahkan bagian yang berubah karena sebab berbeda: definisi model, prosedur pelatihan, dan tabel hasil.
 
-Lingkungan yang dipakai adalah Python 3.13.7, dengan batas bawah 3.12 karena
-numpy 2.5.2 tidak dapat dipasang di bawahnya. Seluruh versi pustaka dipatok
-tepat pada satu berkas \texttt{requirements.txt}. Versi yang dipatok adalah
-versi yang menghasilkan tabel dan hasil pada tugas akhir ini, jadi
-pemutakhiran pustaka tidak dilakukan tanpa alasan yang dicatat. Daftar
-lengkapnya dapat dilihat pada Tabel~\ref{tab:pustaka}.
+Lingkungan yang dipakai adalah Python 3.13.7, dengan batas bawah 3.12 karena numpy 2.5.2 tidak dapat dipasang di bawahnya.
+Seluruh versi pustaka dipatok tepat pada satu berkas \texttt{requirements.txt}.
+Versi yang dipatok adalah versi yang menghasilkan tabel dan hasil pada tugas akhir ini, jadi pemutakhiran pustaka tidak dilakukan tanpa alasan yang dicatat.
+Daftar lengkapnya dapat dilihat pada Tabel~\ref{tab:pustaka}.
 
 \begin{table}[!t]
   \caption{Pustaka Python yang dipakai beserta versinya}
@@ -79,10 +74,163 @@ lengkapnya dapat dilihat pada Tabel~\ref{tab:pustaka}.
   \end{tabular}
 \end{table}
 
-Terdapat dua pustaka kuantum, dan ini disengaja. Qiskit hanya menyediakan
-\mbox{\textit{parameter-shift}} untuk perhitungan gradien, dan cara itu terlalu
-lambat untuk pelatihan. PennyLane dipakai untuk pelatihan, sedangkan Qiskit
-dipertahankan sebagai pembanding untuk memeriksa kedua sirkuit menghasilkan
-hal yang sama. Keduanya sudah dipatok versinya, tetapi belum terpakai. Dari
-tujuh nama pada Listing~\ref{lst:struktur-gfd}, baru \texttt{config.py} dan
-\texttt{dataset/} yang ada berkasnya. Lima subpaket sisanya masih kosong.
+Terdapat dua pustaka kuantum, dan ini disengaja.
+Qiskit hanya menyediakan \mbox{\textit{parameter-shift}} untuk perhitungan gradien, dan cara itu terlalu lambat untuk pelatihan.
+PennyLane dipakai untuk pelatihan, sedangkan Qiskit dipertahankan sebagai pembanding untuk memeriksa kedua sirkuit menghasilkan hal yang sama.
+Keduanya sudah dipatok versinya, tetapi belum terpakai.
+Dari tujuh nama pada Listing~\ref{lst:struktur-gfd}, baru \texttt{config.py} dan \texttt{dataset/} yang ada berkasnya.
+Lima subpaket sisanya masih kosong.
+
+\section{Akuisisi per Sumber}
+\label{sec:akuisisi}
+
+\subsection{PLN Puslitbang}
+\label{subsec:pln}
+Data sambaran PLN Puslitbang tidak memiliki jalur pengunduhan.
+Rekaman itu diperoleh melalui pembimbing dalam bentuk berkas, dan datanya tidak terbuka untuk umum, sehingga tidak dapat disebarluaskan bersama laporan ini.
+Kode hanya memuat pembacaan berkasnya, tanpa bagian akuisisi.
+Berkas yang diterima berbentuk lembar kerja, satu baris satu sambaran.
+Isi kolomnya dapat dilihat pada Tabel~\ref{tab:kolom-pln}.
+
+\begin{table}[!t]
+  \caption{Kolom berkas sambaran PLN Puslitbang}
+  \label{tab:kolom-pln}
+  \footnotesize
+  \begin{tabular}{ | l | p{0.55\textwidth} | }
+    \hline
+    Kolom & Keterangan \\
+    \hline
+    Select & Penanda pilihan bawaan antarmuka ekspor; tidak dipakai \\
+    Date and time & Tanggal dan waktu kejadian sambaran, sampai milidetik \\
+    Latitude & Koordinat lintang sambaran, dalam derajat \\
+    Longitude & Koordinat bujur sambaran, dalam derajat \\
+    Discrimination & Jenis sambaran, misalnya CG$-$ untuk sambaran awan ke tanah bermuatan negatif \\
+    Signal (kA) & Arus puncak sambaran dalam kiloampere; tandanya menunjukkan polaritas \\
+    % BELUM DIVERIFIKASI -- keterangan sementara, tunggu konfirmasi pembimbing
+    Chi square & Ukuran kecocokan penyelesaian lokasi; nilai yang lebih kecil berarti lokasi lebih konsisten \\
+    Ell. smaj & Sumbu panjang elips galat lokasi \\
+    Ell. smin & Sumbu pendek elips galat lokasi \\
+    Ell. angle & Sudut orientasi elips galat lokasi, dalam derajat \\
+    % BELUM DIVERIFIKASI -- keterangan sementara, tunggu konfirmasi pembimbing
+    Freedom & Derajat kebebasan penyelesaian lokasi \\
+    % BELUM DIVERIFIKASI -- keterangan sementara, tunggu konfirmasi pembimbing
+    Multi. & Jumlah sambaran susulan dalam satu kilat \\
+    Sensors nb. & Jumlah sensor yang mendeteksi sambaran \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{MERLIN}
+\label{subsec:merlin}
+Data sambaran MERLIN diambil dari arsip cuaca milik Kennedy Space Center \autocite{ksc2026merlin}, yang dibahas pada Subbab~\ref{subsec:sumber-merlin}.
+Arsip itu tidak menyediakan API yang terdokumentasi, sehingga jalur pengunduhan disusun dengan meniru permintaan yang dipakai antarmuka webnya.
+Permintaan tersebut memerlukan token terkode.
+Penyandian token itu disusun ulang di dalam kode, lalu hasilnya dicocokkan dengan tujuh token yang ditangkap dari antarmuka aslinya, dan ketujuhnya cocok.
+
+Rentang waktu satu permintaan dibatasi oleh arsip, sehingga periode 2018 sampai 2024 dipecah menjadi beberapa jendela unduhan.
+Arsip MERLIN juga dibatasi secara geografis, dan permintaan dari luar wilayah yang diizinkan akan ditolak.
+Pembatasan ini diatasi dengan VPN yang bekerja pada tingkat perangkat, bukan dengan ekstensi peramban, karena permintaan dikirim oleh kode dan bukan oleh peramban.
+
+Berkas hasil unduhan berbentuk CSV, satu baris satu sambaran.
+Isi kolomnya dapat dilihat pada Tabel~\ref{tab:kolom-merlin}.
+
+\begin{table}[!t]
+  \caption{Kolom berkas sambaran MERLIN}
+  \label{tab:kolom-merlin}
+  \footnotesize
+  \begin{tabular}{ | l | p{0.55\textwidth} | }
+    \hline
+    Kolom & Keterangan \\
+    \hline
+    Date & Tanggal kejadian sambaran \\
+    Time & Waktu kejadian sambaran, sampai pecahan detik \\
+    Latitude & Koordinat lintang sambaran, dalam derajat \\
+    Longitude & Koordinat bujur sambaran, dalam derajat \\
+    Signal Strength & Kuat sinyal sambaran; tandanya menunjukkan polaritas \\
+    SemiMajor Axis 50\% CI & Sumbu panjang elips galat lokasi pada selang kepercayaan 50\% \\
+    SemiMinor Axis 50\% CI & Sumbu pendek elips galat lokasi pada selang kepercayaan 50\% \\
+    Ellipse Angle & Sudut orientasi elips galat lokasi, dalam derajat \\
+    Sensors & Daftar nomor sensor yang mendeteksi sambaran \\
+    \hline
+  \end{tabular}
+\end{table}
+
+\subsection{ERA5}
+\label{subsec:era5}
+Data ERA5 diambil dari \textit{Climate Data Store} milik Copernicus melalui pustaka \texttt{cdsapi} \autocite{c3s2023era5}.
+ERA5 adalah reanalisis, yaitu keluaran model cuaca yang digabungkan dengan hasil pengamatan di seluruh dunia melalui asimilasi data, sehingga menghasilkan medan yang lengkap dan konsisten.
+Produk yang dipakai adalah ERA5 \textit{single levels} pada resolusi per jam, yang disajikan pada grid lintang-bujur beraturan berukuran 0,25\textdegree.
+Variabel yang diminta dipilih berdasarkan parameter meteorologis yang dibahas pada Subbab~\ref{subsec:parameter-meteorologis}.
+Pemetaan tiap parameter ke variabelnya dapat dilihat pada Tabel~\ref{tab:era5-variabel}.
+
+Permintaan dibatasi pada kotak koordinat tiap domain, bukan seluruh dunia.
+Kotak itu diturunkan dari sebaran koordinat data sambaran PLN dan MERLIN, lalu dilebarkan ke luar sampai batas sel grid terdekat.
+
+\begin{table}[!t]
+  \caption{Pemetaan parameter meteorologis ke variabel ERA5}
+  \label{tab:era5-variabel}
+  \footnotesize
+  \begin{tabular}{ | l | p{0.26\textwidth} | p{0.40\textwidth} | }
+    \hline
+    Kolom & Parameter & Variabel ERA5 \\
+    \hline
+    CAPE & Energi potensial konvektif & convective\_available\_\newline potential\_energy \\
+    KX & Indeks K & k\_index \\
+    TCIW & Kandungan es awan satu kolom & total\_column\_cloud\_ice\_water \\
+    TCLW & Kandungan air cair awan satu kolom & total\_column\_cloud\_liquid\_\newline water \\
+    VIIWD & Divergensi fluks air beku awan & vertical\_integral\_of\_divergence\_\newline of\_cloud\_frozen\_water\_flux \\
+    VILWD & Divergensi fluks air cair awan & vertical\_integral\_of\_divergence\_\newline of\_cloud\_liquid\_water\_flux \\
+    VIMDF & Divergensi fluks kelembapan & vertical\_integral\_of\_divergence\_\newline of\_moisture\_flux \\
+    TOTALX & Indeks \textit{total totals} & total\_totals\_index \\
+    CIN & Penghambat konveksi & convective\_inhibition \\
+    CBH & Tinggi dasar awan & cloud\_base\_height \\
+    TCWV & Uap air satu kolom & total\_column\_water\_vapour \\
+    D2M & Suhu titik embun pada 2 meter & 2m\_dewpoint\_temperature \\
+    CRR & Laju hujan konvektif & convective\_rain\_rate \\
+    \hline
+  \end{tabular}
+\end{table}
+
+Nilai ERA5 yang dipakai bersifat sesaat, bukan rerata.
+Setiap medan berlaku tepat pada awal jam, bukan sebagai rata-rata sepanjang jam tersebut.
+Karena target menghitung sambaran di dalam rentang satu jam, pemasangan prediktor dengan target mengikuti konvensi pada Subbab~\ref{subsec:grid-temporal}.
+
+Seluruh unduhan mencakup setiap jam sepanjang 2018 sampai 2024 untuk kedua domain, yaitu 61.368 jam per domain.
+Pengunduhan dilakukan dalam potongan bulanan, satu permintaan untuk satu domain satu bulan, karena permintaan satu domain untuk satu tahun penuh melewati batas biaya permintaan CDS.
+
+\subsection{NASA POWER}
+\label{subsec:power}
+Data NASA POWER diambil dari layanan API yang disediakan proyek POWER melalui permintaan HTTP \autocite{nasapower}.
+POWER adalah proyek NASA yang menyediakan data meteorologis dan surya dalam bentuk yang siap dipakai ulang.
+Parameter meteorologisnya berasal dari MERRA-2, yaitu reanalisis milik NASA, dan disajikan pada grid berukuran 0,5\textdegree{} lintang kali 0,625\textdegree{} bujur.
+Parameter yang diminta dipilih berdasarkan pembahasan pada Subbab~\ref{subsec:parameter-meteorologis}, dan pemetaannya dapat dilihat pada Tabel~\ref{tab:power-variabel}.
+
+Titik pengambilan diturunkan dari kotak koordinat yang sama dengan ERA5, tetapi bentuk permintaannya berbeda.
+Grid proyek berukuran 0,5\textdegree{} pada kedua arah, seperti dijelaskan pada Subbab~\ref{subsec:grid-spasial}, sedangkan grid POWER berukuran 0,5\textdegree{} lintang dan 0,625\textdegree{} bujur.
+Langkah bujur POWER lebih besar, sehingga terdapat sel proyek yang berbeda tetapi titik POWER terdekatnya sama.
+
+Layanan POWER pada resolusi per jam hanya melayani permintaan untuk satu titik, bukan untuk satu wilayah, sehingga titik yang diminta harus ditentukan lebih dahulu.
+Yang diminta adalah titik grid asli POWER, bukan titik tengah tiap sel proyek.
+Jika permintaan disusun per sel proyek, sel yang berbagi titik POWER yang sama akan menghasilkan dua permintaan untuk data yang sama.
+
+\begin{table}[!t]
+  \caption{Pemetaan parameter meteorologis ke variabel NASA POWER}
+  \label{tab:power-variabel}
+  \footnotesize
+  \begin{tabular}{ | l | p{0.26\textwidth} | p{0.40\textwidth} | }
+    \hline
+    Kolom & Parameter & Variabel NASA POWER \\
+    \hline
+    PRECTOTCORR & Presipitasi terkoreksi & PRECTOTCORR \\
+    PS & Tekanan permukaan & PS \\
+    T2M & Suhu udara pada 2 meter & T2M \\
+    RH2M & Kelembapan relatif pada 2 meter & RH2M \\
+    WS2M & Kecepatan angin pada 2 meter & WS2M \\
+    \hline
+  \end{tabular}
+\end{table}
+
+Satu parameter POWER yang dipakai penelitian pendahulu tidak diminta pada tugas akhir ini, yaitu AOD\_55\_ADJ.
+POWER menerbitkan parameter itu pada resolusi bulanan dan tidak lebih halus.
+Pada resolusi per jam nilainya tetap sepanjang satu bulan penuh, sehingga tidak dapat menjelaskan ragam antarjam pada target.
+Alasan penggugurannya dibahas pada Subbab~\ref{subsec:parameter-meteorologis}.
