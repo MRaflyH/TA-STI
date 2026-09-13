@@ -39,7 +39,7 @@ where the data preparation is described.
 
 **Decided by.** Rafly, 2026-09-10.
 
-**Status.** `dataset/` is complete: `features.py`, `lightning.py`, `merlin.py`,
+**Status.** `dataset/` is complete and frozen (D-15): `features.py`, `lightning.py`, `merlin.py`,
 `era5.py`, `power.py`, `build.py`, plus the root `config.py`. The package
 installs and tropis builds end to end. `selection/`, `models/`, `training/`,
 `evaluation/` and `experiments/` are still names only — no file exists in any
@@ -471,12 +471,144 @@ follow from measurements; the `cos_sza` over `hour_cos` choice is a judgement.
 
 ---
 
+## D-13 — Temporal encoding moves to `selection/`. Supersedes part of D-12
+
+**Decided.** `dataset/` emits raw time only — `year`, `month_of_year`,
+`day_of_year`, `hour_of_day_utc`, `hour_of_day_local` — as a new
+`features.RAW_TEMPORAL` list, which is neither `CANDIDATES` nor `EXCLUDE`.
+`build.py` no longer computes `hour_sin`, `hour_cos` or `cos_sza`, and
+`_cos_sza` is removed from it. `selection/` owns every temporal encoding.
+
+D-12's *choice* stands — `hour_sin` and `cos_sza` remain the intended pair, on
+the reasoning recorded there. What changes is where they are produced.
+
+**Why.** Whether an hour becomes sin/cos, a spline basis, radial basis
+functions, one-hot or an integer is a representation decision, and
+`selection/` is the subpackage that owns representation. With the derivation in
+`build.py`, trying a different encoding meant a full rebuild of 5,3 million
+rows; it is now a function call. It also concentrated a decision that was split
+across two files — `build.py` chose the encoding, `features.py` chose which
+half survived — which is the same shape as the two-`config.py` failure D-1
+exists to prevent.
+
+**Cost.** The `.meta.json` sidecar no longer records the encodings as columns,
+so the table is slightly less self-describing. `selection/` must reproduce them
+before any model runs, and if it reproduces them differently from D-12 the
+mismatch is silent. The `-0,989` correlation between `hour_cos` and `cos_sza`
+that D-12 rests on was computed on columns that no longer exist in the table;
+it needs recomputing in `selection/` if it stays load-bearing.
+
+**Reversal.** Restore `_cos_sza` and the three derivations in
+`_add_time_features`; the tested version is in the 2026-09-13 chat log. One
+rebuild.
+
+**Bab.** IV (where the encoding decision lives), V (what `dataset/` emits).
+
+**Decided by.** Rafly, 2026-09-14.
+
+---
+
+## D-14 — The seven Tier 1 ERA5 variables become candidates. Closes O-4
+
+**Decided.** `VIMDF`, `CRR`, `TOTALX`, `CIN`, `CBH`, `TCWV`, `D2M` join
+`features.ERA5`. `CANDIDATES` is now 20: 2 spatial, 5 POWER, 13 ERA5. No
+temporal columns, per D-13.
+
+`mean_convective_precipitation_rate` is **not** among them. It was trialled and
+dropped in favour of `convective_rain_rate`: every other predictor is
+instantaneous, and correcting sub-hourly sampling for one variable out of
+twenty while leaving nineteen uncorrected is harder to defend than one uniform
+convention with a stated limitation. The two are not interchangeable — Spearman
+0,684, Pearson 0,533 over one tropis month **[measured]** — so this is a real
+loss, not the removal of a duplicate.
+
+**Why.** The variables were acquired for this. Amri's fourteen are a monthly
+feature set; an hourly problem admits process variables a monthly aggregation
+cannot use.
+
+**Cost.** Bab II owes a literature paragraph for each of the seven, per §5,
+before the raw freeze. Two of them, `CIN` and `CBH`, carry informative
+missingness that no other predictor has — see O-8.
+
+**Reversal.** Remove from `features.ERA5`. The files stay on disk; no
+re-download.
+
+**Bab.** II (each variable reviewed), IV, VI.
+
+**Decided by.** Rafly, 2026-09-14.
+
+---
+
+## D-15 — `dataset/` is frozen
+
+**Decided.** The acquisition, gridding, join and column contract are complete.
+Both tables are built with 20 candidate predictors and no missing values in
+eighteen of them. Further changes to `dataset/` are reversals of a recorded
+decision, not ordinary edits.
+
+**What is frozen.** Four sources acquired and loadable; the 0,5° grid; hourly
+UTC binning; `flash_count` on `log1p`; the left join onto the lightning
+skeleton with `_check_keys`; every month kept at its measured coverage (D-8);
+the three-list contract (D-13); 504 ERA5 files, 590 POWER files, 89 MERLIN
+exports, one PLN workbook.
+
+**What is not frozen and never was.** `selection/`, and everything downstream.
+The open items O-2, O-3, O-6, O-7 and O-8 are all `selection/` decisions that
+read the built tables; none requires `dataset/` to change.
+
+**Cost.** A variable discovered in the literature step after this point costs a
+supplementary CDS pass and a rebuild, not a config change. That is the point of
+a freeze.
+
+**Reversal.** Not a reversal — a new decision superseding this one, per §2's
+raw freeze.
+
+**Bab.** III, IV, V all describe the frozen state.
+
+**Decided by.** Rafly, 2026-09-14.
+
+**Amended.** Declared before D-16, which changed `load_pln`. The freeze dates
+from the rebuild of 2026-09-14 that followed it, not from this entry.
+
+---
+
+## D-16 — PLN strikes are deduplicated in `dataset/`, not `selection/`
+
+**Decided.** `load_pln` drops exact duplicate rows on
+`(timestamp, lat, lon, peak_current_ka)` — the same key `merlin.load` has
+always used. Both domains are now processed identically.
+
+**Why it cannot wait for `selection/`.** This is the line between what
+`dataset/` must do and what it must not, and it is sharper than "merge
+everything, decide later". `aggregate_gfd` collapses strike rows into
+`flash_count`. After that the individual strikes do not exist, so a duplicate
+counted once is uncountable thereafter. Row filtering on coverage or on dead
+cells operates on the aggregated table and can be deferred; deduplicating
+strikes cannot.
+
+`gfd_per_km2_per_day` and `gfd_per_km2_per_year` are computed from
+`flash_count` in the same function, so they inherit the inflation — but the
+count is what is wrong, not the conversion.
+
+**Cost.** Reopens D-15's freeze and required a rebuild. Every tropis strike
+count recorded before 2026-09-14 is the pre-dedup figure.
+
+**Reversal.** Remove the three lines. The raw workbook is untouched.
+
+**Bab.** III (what the source contains), V (what the loader does).
+
+**Decided by.** Rafly, 2026-09-14, after working out that the aggregation makes
+it irreversible.
+
+---
+
 ## Measured
 
 Findings that correct something the archive asserts, or that the thesis will
 need to quote. All `[measured]`, 2026-09-10.
 
-- **The PLN export is entirely cloud-to-ground.** 2 242 100 CG strikes, 0
+- **The PLN export is entirely cloud-to-ground.** 2 242 100 CG rows as
+  exported, 0
   non-CG dropped, and `Discrimination` is present in the workbook so the
   loader's `"CG"` fallback never fired. `positive_share` spans 0 to 1, so
   polarity reads correctly from the same field. v1 left this uncounted and
@@ -518,7 +650,8 @@ need to quote. All `[measured]`, 2026-09-10.
   detector uptime. This is the measurement that makes D-8's "reported, never
   acted on" the only defensible position.
 - **Florida has more strikes but fewer active cell-hours.** 5 301 491 strikes
-  against tropis's 2 242 100, yet 99 273 non-zero cell-hours against 104 955.
+  against tropis's 2 236 390 (post-dedup, D-16), yet 99 273 non-zero
+  cell-hours against 104 955.
   Subtropical lightning is more concentrated in space and time.
 - **MERLIN export overlap is negligible**: 3 duplicate strikes dropped across
   89 windows. All three come from the *same* file each time, so the cause is
@@ -680,7 +813,75 @@ Added 2026-09-11. All `[measured]` unless marked otherwise.
 
 ---
 
+### 2026-09-13/14 — Tier 1 acquisition and the final build
+
+- **Two ERA5 short names in the request map were wrong**, and both were dropped
+  silently until a trial file was read column by column.
+  `vertical_integral_of_divergence_of_moisture_flux` arrives as `vimdf`, not
+  `viwvd`; `mean_convective_precipitation_rate` as `avg_cpr`, not `mcpr`.
+  `2m_dewpoint_temperature` is `d2m`, not `2d` as the candidate note had it.
+- **The multi-variable CDS behaviour is systematic, not intermittent.**
+  `total_totals_index` is absent from **all 84** subtropis `tier1` files and
+  present in all 84 tropis ones. Requested alone for the same box it arrives,
+  as `k_index` did. Two variables, two for two, 84 for 84. Cause unknown.
+- **The ZIP branch of `_open_members` executed for the first time**, on the
+  eight-variable trial. `avg_cpr` has stepType `avg` while the other seven are
+  `instant`, and the mixed request came back archived. With `avg_cpr` dropped,
+  all thirteen ERA5 variables are `instant` and the branch does not fire.
+- **ERA5 longitudes arrive on −180..180, not 0..360.** Measured directly:
+  −82,0 to −78,5 for the subtropis box. The conversion in `parse_netcdf` has
+  therefore never changed a value. v1's smoke test carried this as a warning,
+  and it was carried forward into comments and a Bab IV draft as though it were
+  an observed cause of failure. It is not.
+- **`CIN` and `CBH` carry informative missingness — the only predictors that
+  do.** `CIN` is missing on 23,5% of tropis rows and 46,4% of subtropis rows;
+  `CBH` on 1,2% and 8,4%. The missingness is structural: `CIN` is absent on
+  99,6% / 99,8% of rows where `CAPE` is zero, and `CBH` on 94,3% / 96,0% of
+  rows where cloud water is zero. Critically, it barely touches rows that
+  matter — `CIN` is missing on only 4,6% of tropis and 0,9% of subtropis rows
+  that recorded a flash. A residual 20,6% / 34,6% of rows with positive `CAPE`
+  still lack `CIN`, and that part is unexplained. See O-8.
+- **`CIN` availability differs by domain** — 23,5% missing against 46,4%. The
+  first predictor whose availability, not just its distribution, is asymmetric
+  across the two domains.
+- **PLN rows are flashes, not strokes.** The export carries a `Multi.`
+  (multiplicity) column reporting how many return strokes the network grouped
+  into each row, so `flash_count` as a row count is correct for ground flash
+  density. Had rows been strokes, every GFD figure would be inflated by the
+  mean multiplicity.
+- **The final build:** 504 ERA5 files, none zero-byte. Tropis 1 841 040 rows,
+  subtropis 3 436 608, unchanged by the seven new columns. Key overlap 100% for
+  both POWER and ERA5 in both domains. Eighteen of twenty predictors complete.
+
+
+### 2026-09-14 — PLN duplicates
+
+- **The PLN export contains 5 710 duplicate rows, all inside the 2020 sheet.**
+  Pairs, never triples: 11 420 rows in 5 710 groups of two. Every pair agrees
+  on all thirteen source columns including `Multi.` and `Sensors nb.`, so they
+  are repeated rows rather than two detections sharing a key. 0,25% of the
+  export.
+- **The two sources are not comparable on this.** MERLIN has 3 duplicates in
+  5 301 491 rows — 0,00006% — scattered across three files in three different
+  years. PLN has 5 710 in 2 242 100, all in one year's sheet. Same fix, not
+  the same phenomenon.
+- **After deduplication: 2 236 390 tropis strikes.** The zero share stays at
+  94,30% and the active cell-hour count at 104 955, both unchanged, because a
+  duplicated flash was always inside a cell-hour that already held a real one.
+  Only counts within already-active hours fell.
+- **The final tables.** Tropis 1 841 040 rows x 41 columns; subtropis
+  3 436 608 x 41. Twenty candidate predictors, eighteen complete. Five raw
+  temporal columns, five intensity statistics at 94,3% / 97,1% missing by
+  construction, and bookkeeping.
+
+
 ## Open
+
+**O-1 to O-9 are superseded by the S-list below, 2026-09-14.** They are kept
+because §7 says a record is not edited to look tidier, but the S-list is what
+`selection/` works from. O-2 is the exception — it concerns the environment,
+not selection, and stays live.
+
 
 **O-1 — CLOSED 2026-09-11 by D-12.** `hour_sin` and `cos_sza` are the two
 candidates; the other five calendar columns move to `EXCLUDE`. The `cos_sza`
@@ -789,7 +990,9 @@ observed at all. Options: exclude such cells, exclude `lat`/`lon` as
 predictors, or keep both and declare the effect. This is a `selection/`
 decision, not a `dataset/` one.
 
-**O-4 — Tier 1 ERA5 additions.** Seven candidate variables are drafted and
+**O-4 — CLOSED 2026-09-14 by D-14.** All seven acquired and promoted to candidates; `mean_convective_precipitation_rate` dropped in favour of `convective_rain_rate`. Original text below.
+
+**O-4 (original) — Tier 1 ERA5 additions.** Seven candidate variables are drafted and
 their short names are in `era5.VARIABLE_SHORTNAME`, but `VARIABLES` still
 requests six and `features.CANDIDATES` holds none of them. A one-month,
 one-domain trial is written and waiting on the KX queue; it is also the first
@@ -899,3 +1102,226 @@ not being robust to outliers, against quantile transformation being robust but
 destroying shape entirely. McCarter, *The Kernel Density Integral
 Transformation*, arXiv:2309.10194, interpolates between them with one parameter.
 Metadata unverified.
+
+**O-8 — Informative missingness in `CIN` and `CBH`. New 2026-09-14.**
+Both are undefined rather than absent: `CIN` where there is no convective layer
+to inhibit, `CBH` where there is no cloud. The NaN carries the information "no
+layer here", which for a lightning model is a strong negative signal, so mean
+imputation would both destroy it and insert a plausible-looking value into
+hours that physically had none.
+
+Options: a sentinel plus a missingness indicator, which costs a qubit per
+indicator against a 15-qubit budget; imputing the value that means "no
+inhibition" (0 for `CIN`) and relying on `CAPE = 0` to carry the same
+information, which is defensible given they co-occur 99,6% of the time; or
+dropping both and letting the ablation price it.
+
+Before deciding, explain the residual — 20,6% of tropis and 34,6% of subtropis
+rows have positive `CAPE` and still no `CIN`, which the "undefined without
+CAPE" story does not cover.
+
+A `selection/` decision. Also a Bab IV declaration: `CIN` is available twice as
+often in West Java as in Florida, and a predictor whose availability differs by
+domain is a confound in a cross-domain experiment.
+
+**O-9 — `build.py` silently dropped unclassified columns. Fixed 2026-09-14;
+recorded because the class of fault matters.**
+Column ordering selected only columns the contract named, and
+`check_against_table` ran afterwards — so the check inspected its own output
+and could never fail. Seven acquired ERA5 columns were merged, reported in the
+build log, then discarded before writing, and the contract check reported
+"table matches". Found only by counting uppercase columns in the parquet.
+
+Fixed: the check runs before the reorder, and the reorder appends unknown
+columns rather than dropping them, satisfying §3's "the built table is wider
+than the model". Verified on a synthetic table — 16 columns in, 16 out.
+
+Kept open as a note, not a task. Three faults this week had the same shape:
+something downstream kept comparing against a definition that had moved
+(`expected_files` after AOD left `PARAM_FREQ`; `--check` after
+`SHORTNAME_MAP` grew; this). Worth checking for whenever a list changes.
+
+---
+
+# Selection — the decisions to make
+
+A clean list, replacing O-1..O-9. Each item is one decision, what is already
+measured about it, and the options. Nothing here is decided. When one is
+decided it becomes a numbered `D-` entry and drops off this list.
+
+Order matters a little: S-1 and S-2 change which rows and columns exist, so
+they come before S-5 and S-6, which measure what is left.
+
+---
+
+## S-1 — Which rows to train on
+
+Every month is in the table, including three subtropis months with no lightning
+at all (D-8). Nothing has been filtered.
+
+**Measured.** `coverage` is a weather filter, not a data-quality filter:
+Spearman 0,838 tropis and 0,915 subtropis against mean flash count. Months
+below 25% coverage average 0,008 flashes; months above 90% average 1,72. A
+uniform 0,9 gate would delete 31% of West Java and 70% of Florida, for
+climatic reasons rather than detector reasons.
+
+**Options.** No filter at all. Drop only `coverage = 0` rows, which are
+unambiguously unobserved. Some other gate, argued from something other than
+coverage.
+
+**Constraint.** §4: test rows are never reshaped. Whatever is dropped is
+dropped from training only, and the held-out year stays whole.
+
+---
+
+## S-2 — `lat`, `lon`, and the six dead cells
+
+**Measured.** 6 of 30 tropis cells never flash in 61 368 hours — 368 208 rows,
+20% of the domain. Subtropis has none. All six sit in the two outermost
+latitude rows.
+
+The domains do not overlap in either coordinate. A scaler fitted on one maps
+**100%** of the other's `lat` and `lon` outside the encoded range, in both
+directions.
+
+**So there are two problems, and one fix covers both.** A model can learn
+"this coordinate never flashes" and score well on tropis without meteorology,
+and that rule cannot transfer. And in the cross-domain arms the coordinates
+carry noise regardless.
+
+**Options.** Drop `lat` and `lon`. Keep them and drop the dead cells. Keep
+both and declare the effect. Replace them with a land/sea flag, which is what
+`gow2021ELSF` uses and which transfers.
+
+---
+
+## S-3 — How to encode time
+
+`dataset/` emits raw time only (D-13): `year`, `month_of_year`, `day_of_year`,
+`hour_of_day_utc`, `hour_of_day_local`. `selection/` builds whatever it needs.
+
+**Decided already, in D-12:** `hour_sin` and `cos_sza`. What is left is to
+implement them and check the numbers still hold — the `-0,989` correlation
+between `hour_cos` and `cos_sza` was measured on columns that no longer exist.
+
+**Measured.** Lightning peaks at 16:00 local in tropis and 15:00 in subtropis,
+inside the 1400–1800 LST band the literature reports for continental land. The
+seasonal cycles are close to antiphase: subtropis averages 209 597 strikes in
+July against 2 704 in January.
+
+**Watch for.** `hour_sin` alone is ambiguous — 03:00 and 09:00 share a value.
+D-12 relies on `cos_sza` supplying the missing dimension. That holds if
+`cos_sza` behaves like a cosine of hour angle, which it does in the tropics but
+may not in Florida winter when the sun stays low all day. Check before
+committing.
+
+---
+
+## S-4 — `CIN` and `CBH` missingness
+
+**Measured.** `CIN` missing on 23,5% of tropis rows and 46,4% of subtropis;
+`CBH` on 1,2% and 8,4%. Structural, not lost: `CIN` is absent on 99,6% / 99,8%
+of rows with zero `CAPE`, `CBH` on 94,3% / 96,0% of rows with no cloud water.
+Only 4,6% / 0,9% of rows that actually recorded a flash lack `CIN`.
+
+So the NaN means "no convective layer here", which is a signal, not a gap. Mean
+imputation would destroy it and insert a plausible value into hours that had
+none.
+
+**Options.** Sentinel plus a missingness indicator, at one qubit per indicator.
+Impute 0 for `CIN` and rely on `CAPE = 0` to say the same thing. Drop both.
+
+**Unexplained.** 20,6% of tropis and 34,6% of subtropis rows have positive
+`CAPE` and still no `CIN`. Explain that before choosing.
+
+---
+
+## S-5 — Whether to transform skew before scaling
+
+**Measured, on 13 predictors — needs redoing on 20.** Under plain min-max to
+[0, π], the middle 98% of each predictor would occupy: `PRECTOTCORR` 7,4% /
+3,2% of the range, `VIIWD` 3,8% / 6,8%, `VILWD` 6,9% / 4,3%, `TCIW` ~20%,
+`TCLW` ~20%, `CAPE` 35,0% / 17,3%. Six of thirteen below 25% in tropis, seven
+in subtropis.
+
+Below that, the feature is nearly constant to the circuit — min-max is set by
+the two extreme values, so one outlier takes most of the angle range.
+
+**Options.** Log or Box-Cox on the worst offenders, then scale. A quantile
+transform. Nothing, and accept the compression.
+
+**Do first.** Re-run the measurement on all 20 predictors. `CRR` is a
+precipitation rate like `PRECTOTCORR`, which was the worst.
+
+---
+
+## S-6 — Scaler and range
+
+**From the literature.** Angle encoding needs features inside the rotation
+range, and min-max to [0, π] is the standard recommendation. For this circuit
+it is not a recommendation but a requirement: the feature map is
+`RZ(2·x)`, which is periodic with period π in the data, so anything above π
+wraps to a different value with no error raised.
+
+Common practice is two stages — z-score on training statistics, then min-max to
+the rotation range. **Scaler parameters come from the training set only.**
+
+**The trap.** The cross-domain arms apply the source scaler to target rows,
+deliberately, because refitting would leak. Any target value outside the
+source's range therefore wraps. Measured on 13 predictors: `PS` puts 36,4% of
+subtropis rows outside the tropis range and 25,9% the other way; `T2M` 2,6%;
+`KX` 1,1%; `lat` and `lon` 100%. A poor cross-domain result could be this
+rather than a physical finding.
+
+**Options.** Clip to the source range. Widen the scaler deliberately. Declare
+it as a limitation. Some combination.
+
+---
+
+## S-7 — One model or two stages
+
+**Measured.** Median run of consecutive zero-flash hours within a live cell:
+15 hours tropis, 20 subtropis. p90: 50 and 164 hours. 40,6% and 66,6% of zero
+rows sit inside runs longer than a week. That is switch-like behaviour.
+
+Zeros are also structured in time, so they are partly predictable: tropis zero
+share runs 83,52% at 16:00 local to 99,43% at 09:00.
+
+**Options.** One model on `log1p(flash_count)`. Two stages, occurrence then
+count, as v1's `experiments.py` had. 
+
+**Note for Bab II.** No QML literature on zero-inflated targets was found. The
+hurdle approach is classical. If that gap survives checking, it is worth
+claiming.
+
+---
+
+## S-8 — The split
+
+**Constraints already fixed.** §4: the test set is the held-out year, whole, at
+its natural class ratio. Training rows may be subsampled. D-11: each domain
+gets its own feature set, at equal width.
+
+**To decide.** Which year is held out, and whether the same year in both
+domains. Whether validation comes from a further split or from cross-validation
+within the training years. What subsampling, if any, on the 94–97% zeros.
+
+---
+
+## S-9 — Screening and ablation
+
+The last step, and the one that writes `features.MODELLED`.
+
+**Fixed by §5.** Screen on Spearman and mutual information, not Pearson —
+Pearson finds only straight lines and would discard a variable that matters
+above a threshold. Confirm with leave-one-out ablation, which is what Bab VI
+leads with.
+
+**Supporting evidence already measured.** Amri reports no strong linear
+correlation between any feature and the target, plus multicollinearity, from a
+Pearson heatmap on monthly aggregates. That is the argument for rank and
+information measures here — and a reminder that his figures are monthly and
+yours are hourly, so they are not comparable quantities.
+
+**Blocked by.** S-1 through S-6. Screening a feature set that is about to
+change is wasted work.
