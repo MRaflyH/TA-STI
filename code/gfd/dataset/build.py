@@ -18,7 +18,6 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 from .. import config as cfg
@@ -33,29 +32,11 @@ KEY = ["lat", "lon", cfg.TIME_COL]
 # ==========================================================================
 # Time features
 # ==========================================================================
-def _cos_sza(lat: np.ndarray, lon: np.ndarray, doy: np.ndarray, hour_utc: np.ndarray):
-    """Cosine of the solar zenith angle.
-
-    Computed, not downloaded, so it is free of the raw freeze. Carries season
-    with the correct sign in both hemispheres, which month_of_year does not.
-
-    Symmetric about solar noon -- 09:00 and 15:00 give the same value -- so it
-    complements hour_of_day_local rather than replacing it.
-
-    True solar time comes from longitude. The equation of time is ignored,
-    which is up to ~16 minutes, inside one hourly bin.
-    """
-    decl = np.radians(23.45) * np.sin(2 * np.pi * (284 + doy) / 365.25)
-    hour_angle = np.radians(15.0 * ((hour_utc + lon / 15.0) - 12.0))
-    la = np.radians(lat)
-    return np.sin(la) * np.sin(decl) + np.cos(la) * np.cos(decl) * np.cos(hour_angle)
-
-
 def _add_time_features(table: pd.DataFrame, domain: cfg.Domain) -> list[str]:
-    """Derive calendar columns from the time key. Returns their names.
+    """Raw calendar columns from the time key. Returns their names.
 
-    Everything is emitted regardless of what features.py currently treats as a
-    candidate -- the table is allowed to be wider than the model.
+    Raw only. Cyclical encodings and solar geometry are representation choices
+    and belong to selection/, which can change them without a rebuild.
     """
     periods = table[cfg.TIME_COL]
     stamps = periods.dt.to_timestamp()
@@ -68,23 +49,7 @@ def _add_time_features(table: pd.DataFrame, domain: cfg.Domain) -> list[str]:
     local = stamps.dt.tz_localize("UTC").dt.tz_convert(domain.solar_tz)
     table["hour_of_day_local"] = local.dt.hour
 
-    # Hour 23 and hour 0 are adjacent; an integer says they are 23 apart.
-    ang = 2 * np.pi * table["hour_of_day_local"] / 24.0
-    table["hour_sin"] = np.sin(ang)
-    table["hour_cos"] = np.cos(ang)
-
-    table["cos_sza"] = _cos_sza(
-        table["lat"].to_numpy(),
-        table["lon"].to_numpy(),
-        table["day_of_year"].to_numpy(),
-        table["hour_of_day_utc"].to_numpy(),
-    )
-
-    return [
-        "year", "month_of_year", "day_of_year",
-        "hour_of_day_utc", "hour_of_day_local",
-        "hour_sin", "hour_cos", "cos_sza",
-    ]
+    return list(feat.RAW_TEMPORAL)
 
 
 # ==========================================================================
@@ -93,10 +58,8 @@ def _add_time_features(table: pd.DataFrame, domain: cfg.Domain) -> list[str]:
 def _check_keys(name: str, frame: pd.DataFrame, target: pd.DataFrame) -> None:
     """Key compatibility, before a merge that would not complain.
 
-    Three things cause zero overlap and none of them raise on their own: a
-    dtype mismatch on the time key, a clock difference, and ERA5 longitudes
-    arriving on 0..360 against lightning's -180..180 -- which only ever fails
-    for Florida.
+    A dtype mismatch on the time key or a clock difference will do it, and
+    neither raises on its own. Has never fired: both domains report 100%.
     """
     for col in KEY:
         lhs, rhs = target[col].dtype, frame[col].dtype
@@ -161,6 +124,11 @@ def build_domain(
 
     time_cols = _add_time_features(table, domain)
 
+    # Check before reordering. Ordering used to drop anything the contract did
+    # not name, which made this check inspect its own output and silently
+    # discard newly acquired columns.
+    feat.check_against_table(table.columns)
+
     predictors = [c for c in feat.CANDIDATES if c in table.columns and c not in ("lat", "lon")]
     ordered = (
         ["domain", cfg.TIME_COL] + time_cols + ["lat", "lon"] + predictors
@@ -169,9 +137,10 @@ def build_domain(
            "period_days", "gfd_per_km2_per_day", cfg.TARGET_REPORTING]
     )
     seen: set[str] = set()
-    table = table[[c for c in ordered if c in table.columns and not (c in seen or seen.add(c))]]
-
-    feat.check_against_table(table.columns)
+    front = [c for c in ordered if c in table.columns and not (c in seen or seen.add(c))]
+    # Everything else keeps its place at the end. The table is allowed to be
+    # wider than the contract; the model reads MODELLED.
+    table = table[front + [c for c in table.columns if c not in seen]]
     _report(table, predictors)
     return table
 
