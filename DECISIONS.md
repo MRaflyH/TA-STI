@@ -301,6 +301,176 @@ code "works".
 
 ---
 
+## D-10 — `PRECTOTCORR` is mm/day. The values stay; the annotation is corrected
+
+**Decided.** `PRECTOTCORR` remains a candidate predictor and its stored values
+are unchanged. The unit annotation in `features.POWER` changes from
+`# precipitation, mm/hour` to `mm/day`, and any chapter text repeating
+`mm/hour` is corrected. O-5 closes.
+
+**Why.** NASA POWER's hourly response declares the unit itself. Read as mm/day
+the domain means give 2 886 and 1 246 mm/year and the maxima are 44.8 and
+49.8 mm in an hour; read as mm/hour the same means give 69 319 and 29 933
+mm/year, which are impossible. O-5 asked whether the extremes were a handful of
+rows or a smooth tail — they are a smooth tail across every cell, so the column
+is not corrupt and was never the problem. The v1 annotation was copied from the
+archive and never checked, which is exactly what O-5 suspected.
+
+**Cost.** Every stored value is 24× what its old label implied, so any figure
+quoted from a pre-2026-09-11 draft is wrong by that factor and silently wrong.
+Nothing downstream changes: the two readings differ by a constant, and Spearman,
+mutual information, min-max onto [0, π] and leave-one-out ablation are all
+invariant under a monotone rescaling. The measured squashing figure (7,4% /
+3,2% of [0, π]) is unaffected.
+
+**Not settled by this entry.** Whether each hourly value is a one-hour mean or
+an instantaneous sample. The header does not say. MERRA-2's hourly
+precipitation is time-averaged, which makes an hourly mean likely, but that is
+**unverified** and Bab IV must label it so. If it is instantaneous, the
+`crr` / `avg_cpr` finding in Measured applies here too and a one-hour
+realignment would be owed.
+
+**Reversal.** Dividing by 24 in `power.py` to store mm/hour would need a full
+rebuild of both tables and would change every stored number for no modelling
+gain. Not recommended; recorded so the option stays visible.
+
+**Bab.** II (the variable, correctly described), IV (the unit, and the
+unverified averaging convention).
+
+**Decided by.** Rafly, 2026-09-11.
+
+---
+
+## D-11 — Each domain gets its own feature set, at the same width
+
+**Decided.** `selection/` runs the screen and the leave-one-out ablation
+**separately on each domain** and writes both rankings to disk as the Bab VI
+evidence. `MODELLED` becomes two lists of **identical length N**, one per
+domain. The `pooled` scenario uses the union of the two, truncated to N by
+pooled ranking. N is one number, chosen once, and stated.
+
+**Why.** The rankings disagree, and the disagreement is measured rather than
+feared: `KX` ranks 1st in subtropis and 10th in tropis, `T2M` 6th and 18th,
+`CAPE` 4th and 12th. `TCIW` is the only informative predictor that ranks the
+same in both. A single list selected on either domain handicaps the other, and
+one selected on the pooled table suits neither.
+
+Fixing N is what makes the split safe. Identical width means identical qubit
+count, identical ansatz weight count and identical compute per run, so
+`tropis_in` against `subtropis_in` compares two models of the same capacity. A
+model fitted on one domain and evaluated on the other is still well defined —
+both tables carry all 37 columns, and a fitted model travels with its own
+feature set and its own scaler — so the within-arm gap `tropis_in` minus
+`tropis_to_sub` is exactly as clean as it would be under one shared list.
+
+**Cost.** Three, and all three are declared rather than avoided.
+
+- If the two ablations pick different sizes, forcing both to N means at least
+  one domain runs at a width its own ablation did not choose. Bab VI must say
+  which domain took that cost and how much skill it gave up.
+- Per-domain selection is itself a mild form of domain adaptation: each domain
+  picks its own inputs before training. The measured gap is therefore the gap
+  **after** that adaptation, which is smaller than a zero-knowledge transfer
+  gap. Bab IV must state which question is being answered — "how well does it
+  transfer once each region has chosen its own predictors", not "how well does
+  it transfer with no local information at all". Keeping a shared-set run as a
+  comparison arm answers the harder question too, if the budget allows; that is
+  not committed here.
+- Selection must run on **training rows only**, and therefore per fold under
+  the rolling origin. Selecting once on the whole table would choose the
+  feature set with knowledge of the held-out year. This applies to a shared set
+  as well; two selections make it easier to get wrong.
+
+**Reversal.** Collapse the two lists into one and pick a rule — pooled ranking,
+union or intersection. A `features.py` edit and a re-run of `selection/`; no
+rebuild, and no re-fit of anything in `dataset/`.
+
+**Bab.** IV (why the sets differ and what that does to the transfer claim),
+VI (the two rankings side by side, and the shift table).
+
+**Decided by.** Claude, proposed 2026-09-11 and accepted by Rafly without
+separate ratification of the reasoning. Recorded as a judgement between
+defensible options, not a measurement.
+
+---
+
+## D-12 — The calendar columns: `hour_sin` and `cos_sza`. Closes O-1
+
+**Decided.** Two calendar candidates, `hour_sin` and `cos_sza`. Everything else
+calendar-derived moves to `EXCLUDE`: `month_of_year`, `day_of_year`,
+`hour_of_day_utc`, `hour_of_day_local` and `hour_cos`. `hour_of_day_local`
+stays in the built table as bookkeeping. No rebuild — `build.py` already emits
+all seven columns.
+
+**Why.**
+
+*Redundancy forces most of it.* `month_of_year` and `day_of_year` are Spearman
+0.997 / 0.996 — the same column. `hour_cos` and `cos_sza` are −0.989 / −0.964.
+At one qubit per feature, keeping both of either pair is a wasted qubit.
+
+*`month_of_year` is the single most dangerous column in the set.* Zero share by
+calendar month is antiphase between the domains: tropis is quietest in July and
+August (0.987) and most active in April (0.903); subtropis is quietest in
+January (0.997) and most active in July (0.924). A model that learns "month 7
+means quiet" from West Java predicts quiet in Florida's most active month.
+
+*`hour_of_day_utc` versus `hour_of_day_local` cannot be settled by screening.*
+Their mutual information is 0.1067 and 0.1062 — identical to within binning
+noise, because MI is invariant under a bijective relabelling of bins and the
+two columns are the same partition with different labels. Taken at face value
+the screen ranks UTC hour 3rd in tropis, above local hour, `PS` and
+`PRECTOTCORR`. It is the one column guaranteed to inject a domain-specific
+offset into a cross-domain experiment. The choice between them is structural,
+not informational.
+
+*Why `hour_sin` and not the integer hour.* Hour 23 and hour 0 are adjacent and
+an integer says they are 23 apart. `hour_sin` is also asymmetric about solar
+noon, which matters: lightning peaks in the late afternoon, two to three hours
+after peak insolation, because the boundary layer keeps accumulating
+instability. `sin(2πh/24)` separates 09:00 from 15:00; a symmetric function
+cannot.
+
+*Why `cos_sza` and not `hour_cos`.* They carry nearly the same diurnal
+information. `cos_sza` is preferred because it is **physically** comparable
+across domains rather than only nominally: `hour_cos` asserts that noon in Java
+in March and noon in Florida in January are the same state, and they are not.
+`cos_sza` encodes actual solar elevation, which means the same thing in both
+hemispheres.
+
+**Cost, and an argument this entry does not make.** O-1 justified `cos_sza`ex
+partly as carrying the seasonal cycle with the correct sign in both
+hemispheres. That claim is now measured and does **not** survive as stated:
+Spearman between `cos_sza` and `month_of_year` is 0.0094 (tropis) and −0.0360
+(subtropis). The seasonal signal is present and correctly signed in the monthly
+means — tropis peaks in January at +0.042 and troughs in July at −0.042,
+subtropis mirrors it at −0.170 and +0.187 — but the column swings roughly −1 to
++1 every day, so a seasonal modulation of amplitude 0.09 (tropis) is swamped.
+**`cos_sza` is chosen as a solar-elevation feature, not as a seasonal one.**
+Season is therefore not represented in the modelled set at all. That is a
+deliberate omission, on the antiphase grounds above, and Bab IV must say so.
+
+Two qubits either way. Dropping the diurnal columns entirely would cost more in
+tropis than anything else on the table: the diurnal cycle spans 15.91 points of
+zero share there against `CAPE`'s 8.52 across its deciles.
+
+**Not addressed here.** Over water the diurnal cycle is reversed — continental
+lightning peaks in the afternoon, oceanic at night or in the morning. A large
+part of the subtropis box is Atlantic, and one `hour_sin` / `cos_sza` pair
+cannot separate land cells from sea cells. This is the strongest argument
+available for the land/sea flag O-3 raises, and it stays open.
+
+**Reversal.** A `features.py` edit and a re-run of `selection/`. No rebuild.
+The dropped columns remain in both built tables.
+
+**Bab.** II (the diurnal and seasonal mechanism, with the lag), IV (which
+columns and why), VI (the tropis/subtropis diurnal asymmetry).
+
+**Decided by.** Claude, proposed 2026-09-11 and accepted by Rafly without
+separate ratification of the reasoning. The redundancy and antiphase parts
+follow from measurements; the `cos_sza` over `hour_cos` choice is a judgement.
+
+---
+
 ## Measured
 
 Findings that correct something the archive asserts, or that the thesis will
@@ -389,11 +559,135 @@ need to quote. All `[measured]`, 2026-09-10.
   35,0%/17,3% (tropis/subtropis). Six of thirteen predictors fall below 25% in
   tropis, seven in subtropis.
 
+Added 2026-09-11. All `[measured]` unless marked otherwise.
+
+- **`PRECTOTCORR` is mm/day, not mm/hour.** The NASA POWER hourly response
+  declares `"units": "mm/day"` in its own `parameters` block. The four other
+  POWER parameters match `features.py` exactly — `PS` kPa, `T2M` C, `RH2M` %,
+  `WS2M` m/s — so this is one wrong annotation, not a systematic problem. One
+  sampled point-year sums to 960.97 mm; the domain means of 7.9077 and 3.4147
+  give 2 886 and 1 246 mm/year `[derived]`. The maxima of 1075.77 and 1194.43
+  are 44.8 and 49.8 mm in an hour. See D-10.
+- **The column is not corrupt.** Zero nulls in either table. The tail is smooth
+  to the 0.99999 quantile (tropis 0.5=2.640, 0.99=79.780, 0.999=221.730,
+  0.9999=439.453). The 699 tropis rows above 305 span all 30 cells and 281
+  distinct hours; the 286 subtropis rows span 41 of 56 cells and 122 hours.
+  Neither of O-5's two hypotheses survives.
+- **Zero-inflation is ruled out. The target is overdispersion, not a mixture.**
+  A method-of-moments negative binomial implies P(0) = 0.9638 (tropis) and
+  0.9852 (subtropis) against observed 0.9430 and 0.9700 — a *negative* excess
+  of 2.08 and 1.52 points. var/mean is 170.59 and 633.77. A Poisson implies
+  0.2959 and 0.2325 and is not a candidate. Caveats that belong with the
+  figure: method of moments rather than maximum likelihood, a *marginal* rather
+  than conditional fit, and dominated by the extreme tail. Indicative, not
+  precise. What it rules out is a ZI mixture; it does not argue against a
+  hurdle, which is a factorisation and valid either way.
+- **There is no clean occurrence gate.** Zero share, `coverage > 0` rows, under
+  progressively harder conditioning (tropis/subtropis): unconditional
+  94.30%/97.00%; top CAPE decile 91.29%/91.01%; top decile CAPE and KX
+  89.87%/81.04%; top decile CAPE, KX and TCIW 74.20%/70.90%; same cell flashed
+  within ±3 h 65.71%/69.01%; domain active *and* same cell active within ±3 h
+  **56.29%/64.93%**. It never collapses. Sampling zeros are irreducible at
+  0.5° / 1 h — a cell is larger than a storm and an hour longer than a flash
+  gap. Stage 1's ceiling is set by resolution, not by the model.
+- **Hour of day out-discriminates CAPE in the tropics, and not in the
+  subtropics.** Tropis: CAPE deciles span 8.52 points of zero share, the
+  diurnal cycle 15.91 `[derived]` from the two measurements. Subtropis: CAPE
+  8.98, diurnal 5.04. The same feature set carries different information in
+  each domain, which is itself a Bab VI finding.
+- **`coverage == 0` occurs only in subtropis, and only in the three empty
+  MERLIN months.** 122 304 rows = 56 cells × 2 184 hours = 91 days =
+  2021-03 (31) + 2022-12 (31) + 2024-02 (29). Tropis has none. Excluding them
+  gives 97.0047%, reproducing v1's convention exactly, as D-8 predicted. So a
+  zero here means climatological absence, not detector downtime.
+- **Roughly 20% of subtropis rows have CAPE at or near zero.** The bottom two
+  deciles merged at 665 735 rows, CAPE ≤ 0.375. A point mass that size breaks
+  both min-max and quantile transforms in different ways. Carry it into O-7.
+- **The built tables emit seven calendar columns, not four.** `hour_sin`,
+  `hour_cos` and `cos_sza` are present in both tables and appear in neither
+  `CANDIDATES` nor `EXCLUDE`, which `check_against_table` reports in both
+  domains. `cos_sza` therefore already exists; O-1 describes computing it as a
+  proposal. All 17 declared candidates are present in both tables; 37 columns
+  each. Nothing else is missing or unclassified.
+- **`mean_coverage` in the meta files contradicts this section.** meta.json
+  records 0.6907 (tropis) and 0.5156 (subtropis); the bullets above record
+  0.855 and 0.571. The minima agree (0.129). Both are `[measured]`, so one is
+  from a different build, denominator or weighting. **Unresolved** — do not
+  quote either in a chapter until it is settled.
+- **The screen ranks features differently in each domain.** Normalised mutual
+  information against occurrence, `coverage > 0` rows, largest rank shifts:
+  `T2M` 18th tropis / 6th subtropis, `lat` 9th/19th, `hour_of_day_local`
+  4th/14th, `KX` 10th/1st, `CAPE` 12th/4th. `TCIW` is the only informative
+  predictor ranking identically (2nd/2nd); `lon` is last in both (20th/20th).
+  See D-11.
+- **`VIIWD` is the case §5 predicts.** Spearman 0.0226 / 0.0219 — near zero,
+  discarded by any correlation screen — but MI ranks it 8th and 5th. A variable
+  that matters above a threshold with no monotone relationship. `VILWD` is a
+  weaker instance. This is the concrete example Bab VI should lead the
+  screening section with.
+- **Spearman against the count and against occurrence agree to three decimals**
+  on every predictor in both domains. The screen does not distinguish the two
+  stages, so it need not be run twice.
+- **`lat` is informative only where the dead cells are.** 9th in tropis, 19th
+  in subtropis; `lon` 20th in both. The asymmetry is the O-3 shortcut appearing
+  in the screen. The predecessor reports `LAT` as his most influential feature
+  in **both** datasets while his own heatmap gives LAT–LIGHTNINGCOUNT 0.11
+  (PLN) and −0.01 (MERLIN) `[repo]`. Correcting this is a Bab VI result.
+- **Calendar redundancy.** `month_of_year` ~ `day_of_year` 0.997 / 0.996;
+  `hour_cos` ~ `cos_sza` −0.989 / −0.964; `hour_of_day_local` ~ `hour_sin`
+  −0.746 in both. See D-12.
+- **`cos_sza` does not carry season as a column.** Spearman against
+  `month_of_year` is 0.0094 (tropis) and −0.0360 (subtropis). The seasonal term
+  is present in the monthly means and correctly signed — tropis +0.042 January
+  to −0.042 July, subtropis −0.170 January to +0.187 June — but the daily swing
+  is roughly −1 to +1, so an amplitude of 0.09 (tropis) or 0.37 (subtropis) is
+  swamped. Corrects the assumption in O-1.
+- **The antiphase, measured on the target itself.** Zero share by calendar
+  month: tropis 0.933 Jan, 0.903 Apr, 0.987 Jul, 0.926 Dec; subtropis 0.997
+  Jan, 0.977 Apr, 0.924 Jul, 0.995 Dec. Spreads of 8.4 and 7.3 points, matching
+  the strike-total figures already recorded.
+- **Monthly aggregation destroys the cross-domain comparison. Evidence for
+  D-2.** Aggregating the hourly tables to cell-months reproduces the
+  predecessor's table exactly — tropis 2 520 rows, 30 cells — and conditions the
+  target well: zero share falls to 29.37% / 17.94% and `log1p` skew to −0.12 /
+  −0.06. But the predictors change sign between domains. Spearman against the
+  monthly count: `CAPE` **−0.040 tropis against +0.680 subtropis**; `T2M`
+  −0.507 against +0.602; `TCLW` +0.705 against +0.029. At hourly the same
+  predictors agree in sign (`CAPE` +0.128/+0.187, `T2M` −0.062/+0.172).
+  Monthly averaging replaces the instantaneous physical relationship with a
+  seasonal climatology, and the two climatologies are antiphase, so a
+  cross-domain model at monthly resolution transfers an inverted climatology
+  rather than physics. **This is the justification for hourly, and it belongs
+  in Bab III.** The aggregation is a groupby on the existing parquets, so a
+  monthly comparison arm against the predecessor's numbers remains available
+  without touching `dataset/`; nothing is committed here.
+- **Monthly zeros are mostly already-known effects.** Tropis: 6 dead cells × 84
+  months = 504 of 740 zero cell-months `[derived]`, leaving 11.7% over live
+  cells. Subtropis: 3 empty MERLIN months × 56 cells = 168 of 844 `[derived]`;
+  the remaining 676 are winter, with mean coverage 0.1949 against 0.6517
+  elsewhere — so at monthly resolution "quiet" and "unobserved" are harder to
+  separate than at hourly, not easier.
+- **Lightning is autocorrelated, but the model does not use it.** Zero share
+  falls from 94.30%/97.00% to 65.71%/69.01% conditioned on the same cell having
+  flashed within ±3 h. §4 makes the model a diagnostic — predictors and target
+  at the same hour, no lags — so this persistence is measured and deliberately
+  unexploited. Say so in Bab IV rather than letting it read as an oversight.
+
+- **A note on this file's decimal convention.** §6 puts decimal points in code
+  and records and commas in the thesis. The bullets above 2026-09-11 mix both.
+  Entries from 2026-09-11 use points. The older bullets are left as written
+  rather than silently normalised.
+
 ---
 
 ## Open
 
-**O-1 — The calendar columns.** A proposal exists and is not yet written into
+**O-1 — CLOSED 2026-09-11 by D-12.** `hour_sin` and `cos_sza` are the two
+candidates; the other five calendar columns move to `EXCLUDE`. The `cos_sza`
+seasonal claim below did not survive measurement — see D-12 and Measured. The
+land/sea question D-12 raises stays open under O-3. Original text kept below.
+
+**O-1 (original) — The calendar columns.** A proposal exists and is not yet written into
 `features.py`: `hour_of_day_local` as a candidate, encoded sin/cos rather than
 as an integer; `cos_sza` as a new candidate, computed from lat, longitude, day
 of year and hour rather than downloaded, carrying season with the correct sign
@@ -419,6 +713,26 @@ the other.
 `build.py` already emits all seven columns, so this is a `features.py` edit
 with no rebuild. Blocked on the literature step.
 
+**Updated 2026-09-11. No longer blocked, and more urgent than it reads.**
+`hour_sin`, `hour_cos` and `cos_sza` are present in both built tables and are
+in **neither `CANDIDATES` nor `EXCLUDE`** — `check_against_table` reports this
+in both domains. `cos_sza` is described above as a proposal to compute; it
+already exists. Three unclassified numeric columns is exactly the hazard the
+check's own message names: any "everything numeric" selection in `selection/`
+picks them up without a decision having been made. **This must close before
+`selection/` reads a column list.**
+
+Evidence for keeping `hour_of_day_local`, now measured rather than argued: in
+tropis the diurnal cycle spans 15,91 points of zero share against CAPE's 8,52
+across its deciles — the clock discriminates nearly twice as well as the single
+most-cited convective predictor. In subtropis it reverses, CAPE 8,98 against
+diurnal 5,04. That asymmetry is itself a Bab VI finding.
+
+The literature offers weak support for including calendar columns regardless of
+screening outcome: one forecast post-processing study force-includes prediction
+time, month and hour whatever its three selection methods return (arXiv
+2604.19340, metadata unverified). It does not address the antiphase problem.
+
 **O-2 — Whether the lock is one file or two.** `requirements.txt` holds both
 the pins and the reasoning, so regenerating it with `pip freeze` destroys the
 comments — which has already happened once. The alternative is a
@@ -438,11 +752,26 @@ rule to transfer to Florida, so it inflates one side of the comparison and does
 nothing for the other — and the cross-domain gap is the number this thesis
 reports.
 
-**The wrapping measurement makes this sharper.** Tropis latitude spans −7,75
+**The range measurement makes this sharper.** Tropis latitude spans −7,75
 to −5,75; subtropis 26,75 to 30,25. They do not overlap at all, so a
 source-fitted min-max scaler maps **100% of the target domain's `lat` and `lon`
-outside [0, π]** in both directions, where a rotation wraps rather than clips.
-In the cross-domain arms those two features carry noise.
+outside [0, π]** in both directions.
+
+**Corrected 2026-09-11.** This paragraph previously said the rotation *wraps
+rather than clips* and that the two features *carry noise*. Both are wrong
+against the archive `[repo]`: `CLIP_TEST_FEATURES = True`, and `Scaler.transform`
+clips to [0, 1] before mapping onto [0, π] — the archive makes the same aliasing
+argument and already prevents it. The correct statement is **saturation, not
+aliasing**: every target-domain `lat` and `lon` value clips to exactly 0.0 or
+exactly π. In the cross-domain arms those are not noisy features, they are two
+constants occupying two of fifteen qubits. That is a larger and more measurable
+cost than "noise", and it applies only to the cross-domain arms — the number
+this thesis reports.
+
+The same mechanism, milder, applies to `PS`: 36,37% of subtropis rows collapse
+onto a single boundary value in `sub_to_tropis`.
+
+Whether the new code clips at all is itself a decision, not an inheritance.
 
 So dropping `lat` and `lon` as predictors addresses both problems at once: the
 dead-cell shortcut and the fact that a coordinate cannot mean anything in the
@@ -469,22 +798,104 @@ exercise the ZIP branch. `mean_convective_precipitation_rate` is a mean rate
 and would need a one-hour realignment; `convective_rain_rate` is the
 instantaneous alternative and would not. Undecided.
 
-**O-5 — `PRECTOTCORR` may have a unit or data problem. Unresolved.**
-Maximum is 1076 (tropis) and 1194 (subtropis) against a column documented as
-mm/hour. The world record for one-hour rainfall is roughly 305 mm, so these are
-not possible as hourly rates. Either the unit annotation in `features.py` is
-wrong — it was copied from the v1 archive and never verified against the NASA
-POWER parameter definition — or the values are not what they appear. **Settle
-this before the column appears in any chapter.** Check whether the extreme
-values are a handful of rows or a smooth tail.
+**Updated 2026-09-11.** The seven are named in `era5.VARIABLE_SHORTNAME` and are
+`VIMDF`, `TOTALX`, `CIN`, `CBH`, `TCWV`, `D2M`, `CRR` — `convective_rain_rate`,
+the instantaneous option, is the one in flight. The download is still running;
+the built tables measured on 2026-09-11 are the **pre-tier-1 baseline**, 37
+columns and six ERA5 variables, and `check_against_table` should be re-run
+against that baseline when the seven land.
 
-**O-6 — One model or two stages.** The dry-spell measurement supports v1's
-`occurrence`/`count` split: median runs of 15–20 hours and two thirds of
-subtropis zero rows inside week-long runs is switch-like behaviour rather than
-a continuous process with many small values. No QML literature on zero-inflated
-targets was found; the hurdle approach is classical. Undecided.
+Two things to check on arrival, neither assumed:
+
+- **`CBH` may be undefined in clear-sky hours.** If ERA5 returns NaN there it is
+  the first candidate to break "no missing values". Unverified.
+- **Run `--check` before trusting the files.** These are the first request to
+  mix analysis and forecast variables, so the first that can return a ZIP, and
+  Measured records that `_open_members`' archive branch has never executed.
+
+**A Bab II point this settles.** Recent lightning-ML work identifies the
+700–500 hPa lapse rate and a moist-static-energy ratio as dominant predictors
+(western-US CG-lightning CNNs, PMC11583119, metadata unverified). Neither is a
+standalone column here, and a true lapse rate **cannot** be: it needs
+`reanalysis-era5-pressure-levels`, a different dataset and therefore a second
+acquisition job, which §2 forbids after the freeze. But the ingredient is
+present — total totals is (T850−T500)+(Td850−T500) and K index is
+(T850−T500)+Td850−(T700−Td700), so both carry a mid-level lapse-rate term
+inside them. Bab II should say the contribution enters through KX and TOTALX
+rather than standalone, and name the dataset constraint. That is a stated
+limitation, not a gap.
+
+**O-5 — CLOSED 2026-09-11.** The unit annotation was wrong; the data is fine.
+NASA POWER declares mm/day. The tail is smooth and spans every cell, so neither
+of the two hypotheses this item offered survives. See D-10 and Measured. Two
+code edits are outstanding: the `mm/hour` comment in `features.POWER`, and any
+chapter text repeating it.
+
+**O-6 — One model or two stages. Narrowed 2026-09-11; still undecided.**
+The dry-spell measurement supports v1's `occurrence`/`count` split: median runs
+of 15–20 hours and two thirds of subtropis zero rows inside week-long runs is
+switch-like behaviour rather than a continuous process with many small values.
+
+Two measurements now bound the question:
+
+- **A zero-inflated mixture is ruled out.** The negative binomial already
+  over-predicts the zeros in both domains, so there is no surplus for a
+  structural-zero component to explain. This does *not* rule out a hurdle: a
+  hurdle is the factorisation P(y) = P(y>0)·P(y | y>0), which is valid whatever
+  produces the zeros. ZI makes a claim about the world; a hurdle makes a claim
+  about how the prediction is decomposed.
+- **The gate is not clean.** Under maximal conditioning the zero share is still
+  56,29% and 64,93%. Whatever is chosen, stage 1 has a resolution-imposed
+  ceiling and Bab VI must declare it rather than let it read as a weak
+  classifier.
+
+v1 already ran `TASK = "hurdle"` by default, on measured grounds this record
+does not carry: at a 6-hour reporting window the target is still 85,40% /
+91,35% zeros `[repo]`, so a single count regressor stays badly conditioned no
+matter how wide the window gets.
+
+The remaining choice is between a hurdle whose stages are composed and scored on
+the whole held-out year at natural ratio, a hurdle whose count stage is scored
+on non-zero test rows only (v1's practice, which reshapes the test set and
+violates §4), and a single model on all rows. No QML literature on zero-inflated
+targets was found; the hurdle approach is classical.
 
 **O-7 — Skew must be fixed before min-max, for some predictors.** See the
 squashing measurements. Under plain min-max the worst predictors are nearly
 constant to the circuit. The likely order is: fix skew, z-score, then min-max
 to [0, π]. Which transform, and which predictors need it, is undecided.
+
+**Sharpened 2026-09-11 — this is a fairness condition, not a preprocessing
+preference.** `_apply_feature_map` is Hadamard then `RZ(2x)` `[repo]`, so the
+encoding has period π in x and [0, π] is exactly one full period rather than an
+arbitrary convention. A predictor occupying 7,4% of that range is evaluated over
+a phase arc of roughly 0,46 rad, where a sinusoid is close to linear — so the
+circuit's response to it is approximately affine no matter how many ansatz reps
+are added. The loss is in the encoding, before any trainable parameter.
+
+A classical MLP fed the same squashed column simply learns a larger weight and
+loses nothing. **So a bad transform degrades one arm of the comparison and not
+the other**, and the gap between the arms is the number this thesis reports.
+
+Theoretical support: Schuld, Sweke & Meyer, *Effect of data encoding on the
+expressive power of variational quantum-machine-learning models*, Phys. Rev. A
+103, 032430 (2021), arXiv:2008.08605 — a quantum model is a partial Fourier
+series in the data whose accessible frequencies are set by the encoding gates.
+Practical support for pre-scaling to [0, π]: Sammartino, arXiv:2606.05387
+(preprint, not peer-reviewed).
+
+Two complications the transform choice has to survive:
+
+- **Roughly 20% of subtropis rows have CAPE ≤ 0,375.** Min-max leaves that mass
+  at one end; a quantile transform spreads it across a wide output range purely
+  on tie-breaking, inventing structure that is not there.
+- **A rank-based transform is not a fix for O-3.** Quantile transforms map
+  unseen out-of-range values to the *bounds*, so a source-fitted quantile
+  transform collapses the whole target domain's `lat` onto one value. That is a
+  different failure, not a solution.
+
+The literature frames the trade-off as min-max preserving distribution shape but
+not being robust to outliers, against quantile transformation being robust but
+destroying shape entirely. McCarter, *The Kernel Density Integral
+Transformation*, arXiv:2309.10194, interpolates between them with one parameter.
+Metadata unverified.
