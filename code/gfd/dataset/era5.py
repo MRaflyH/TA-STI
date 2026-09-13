@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import tempfile
+import time
 import zipfile
 from pathlib import Path
 
@@ -42,6 +43,7 @@ VARIABLE_SHORTNAME = {
     # Tier 1 candidates. Short names unverified against a real file -- --check
     # reports anything that lands under a different name.
     "vertical_integral_of_divergence_of_moisture_flux": "vimdf",
+    "mean_convective_precipitation_rate": "avg_cpr",
     "total_totals_index": "totalx",
     "convective_inhibition": "cin",
     "cloud_base_height": "cbh",
@@ -71,6 +73,7 @@ SHORTNAME_MAP = {
     "viiwd": "VIIWD",
     "vilwd": "VILWD",
     "vimdf": "VIMDF",
+    "avg_cpr": "MCPR",
     "totalx": "TOTALX",
     "cin": "CIN",
     "cbh": "CBH",
@@ -91,13 +94,44 @@ def _stamp(year: int, month: int) -> str:
 # ==========================================================================
 # Download
 # ==========================================================================
-def _submit(request: dict, dest: Path, tag: str) -> Path:
+def _submit(request: dict, dest: Path, tag: str, retries: int = 3) -> Path:
+    """Submit and download, retrying transfers that fail after the job succeeds.
+
+    The CDS can report a job successful and still hand back a short or empty
+    file. A partial download left on disk would be treated as cached forever,
+    so it is removed before any retry.
+    """
     import cdsapi
 
-    print(f"[era5] submit {tag} ...", flush=True)
-    cdsapi.Client().retrieve(DATASET, request, str(dest))
-    print(f"[era5] saved  {dest.name} ({dest.stat().st_size / 1e6:.2f} MB)")
-    return dest
+    for attempt in range(1, retries + 1):
+        print(f"[era5] submit {tag} ...", flush=True)
+        try:
+            cdsapi.Client().retrieve(DATASET, request, str(dest))
+            if dest.stat().st_size == 0:
+                raise OSError("downloaded file is empty")
+            print(f"[era5] saved  {dest.name} ({dest.stat().st_size / 1e6:.2f} MB)")
+            return dest
+        except Exception as exc:  # noqa: BLE001 -- retry any transfer failure
+            dest.unlink(missing_ok=True)
+            if attempt == retries:
+                raise
+            wait = 30 * attempt
+            print(f"[era5] !! {type(exc).__name__}: {exc}")
+            print(f"[era5]    attempt {attempt}/{retries} failed, retry in {wait}s")
+            time.sleep(wait)
+    raise RuntimeError("unreachable")
+
+
+def _cached(dest: Path, overwrite: bool) -> bool:
+    """A zero-byte file is a failed download, not a cache hit."""
+    if overwrite or not dest.exists():
+        return False
+    if dest.stat().st_size == 0:
+        print(f"[era5] {dest.name} is empty -- refetching")
+        dest.unlink()
+        return False
+    print(f"[era5] cached {dest.name}")
+    return True
 
 
 def _request(domain: cfg.Domain, year: int, month: int, variables: list[str]) -> dict:
@@ -130,8 +164,7 @@ def fetch_chunk(
     out_dir.mkdir(parents=True, exist_ok=True)
     dest = out_dir / f"era5_{domain.name}_hourly_{_stamp(year, month)}.nc"
 
-    if dest.exists() and not overwrite:
-        print(f"[era5] cached {dest.name}")
+    if _cached(dest, overwrite):
         return dest
     return _submit(
         _request(domain, year, month, variables or VARIABLES),
@@ -172,8 +205,7 @@ def fetch_supplement(
     out_dir.mkdir(parents=True, exist_ok=True)
     dest = out_dir / f"era5_{domain.name}_hourly_{_stamp(year, month)}_{tag}.nc"
 
-    if dest.exists() and not overwrite:
-        print(f"[era5] cached {dest.name}")
+    if _cached(dest, overwrite):
         return dest
     return _submit(
         _request(domain, year, month, variables),
@@ -182,22 +214,51 @@ def fetch_supplement(
     )
 
 
-def fetch_domain(domain: cfg.Domain, **kw) -> list[Path]:
+def _months(domain: cfg.Domain):
     return [
-        fetch_chunk(domain, y, m, **kw)
+        (y, m)
         for y in range(domain.year_start, domain.year_end + 1)
         for m in range(1, 13)
     ]
+
+
+def _run(domain: cfg.Domain, fetch, label: str) -> list[Path]:
+    """Fetch every month, carrying on past failures.
+
+    One bad transfer should not abandon the other 167. Failures are collected
+    and reported; re-running picks them up, since successes are cached.
+    """
+    saved, failed = [], []
+    months = _months(domain)
+    for i, (y, m) in enumerate(months, 1):
+        try:
+            saved.append(fetch(y, m))
+        except Exception as exc:  # noqa: BLE001
+            failed.append((f"{y}{m:02d}", f"{type(exc).__name__}: {exc}"))
+            print(f"[era5] !! {domain.name} {y}{m:02d} GIVING UP: {exc}")
+        if i % 12 == 0:
+            print(f"[era5] {domain.name} {label}: {i}/{len(months)} months")
+
+    if failed:
+        print(f"\n[era5] {domain.name}: {len(failed)} of {len(months)} failed")
+        for stamp, why in failed:
+            print(f"         {stamp}  {why}")
+        print("[era5] re-run to retry -- successful months are cached")
+    return saved
+
+
+def fetch_domain(domain: cfg.Domain, **kw) -> list[Path]:
+    return _run(domain, lambda y, m: fetch_chunk(domain, y, m, **kw), "main")
 
 
 def fetch_supplement_domain(
     domain: cfg.Domain, variables: str | list[str], tag: str | None = None, **kw
 ) -> list[Path]:
-    return [
-        fetch_supplement(domain, y, m, variables, tag, **kw)
-        for y in range(domain.year_start, domain.year_end + 1)
-        for m in range(1, 13)
-    ]
+    return _run(
+        domain,
+        lambda y, m: fetch_supplement(domain, y, m, variables, tag, **kw),
+        tag or "supplement",
+    )
 
 
 # ==========================================================================
@@ -260,8 +321,9 @@ def parse_netcdf(path: str | Path) -> pd.DataFrame:
     for extra in frames[1:]:
         out = out.merge(extra, on=["lat", "lon", "time"], how="outer")
 
-    # ERA5 longitudes can arrive on 0..360. Onto -180..180 to match the other
-    # frames. Only bites Florida; West Java is positive either way.
+    # The CDS sends -180..180 for both boxes (measured: -82,0..-78,5 for
+    # subtropis). This is a guard against that changing, not a fix for
+    # something observed -- it has never altered a value.
     out["lon"] = ((out["lon"] + 180) % 360) - 180
     return out
 
