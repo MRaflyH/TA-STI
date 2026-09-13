@@ -84,10 +84,26 @@ def load_pln_workbook(path: str | Path, sheets: list[str] | None = None) -> pd.D
 
 
 def load_pln(directory: str | Path = cfg.RAW_PLN_DIR, pattern: str = "*.xlsx") -> pd.DataFrame:
+    """Every PLN workbook, with exact duplicate rows dropped.
+
+    Must happen here, not in selection/. aggregate_gfd counts strike rows into
+    flash_count, and once counted a duplicate cannot be undone -- the
+    individual strikes are gone.
+
+    Measured 2026-09-14: 5 710 pairs, every one inside the 2020 sheet, every
+    one identical across all thirteen source columns. Same key merlin.load
+    uses.
+    """
     files = sorted(Path(directory).glob(pattern))
     if not files:
         raise FileNotFoundError(f"no PLN workbooks matching {pattern!r} under {directory}")
-    return pd.concat([load_pln_workbook(f) for f in files], ignore_index=True)
+
+    strikes = pd.concat([load_pln_workbook(f) for f in files], ignore_index=True)
+    before = len(strikes)
+    strikes = strikes.drop_duplicates(subset=["timestamp", "lat", "lon", "peak_current_ka"])
+    if before - len(strikes):
+        print(f"[pln] dropped {before - len(strikes):,} duplicate rows")
+    return strikes.reset_index(drop=True)
 
 
 LOADERS = {"tropis": load_pln, "subtropis": merlin.load}
