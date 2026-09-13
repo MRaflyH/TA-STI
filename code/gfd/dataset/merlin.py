@@ -306,7 +306,12 @@ def load_file(path: str | Path) -> pd.DataFrame:
 
 
 def load(directory: str | Path = cfg.RAW_MERLIN_DIR, pattern: str = "*.csv") -> pd.DataFrame:
-    """Every export. Windows overlap, so exact duplicates are dropped."""
+    """Every export, with exact duplicates dropped.
+
+    The windows do not overlap -- each ends at 23:59:59 and the next starts at
+    00:00:00, leaving a one-second gap. The duplicates that do occur are
+    repeated rows within a single file, three across 89 files.
+    """
     files = sorted(Path(directory).glob(pattern))
     if not files:
         raise FileNotFoundError(f"no MERLIN exports matching {pattern!r} under {directory}")
@@ -315,7 +320,7 @@ def load(directory: str | Path = cfg.RAW_MERLIN_DIR, pattern: str = "*.csv") -> 
     before = len(strikes)
     strikes = strikes.drop_duplicates(subset=["timestamp", "lat", "lon", "peak_current_ka"])
     if before - len(strikes):
-        print(f"[merlin] dropped {before - len(strikes):,} duplicates across overlapping exports")
+        print(f"[merlin] dropped {before - len(strikes):,} duplicate rows")
 
     return strikes.sort_values("timestamp").reset_index(drop=True)
 
