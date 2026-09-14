@@ -708,6 +708,57 @@ result).
 
 ---
 
+## D-18 — `selection/` declares the transform chain; `training/` executes it
+
+**Decided.** `selection/` owns *what* the transform chain is — the temporal
+encoding, the missingness handling, the skew transform, the scaler and its
+range — and emits it as a declared spec. `training/` owns *when and on what*:
+it fits the chain on the training rows of each fold and applies it to the rest.
+Neither duplicates the other, and no third place transforms anything.
+
+`selection/` holds five modules, one per stage:
+
+    description.py   stage 1. Measures the table. Never puts a predictor
+                     against the target.
+    diagnosis.py     stage 2. Measures the problems. May use the target.
+                     Still only measures.
+    prepare.py       stage 3. Declares and builds the chain. The only module
+                     in selection/ that changes a value.
+    screen.py        ranks the candidates.
+    ablate.py        leave-one-out; writes modelled.json.
+
+Files are divided by **what the code does**, not by which question it answers.
+A question is a function; a file is a stage. Questions multiply without limit.
+
+**Why a spec rather than a function each side calls.** §3 assigns scaling to
+`training/` and D-13 assigns temporal encoding to `selection/`, so the chain
+was already split across two subpackages. But `screen.py` and `ablate.py` need
+transformed data too, and if they build their own the screen measures a
+different matrix from the one that trains — the fault §3 names about a
+benchmark constructing its own circuit. A declared spec is the only
+arrangement in which three consumers cannot disagree.
+
+**Why description and diagnosis are two files, not two sections.** Stage 1's
+guarantee is that it never puts a predictor against the target, and that
+guarantee is what lets it run on the whole table with no leakage concern. In
+one file it is a comment someone can violate without noticing. In two it is
+checkable: `description.py` never names the target beside a candidate.
+
+**Cost.** Indirection. Reading the chain end to end means reading a spec in
+`selection/prepare.py` and an executor in `training/`. The alternative was one
+subpackage reaching into the other, which is worse and harder to see.
+
+`prepare.py`, `screen.py` and `ablate.py` do not exist yet.
+
+**Reversal.** Collapse the spec into a function `training/` imports. Nothing is
+lost but the guarantee that three consumers see one chain.
+
+**Bab.** IV (pipeline design), V (implementation).
+
+**Decided by.** Rafly, 2026-09-14, choosing between three seams Claude set out.
+
+---
+
 ## Measured
 
 Findings that correct something the archive asserts, or that the thesis will
@@ -1076,6 +1127,148 @@ training rows only.
 999,5, both with detachment 0,0 — the distribution runs to that value and
 stops. Either coincidence or a ceiling in the ERA5 field. Worth settling before
 the `CIN` handling is decided.
+
+---
+
+### 2026-09-14 — stage 2 diagnosis, first pass
+
+`selection/diagnosis.py`, missingness and zero structure. All `[measured]`.
+Recorded, not acted on: three S-items move and none is decided here.
+
+**The `CIN` residual is a threshold, not a mystery. S-4's blocker is closed.**
+The null rate decays monotonically down `CAPE`'s deciles — subtropis 0,9885 in
+the bottom decile to 0,0001 in the top; tropis 0,9581 to 0,0004. The residual
+rows carry a median `CAPE` of 10,81 subtropis and 16,47 tropis. `CIN` is
+undefined when `CAPE` is **negligible**, not only when it is exactly zero, and
+the physical story holds with that correction. `CBH` is the same shape against
+cloud water: residual medians 0,00032 and 0,00049.
+
+**And that weakens the missing-indicator case.** If the blank is a threshold on
+`CAPE`, then `CIN_missing` is a thresholded copy of a variable already in the
+candidate set, and it would cost a qubit to encode information `CAPE` carries.
+The missing-indicator literature in S-4 assumes the indicator supplies
+information not otherwise present. Here it demonstrably does not. `CIN`'s
+**value** where present is a separate matter — it appears in neither domain's
+top-15 Spearman pairs with `CAPE`.
+
+**A domain asymmetry to declare.** Subtropis `CIN`-null rows are 99,95% zero
+and carry 0,25% of all flashes. Tropis nulls are 98,89% zero and carry
+**2,31%** — roughly 51 700 flashes. The same blank means "no lightning" in
+Florida and does not quite mean it in West Java.
+
+**`CIN` is capped at 1000.** Subtropis max exactly 1000,0 with one row on it
+and 363 within 1%; tropis 999,469 with 25 within 1%. A real ceiling that almost
+nothing reaches, so it does not distort the distribution — but it is the
+direction a physically-motivated imputation would point, since no LFC means
+effectively unbounded inhibition. Imputing 0 asserts the opposite.
+
+**The target is not zero-inflated, and this overturns the standing assumption
+behind S-7.** A negative binomial at the observed mean and variance predicts
+**more** zeros than are observed: subtropis 0,9858 predicted against 0,9711
+observed, tropis 0,9639 against 0,9430. The excess is negative in both domains.
+The overdispersion alone over-explains the zeros. A Poisson would give 0,2449
+and 0,2968, so the target is emphatically not Poisson — but the gap that a
+hurdle or zero-inflated model exists to close is not there.
+
+**Stated as a limitation of the test**: this is a marginal moment fit, and
+conditional zero-inflation given the predictors is a different question that
+this does not answer. It is a yardstick, not a proof. The direction is the
+opposite of what 94-97% zeros invites, which is why it is worth reporting
+either way.
+
+**What does support two stages is persistence, not inflation.** Zero runs
+within live cells: median 20 hours subtropis and 15 tropis, p90 164 and 50,
+p99 1 184 and 338. **90,66% of subtropis zero rows and 74,25% of tropis sit
+inside runs longer than 24 hours**; 66,59% and 40,62% inside runs longer than a
+week. That is switch-like behaviour, and it is a different argument for the
+same architecture. S-7 should lead with it.
+
+**Tropis is diurnally driven; subtropis is seasonally driven.** Zero-share
+amplitude, tropis: **15,9 points** diurnal (0,835 at 16:00 local, 0,994 at
+09:00) against 8,4 points seasonal. Subtropis: 5,0 points diurnal (0,937 at
+15:00, 0,987 at 02:00) against **7,3 points** seasonal (0,924 July, 0,997
+January). The diurnal signal is three times stronger in West Java than in
+Florida, and in Florida the seasonal signal is the larger of the two.
+
+This bears on S-3, which inherited from the parked D-12 a choice of `hour_sin`
+with `month_of_year` excluded — a choice that suits tropis and underserves
+subtropis. It also bears on S-10: if the two domains need different *kinds* of
+temporal feature rather than different weights on one, equal width is a harder
+constraint than it looked.
+
+**Non-zero counts.** Share of non-zero cell-hours equal to exactly 1: 0,1931
+subtropis, 0,2863 tropis. Non-zero var/mean 586,53 and 150,68.
+
+**S-items moved, none decided.** S-4 (blocker closed, indicator weakened),
+S-7 (justification replaced), S-3 (new constraint), S-5 (a further point mass
+if `CIN` is imputed), S-10 (equal width harder to defend).
+
+---
+
+### 2026-09-14 — stage 2 diagnosis, second pass
+
+Cross-domain maps and temporal structure. All `[measured]`. Recorded, not acted
+on. This closes the measuring phase.
+
+**A bounded map beats min-max on cross-domain resolution, by about four times,
+in 35 of 36 column-arm pairs.** Averaged over the eighteen non-coordinate
+candidates, the target domain's middle 50% occupies roughly **7% of the output
+range under source-fitted min-max and 27% under a bounded map**. The one
+exception is `TCWV` subtropis-to-tropis, 0,1812 against 0,1546.
+
+Worst individual cases, min-max then bounded: `CRR` tropis-to-subtropis 0,0007
+to 0,0582 — under min-max the middle half of two million rows occupies 0,07% of
+the rotation range. `PRECTOTCORR` subtropis-to-tropis 0,0066 to 0,3817.
+`TCIW` subtropis-to-tropis 0,0172 to 0,3629.
+
+**This reframes O-3. The transfer problem is compression, not saturation.**
+`outside`, the share of target rows beyond the source's range, is 0,0000 for
+almost every non-coordinate candidate in both directions. Rows are not falling
+out of range. One Florida `CAPE` value of 22 396 crushes the whole West Java
+distribution into the bottom 2,4% of the dial without a single row clipping.
+Min-max's fragility is real and is exactly its two fitted parameters being
+single observations — but the damage arrives as crushing, inside the range.
+
+**Stated limitation of this measurement.** The bounded map used the **source
+interquartile range** as its scale, which is a fitted quantity. So this
+establishes that bounding helps, and by how much; it does **not** validate a
+parameter-free map. The open question in S-6 moves from *whether* to bound to
+*where the scale comes from*.
+
+**No monotone map rescues the coordinates.** `lon` scores 0,0000 resolution
+under both maps in both directions, with 100% of target rows pinned at an
+output extreme — the domains are on opposite sides of the meridian. `lat`
+scores 0,0004. S-2's case for dropping coordinates now has a number in both
+directions.
+
+**Tropis is one coherent diurnal signal; subtropis is not one signal at all.**
+Tropis: **22 of 24 live cells diurnal-dominant**, per-cell ratio median 1,64,
+peak hours clustered at 15:00-17:00 local in every high-flash cell. Per-cell
+diurnal amplitude reaches 0,42 against a pooled 0,159 — pooling across cells
+with slightly different peaks smears the cycle and understates it.
+
+Subtropis: **13 of 56 diurnal-dominant**, median ratio 0,69, and per-cell peak
+hours spanning **sixteen distinct values from 00:00 to 22:00** against tropis's
+eight.
+
+**And the subtropis spread is spatially organised, not noise.** Diurnal
+amplitude collapses eastward into the Atlantic at fixed latitude: 28,75/-81,25
+0,1615, 28,75/-80,75 0,1158, 28,75/-80,25 0,0407. Same at 28,25. The nocturnal
+peak hours in the cell list (0, 1, 6, 7) are the offshore cells. This is the
+land-sea contrast Pan et al. (2013) describe — land a single afternoon peak,
+ocean bimodal with a nocturnal maximum — appearing inside one domain.
+
+So **no single temporal feature serves subtropis**, for a physical and citable
+reason. This is the strongest evidence yet for the land/sea flag S-2 lists
+from `gow2021ELSF`.
+
+**S-items moved, none decided.** S-2 (coordinates, now measured both
+directions; land/sea flag strengthened), S-3 (subtropis needs more than one
+temporal feature), S-6 (bounding established, scale source now the question),
+S-5 (compression is the mechanism, not saturation), S-10 (equal width harder
+still if the domains need different kinds of feature).
+
+**Measuring stops here.** Every S-item has its evidence.
 
 ---
 
