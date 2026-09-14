@@ -1,382 +1,516 @@
-"""Step 4, part one: measure the tables so the decisions have evidence.
+"""Stage 1 — generic description. Neutral inventory of the built tables.
 
     python3 -m gfd.selection.description
     python3 -m gfd.selection.description --domain tropis
-    python3 -m gfd.selection.description --step transforms
-    python3 -m gfd.selection.description --json
+    python3 -m gfd.selection.description --no-json
 
-Every figure quoted in DECISIONS.md from 2026-09-11 onward comes from here.
-Nothing in this module fits, scales or selects; it reports.
+Stage 1 holds no decisions. It measures the table and says what is there; what
+to do about any of it is stage 2 or stage 3 (INSTRUCTIONS §5, D-17).
+
+Three rules this module obeys, and they are the reason it can run on the whole
+table without a leakage concern:
+
+  * It never measures a predictor against the target. That is the screen, and
+    the screen is stage 3 and runs on training rows only.
+  * It fits nothing. A whole-table minimum is descriptive; a scaler is not.
+  * It drops, fills and filters nothing, and emits no recommendation.
+
+Anything that presupposes a later choice belongs to stage 3, not here: the
+redundancy matrix is computed but no redundancy threshold is applied.
+
+Cross-domain range comparison is deliberately absent. It is a stage 2 item in
+its own right (D-17) and is measured there, where the scaling question it
+feeds is being decided.
+
+Section H reads the tails. Any scaler is defined by the extremes, so a single
+sentinel or mis-scaled row sets the range every other value is squeezed into.
+Whether a max is one observation or ten thousand identical ones is the
+difference between a rare event and a fill value, and only the row counts at
+the extreme distinguish them.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr, yeojohnson
 
 from .. import config as cfg
-from ..dataset import features
+from ..dataset import features as feat
 
-PI = np.pi
-
-# Fractions of [0, pi] the middle 98% and the middle 50% of a column occupy
-# after a source-fitted min-max. The circuit sees one full period of RZ(2x)
-# across [0, pi], so these are the shares of that period the data actually uses.
-SPREADS = (0.98, 0.50)
-
-REDUNDANCY_THRESHOLD = 0.90
+QUANTILES = [0.01, 0.25, 0.50, 0.75, 0.99]
 
 
 # --------------------------------------------------------------------------
 # Loading
 # --------------------------------------------------------------------------
-def load(domain: str) -> pd.DataFrame:
-    path = cfg.PROCESSED_DIR / f"gfd_{domain}_hourly.parquet"
+def load(domain: str) -> tuple[pd.DataFrame, dict]:
+    """The built table and the meta written beside it."""
+    path = cfg.processed_table(domain)
+    meta_path = cfg.processed_meta(domain)
     if not path.exists():
-        raise FileNotFoundError(
-            f"{path} does not exist -- run `python3 -m gfd.dataset.build` first."
-        )
-    return pd.read_parquet(path)
-
-
-def observed(df: pd.DataFrame) -> pd.DataFrame:
-    """Rows where the target was observed at all.
-
-    D-8 keeps months with coverage 0 so an unobserved zero is labelled rather
-    than dropped. Every statistic about the target has to honour that label or
-    it counts an absence of observation as an observation of absence.
-    """
-    return df.loc[df["coverage"] > 0]
-
-
-def predictors(df: pd.DataFrame) -> list[str]:
-    return [c for c in features.CANDIDATES if c in df.columns]
+        raise FileNotFoundError(f"{path} does not exist -- run gfd.dataset.build first.")
+    df = pd.read_parquet(path)
+    meta = json.loads(meta_path.read_text(encoding="utf-8")) if meta_path.exists() else {}
+    if not meta:
+        print(f"[{domain}] no meta beside the table; contract checks run against features.py only")
+    return df, meta
 
 
 # --------------------------------------------------------------------------
-# Transforms -- candidates for O-7, applied before the min-max onto [0, pi]
+# A. Contract and shape
 # --------------------------------------------------------------------------
-def _identity(x: np.ndarray) -> np.ndarray:
-    return x
+def describe_contract(df: pd.DataFrame, meta: dict, domain: str) -> dict:
+    dom = cfg.DOMAINS[domain]
+    cells = df[["lat", "lon"]].drop_duplicates()
+    n_cells = len(cells)
+    n_hours = df[cfg.TIME_COL].nunique()
 
+    present = set(df.columns)
+    known = set(feat.CANDIDATES) | set(feat.EXCLUDE) | set(feat.RAW_TEMPORAL)
+    unclassified = [c for c in df.columns if c not in known]
+    missing = [c for c in feat.CANDIDATES if c not in present]
 
-def _log1p_shift(x: np.ndarray) -> np.ndarray:
-    lo = np.nanmin(x)
-    return np.log1p(x - lo if lo < 0 else x)
+    # The table against what built it, which the contract alone cannot catch:
+    # a stale parquet satisfies features.py and disagrees with its own meta.
+    meta_drift = {}
+    if meta:
+        for key, actual in (
+            ("n_rows", len(df)),
+            ("n_cells", n_cells),
+        ):
+            if key in meta and meta[key] != actual:
+                meta_drift[key] = {"meta": meta[key], "table": actual}
+        if "columns" in meta and list(meta["columns"]) != list(df.columns):
+            meta_drift["columns"] = {
+                "only_in_meta": sorted(set(meta["columns"]) - present),
+                "only_in_table": sorted(present - set(meta["columns"])),
+            }
+        if "candidates" in meta and list(meta["candidates"]) != list(feat.CANDIDATES):
+            meta_drift["candidates"] = {
+                "only_in_meta": sorted(set(meta["candidates"]) - set(feat.CANDIDATES)),
+                "only_in_contract": sorted(set(feat.CANDIDATES) - set(meta["candidates"])),
+            }
 
-
-def _yeo_johnson(x: np.ndarray) -> np.ndarray:
-    finite = x[np.isfinite(x)]
-    if finite.size == 0 or np.nanstd(finite) == 0:
-        return x
-    try:
-        return yeojohnson(finite.astype(np.float64))[0]
-    except (ValueError, RuntimeWarning):
-        return x
-
-
-def _quantile_uniform(x: np.ndarray) -> np.ndarray:
-    order = np.argsort(np.argsort(x))
-    return order / max(len(x) - 1, 1)
-
-
-TRANSFORMS = {
-    "minmax": _identity,
-    "log1p": _log1p_shift,
-    "yeojohnson": _yeo_johnson,
-    "quantile": _quantile_uniform,
-}
-
-
-def spread_of_period(x: np.ndarray, inner: float) -> float:
-    """Share of [0, pi] the inner fraction of a min-maxed column occupies."""
-    x = x[np.isfinite(x)]
-    if x.size == 0:
-        return float("nan")
-    lo, hi = float(np.min(x)), float(np.max(x))
-    if hi <= lo:
-        return 0.0
-    tail = (1.0 - inner) / 2.0
-    q_lo, q_hi = np.quantile(x, [tail, 1.0 - tail])
-    return float((q_hi - q_lo) / (hi - lo))
-
-
-# --------------------------------------------------------------------------
-# Steps
-# --------------------------------------------------------------------------
-def contract(df: pd.DataFrame) -> dict:
-    features.check_against_table(df.columns)
-    names = predictors(df)
-    return {
-        "n_rows": int(len(df)),
-        "n_columns": int(df.shape[1]),
-        "n_candidates_present": len(names),
-        "candidates_present": names,
-        "n_cells": int(df[["lat", "lon"]].drop_duplicates().shape[0]),
+    out = {
+        "domain": domain,
+        "label": dom.label,
+        "n_rows": len(df),
+        "n_columns": len(df.columns),
+        "n_cells": n_cells,
+        "n_hours": n_hours,
+        "rows_equal_cells_times_hours": len(df) == n_cells * n_hours,
+        "grid_deg": cfg.GRID_DEG,
+        "lat_range": [float(cells["lat"].min()), float(cells["lat"].max())],
+        "lon_range": [float(cells["lon"].min()), float(cells["lon"].max())],
+        "first_time": str(df[cfg.TIME_COL].min()),
+        "last_time": str(df[cfg.TIME_COL].max()),
+        "n_candidates_declared": len(feat.CANDIDATES),
+        "n_candidates_present": len(feat.CANDIDATES) - len(missing),
+        "candidates_missing": missing,
+        "unclassified_columns": unclassified,
+        "raw_temporal_present": [c for c in feat.RAW_TEMPORAL if c in present],
+        "meta_drift": meta_drift,
+        "dtypes": {c: str(t) for c, t in df.dtypes.items()},
     }
 
+    print(f"\n{'=' * 74}\n{domain.upper()} — {dom.label}\n{'=' * 74}")
+    print("\n[A] contract and shape")
+    print(f"  rows            {len(df):,}")
+    print(f"  columns         {len(df.columns)}")
+    print(f"  cells x hours   {n_cells} x {n_hours:,} = {n_cells * n_hours:,}")
+    print(f"  period          {out['first_time']} .. {out['last_time']}")
+    print(f"  lat / lon       {out['lat_range']} / {out['lon_range']}")
+    print(f"  candidates      {out['n_candidates_present']} of {len(feat.CANDIDATES)} present")
 
-def target_shape(df: pd.DataFrame) -> dict:
-    d = observed(df)
-    y = d[cfg.TARGET].to_numpy(dtype=float)
-    nz = y[y > 0]
-    m, v = float(y.mean()), float(y.var())
+    # These print whether or not they are empty. An empty tripwire that only
+    # prints when it fires is a tripwire nobody knows is armed (O-9).
+    print(f"  unclassified    {unclassified if unclassified else 'none'}")
+    print(f"  missing         {missing if missing else 'none'}")
+    print(f"  meta drift      {meta_drift if meta_drift else 'none'}")
 
-    p_poisson = float(np.exp(-m))
-    p_negbin = float("nan")
-    if v > m > 0:
-        r = m ** 2 / (v - m)
-        p_negbin = float((r / (r + m)) ** r)
-
-    return {
-        "n_observed": int(len(d)),
-        "n_unobserved": int(len(df) - len(d)),
-        "zero_share_observed": float((y == 0).mean()),
-        "zero_share_all": float((df[cfg.TARGET] == 0).mean()),
-        "mean": m,
-        "variance": v,
-        "var_over_mean": float(v / m) if m else float("nan"),
-        "nonzero_count": int(nz.size),
-        "nonzero_skew_raw": float(pd.Series(nz).skew()),
-        "nonzero_skew_log1p": float(pd.Series(np.log1p(nz)).skew()),
-        "poisson_implied_p0": p_poisson,
-        "negbin_implied_p0": p_negbin,
-        "negbin_excess": float((y == 0).mean() - p_negbin),
-        "mean_coverage": float(df["coverage"].mean()),
-    }
-
-
-def zero_structure(df: pd.DataFrame) -> dict:
-    """Zero share under progressively harder convective conditioning.
-
-    Answers whether the occurrence gate separates cleanly. A share that stays
-    high under maximal conditioning means sampling zeros are irreducible at
-    this resolution, which is a property of the grid rather than the model.
-    """
-    d = observed(df).sort_values(["lat", "lon", cfg.TIME_COL])
-    y = d[cfg.TARGET].to_numpy(dtype=float)
-    wet = y > 0
-
-    def share(mask: np.ndarray) -> dict:
-        n = int(mask.sum())
-        return {
-            "n": n,
-            "zero_share": float((y[mask] == 0).mean()) if n else float("nan"),
-        }
-
-    out = {"unconditional": share(np.ones(len(d), dtype=bool))}
-
-    top = {}
-    for col in ("CAPE", "KX", "TCIW"):
-        if col in d.columns:
-            top[col] = d[col].to_numpy() >= d[col].quantile(0.90)
-
-    if "CAPE" in top:
-        out["top_decile_CAPE"] = share(top["CAPE"])
-    if {"CAPE", "KX"} <= top.keys():
-        out["top_decile_CAPE_KX"] = share(top["CAPE"] & top["KX"])
-    if {"CAPE", "KX", "TCIW"} <= top.keys():
-        out["top_decile_CAPE_KX_TCIW"] = share(
-            top["CAPE"] & top["KX"] & top["TCIW"]
+    if not out["rows_equal_cells_times_hours"]:
+        raise AssertionError(
+            f"{domain}: {len(df):,} rows but {n_cells} cells x {n_hours:,} hours = "
+            f"{n_cells * n_hours:,}. The table is not a complete grid."
         )
-
-    near = (
-        pd.Series(wet.astype(float), index=d.index)
-        .groupby([d["lat"], d["lon"]])
-        .transform(lambda s: s.rolling(7, center=True, min_periods=1).max())
-        .to_numpy()
-        > 0
-    )
-    out["cell_active_within_3h"] = share(near)
-
-    domain_active = d.groupby(cfg.TIME_COL)[cfg.TARGET].transform("max").to_numpy() > 0
-    out["domain_active_this_hour"] = share(domain_active)
-    out["domain_and_cell_active"] = share(domain_active & near)
-
-    hourly = d.groupby("hour_of_day_local")[cfg.TARGET].apply(lambda s: (s == 0).mean())
-    monthly = d.groupby("month_of_year")[cfg.TARGET].apply(lambda s: (s == 0).mean())
-    out["by_local_hour"] = {int(k): float(v) for k, v in hourly.items()}
-    out["by_month"] = {int(k): float(v) for k, v in monthly.items()}
-    out["diurnal_spread"] = float(hourly.max() - hourly.min())
-    out["seasonal_spread"] = float(monthly.max() - monthly.min())
     return out
 
 
-def transform_spread(df: pd.DataFrame) -> pd.DataFrame:
-    """O-7: how much of the encoding period each predictor uses, per transform."""
-    d = observed(df)
-    rows = []
-    for col in predictors(d):
-        x = d[col].to_numpy(dtype=float)
-        row = {"feature": col}
-        for tname, fn in TRANSFORMS.items():
-            t = fn(x)
-            for inner in SPREADS:
-                row[f"{tname}_p{int(inner * 100)}"] = spread_of_period(t, inner)
-        rows.append(row)
-    return pd.DataFrame(rows).set_index("feature")
+# --------------------------------------------------------------------------
+# B. Duplicates
+# --------------------------------------------------------------------------
+def describe_duplicates(df: pd.DataFrame, domain: str) -> dict:
+    key = ["lat", "lon", cfg.TIME_COL]
+    n_dup = int(df.duplicated(subset=key).sum())
+    out = {"key": key, "n_duplicate_rows": n_dup, "n_full_duplicate_rows": int(df.duplicated().sum())}
+    print("\n[B] duplicates")
+    print(f"  on {'+'.join(key)}   {n_dup:,}")
+    print(f"  whole-row              {out['n_full_duplicate_rows']:,}")
+    if n_dup:
+        raise AssertionError(
+            f"{domain}: {n_dup:,} duplicate cell-hours. D-16 deduplicates strikes in "
+            f"dataset/; a duplicate here is a different fault and everything below is unsafe."
+        )
+    return out
 
 
-def redundancy(df: pd.DataFrame) -> tuple[pd.DataFrame, list[dict]]:
-    """Spearman among predictors, plus the pairs a screen would act on.
+# --------------------------------------------------------------------------
+# C. Missingness
+# --------------------------------------------------------------------------
+def describe_missingness(df: pd.DataFrame) -> dict:
+    cands = [c for c in feat.CANDIDATES if c in df.columns]
+    nulls = df[cands].isna()
+    per_col = {c: int(nulls[c].sum()) for c in cands}
+    with_nulls = [c for c, n in per_col.items() if n]
 
-    The matrix is the Bab VI figure; the pair list is the decision object. A
-    redundant predictor costs a qubit, which a classical model does not pay.
+    out = {
+        "per_column": {c: {"n": n, "share": n / len(df)} for c, n in per_col.items()},
+        "columns_with_nulls": with_nulls,
+        "rows_any_candidate_null": int(nulls.any(axis=1).sum()),
+        "rows_all_candidates_present": int((~nulls.any(axis=1)).sum()),
+        "co_occurrence": {},
+        "by_year": {},
+        "by_month_of_year": {},
+    }
+
+    # Reported as a table. Co-occurrence is not causation and stage 1 does not
+    # read it as any -- it is here so stage 2 can see whether two columns go
+    # missing together.
+    for a in with_nulls:
+        out["co_occurrence"][a] = {
+            b: float((nulls[a] & nulls[b]).sum() / max(per_col[a], 1))
+            for b in with_nulls
+            if b != a
+        }
+
+    # A null that clusters in a period looks like an acquisition gap; one that
+    # scatters looks like a property of the atmosphere. Stage 1 reports the
+    # spread and draws neither conclusion.
+    for a in with_nulls:
+        out["by_year"][a] = {
+            str(int(y)): float(v) for y, v in nulls[a].groupby(df["year"]).mean().items()
+        }
+        out["by_month_of_year"][a] = {
+            str(int(m)): float(v)
+            for m, v in nulls[a].groupby(df["month_of_year"]).mean().items()
+        }
+
+    print("\n[C] missingness")
+    print(f"  {'column':<14}{'nulls':>14}{'share':>10}")
+    for c in cands:
+        n = per_col[c]
+        print(f"  {c:<14}{n:>14,}{n / len(df):>10.4f}")
+    print(f"  rows with any candidate null   {out['rows_any_candidate_null']:,}")
+    print(f"  rows with all present          {out['rows_all_candidates_present']:,}")
+
+    for a in with_nulls:
+        print(f"\n  {a} null share by year")
+        print("    " + "  ".join(f"{y}:{v:.3f}" for y, v in out["by_year"][a].items()))
+        print(f"  {a} null share by month")
+        print("    " + "  ".join(f"{m}:{v:.3f}" for m, v in out["by_month_of_year"][a].items()))
+        if len(with_nulls) > 1:
+            print(f"  {a} null, share of those also null in")
+            print("    " + "  ".join(f"{b}:{v:.3f}" for b, v in out["co_occurrence"][a].items()))
+    return out
+
+
+# --------------------------------------------------------------------------
+# D. Per-column distribution, candidates only
+# --------------------------------------------------------------------------
+def describe_distributions(df: pd.DataFrame) -> dict:
+    cands = [c for c in feat.CANDIDATES if c in df.columns]
+    out = {}
+    for c in cands:
+        s = df[c].dropna()
+        counts = s.value_counts()
+        top_val, top_n = (counts.index[0], int(counts.iloc[0])) if len(counts) else (np.nan, 0)
+        q = s.quantile(QUANTILES)
+        out[c] = {
+            "n": int(s.size),
+            "mean": float(s.mean()),
+            "sd": float(s.std()),
+            "min": float(s.min()),
+            "p1": float(q.loc[0.01]),
+            "p25": float(q.loc[0.25]),
+            "p50": float(q.loc[0.50]),
+            "p75": float(q.loc[0.75]),
+            "p99": float(q.loc[0.99]),
+            "max": float(s.max()),
+            "skew": float(s.skew()),
+            "kurtosis": float(s.kurtosis()),
+            "zero_share": float((s == 0).mean()),
+            "negative_share": float((s < 0).mean()),
+            "n_distinct": int(s.nunique()),
+            "is_constant": bool(s.nunique() <= 1),
+            # The pile-up. A column can look well spread on quantiles and still
+            # be one value on a third of its rows.
+            "largest_point_mass_value": float(top_val) if top_n else None,
+            "largest_point_mass_share": float(top_n / s.size) if s.size else None,
+        }
+
+    print("\n[D] per-column distribution — candidates")
+    hdr = f"  {'column':<14}{'min':>12}{'p25':>12}{'p50':>12}{'p75':>12}{'max':>12}{'skew':>9}{'mass':>8}"
+    print(hdr)
+    for c, d in out.items():
+        print(
+            f"  {c:<14}{d['min']:>12.4g}{d['p25']:>12.4g}{d['p50']:>12.4g}"
+            f"{d['p75']:>12.4g}{d['max']:>12.4g}{d['skew']:>9.2f}"
+            f"{(d['largest_point_mass_share'] or 0):>8.3f}"
+        )
+    flat = [c for c, d in out.items() if d["is_constant"]]
+    near = [c for c, d in out.items() if not d["is_constant"] and d["n_distinct"] < 10]
+    print(f"  constant        {flat if flat else 'none'}")
+    print(f"  under 10 values {near if near else 'none'}")
+    print("  'mass' is the share held by the single most frequent value.")
+    return out
+
+
+# --------------------------------------------------------------------------
+# E. Target
+# --------------------------------------------------------------------------
+def describe_target(df: pd.DataFrame) -> dict:
+    t = df[cfg.TARGET]
+    nz = t[t > 0]
+    per_cell = df.groupby(["lat", "lon"])[cfg.TARGET].sum()
+    dead = per_cell[per_cell == 0]
+
+    observed = df["coverage"] > 0 if "coverage" in df.columns else pd.Series(True, index=df.index)
+    q = nz.quantile(QUANTILES) if len(nz) else None
+
+    out = {
+        "n_rows": int(len(t)),
+        "zero_share_all_rows": float((t == 0).mean()),
+        "n_rows_observed": int(observed.sum()),
+        "zero_share_observed_rows": float((t[observed] == 0).mean()) if observed.any() else None,
+        "n_nonzero": int(len(nz)),
+        "total_flashes": int(t.sum()),
+        "mean": float(t.mean()),
+        "variance": float(t.var()),
+        "var_over_mean": float(t.var() / t.mean()) if t.mean() else None,
+        "skew_raw": float(t.skew()),
+        "skew_log1p": float(np.log1p(t).skew()),
+        "nonzero": {
+            "min": float(nz.min()),
+            "p1": float(q.loc[0.01]),
+            "p25": float(q.loc[0.25]),
+            "p50": float(q.loc[0.50]),
+            "p75": float(q.loc[0.75]),
+            "p99": float(q.loc[0.99]),
+            "max": float(nz.max()),
+            "mean": float(nz.mean()),
+            "skew": float(nz.skew()),
+        } if len(nz) else None,
+        "n_dead_cells": int(len(dead)),
+        "dead_cells": [[float(a), float(b)] for a, b in dead.index],
+        "rows_in_dead_cells": int(len(dead) * df[cfg.TIME_COL].nunique()),
+        "by_year": {
+            str(int(y)): {"total": int(v), "zero_share": float(z)}
+            for (y, v), (_, z) in zip(
+                t.groupby(df["year"]).sum().items(),
+                (t == 0).groupby(df["year"]).mean().items(),
+            )
+        },
+    }
+
+    print(f"\n[E] target — {cfg.TARGET}")
+    print(f"  zero share, all rows       {out['zero_share_all_rows']:.4f}")
+    if out["zero_share_observed_rows"] is not None:
+        print(f"  zero share, coverage > 0   {out['zero_share_observed_rows']:.4f} "
+              f"({out['n_rows_observed']:,} rows)")
+    print(f"  non-zero cell-hours        {out['n_nonzero']:,}")
+    print(f"  total flashes              {out['total_flashes']:,}")
+    print(f"  mean / var / var-mean      {out['mean']:.4f} / {out['variance']:.4f} / "
+          f"{out['var_over_mean']:.2f}")
+    print(f"  skew raw / log1p           {out['skew_raw']:.2f} / {out['skew_log1p']:.2f}")
+    if out["nonzero"]:
+        n = out["nonzero"]
+        print(f"  non-zero p25/p50/p75/max   {n['p25']:.0f} / {n['p50']:.0f} / "
+              f"{n['p75']:.0f} / {n['max']:.0f}")
+    print(f"  dead cells                 {out['n_dead_cells']} "
+          f"({out['rows_in_dead_cells']:,} rows)")
+    print(f"  {'year':<8}{'total':>14}{'zero share':>14}")
+    for y, d in out["by_year"].items():
+        print(f"  {y:<8}{d['total']:>14,}{d['zero_share']:>14.4f}")
+    return out
+
+
+# --------------------------------------------------------------------------
+# F. Coverage
+# --------------------------------------------------------------------------
+def describe_coverage(df: pd.DataFrame) -> dict:
+    if "coverage" not in df.columns:
+        return {}
+    cov = df["coverage"]
+    # coverage derives from observed_days / days_in_month, so it is constant
+    # within a (cell, month). Both weightings are stated because the record
+    # holds two different means for the same field and does not say which is
+    # which.
+    per_cm = df.groupby(["lat", "lon", "month"], observed=True)["coverage"].first()
+    q = cov.quantile(QUANTILES)
+    out = {
+        "row_weighted_mean": float(cov.mean()),
+        "cell_month_weighted_mean": float(per_cm.mean()),
+        "median": float(cov.median()),
+        "min": float(cov.min()),
+        "max": float(cov.max()),
+        "p1": float(q.loc[0.01]),
+        "p25": float(q.loc[0.25]),
+        "p75": float(q.loc[0.75]),
+        "p99": float(q.loc[0.99]),
+        "n_rows_zero_coverage": int((cov == 0).sum()),
+        "n_cell_months": int(len(per_cm)),
+        "n_months": int(df["month"].nunique()),
+        "cell_months_zero_coverage": int((per_cm == 0).sum()),
+    }
+    print("\n[F] coverage — reported, never acted on (INSTRUCTIONS §4)")
+    print(f"  row-weighted mean          {out['row_weighted_mean']:.4f}")
+    print(f"  cell-month-weighted mean   {out['cell_month_weighted_mean']:.4f}")
+    print(f"  median / min / max         {out['median']:.4f} / {out['min']:.4f} / {out['max']:.4f}")
+    print(f"  p1 / p25 / p75 / p99       {out['p1']:.4f} / {out['p25']:.4f} / "
+          f"{out['p75']:.4f} / {out['p99']:.4f}")
+    print(f"  rows at zero               {out['n_rows_zero_coverage']:,}")
+    print(f"  months / cell-months       {out['n_months']} / {out['n_cell_months']:,}")
+    return out
+
+
+# --------------------------------------------------------------------------
+# G. Predictor redundancy
+# --------------------------------------------------------------------------
+def describe_redundancy(df: pd.DataFrame, top: int = 15) -> dict:
+    """Spearman among candidates. No threshold -- a threshold is stage 3.
+
+    A column later dropped on this basis must have it recomputed on training
+    rows only. This is a property of the table, not a selection step.
     """
-    d = observed(df)
-    names = predictors(d)
-    matrix = d[names].corr(method="spearman")
+    cands = [c for c in feat.CANDIDATES if c in df.columns]
+    rho = df[cands].corr(method="spearman")  # pairwise-complete where nulls exist
 
     pairs = []
-    for i, a in enumerate(names):
-        for b in names[i + 1:]:
-            r = float(matrix.loc[a, b])
-            if abs(r) >= REDUNDANCY_THRESHOLD:
-                pairs.append({"a": a, "b": b, "spearman": r})
-    pairs.sort(key=lambda p: -abs(p["spearman"]))
-    return matrix, pairs
+    for i, a in enumerate(cands):
+        for b in cands[i + 1:]:
+            v = rho.loc[a, b]
+            if pd.notna(v):
+                pairs.append((a, b, float(v)))
+    pairs.sort(key=lambda p: abs(p[2]), reverse=True)
+
+    out = {
+        "matrix": {a: {b: (None if pd.isna(rho.loc[a, b]) else float(rho.loc[a, b]))
+                       for b in cands} for a in cands},
+        "ranked_pairs": [{"a": a, "b": b, "spearman": v} for a, b, v in pairs],
+    }
+    print(f"\n[G] predictor redundancy — Spearman, top {top} pairs by |rho|, no threshold applied")
+    for a, b, v in pairs[:top]:
+        print(f"  {a:<14}{b:<14}{v:>9.3f}")
+    return out
 
 
-def cross_domain_range(source: pd.DataFrame, target: pd.DataFrame) -> pd.DataFrame:
-    """What a source-fitted min-max does to the other domain's rows.
+# --------------------------------------------------------------------------
+# H. Tails
+# --------------------------------------------------------------------------
+def describe_tails(df: pd.DataFrame, k: int = 10, detach: float = 3.0) -> dict:
+    """The extreme distinct values of every candidate, with their row counts.
 
-    Reports saturation, not aliasing: the scaler clips, so an out-of-range
-    value becomes exactly 0 or exactly pi. A predictor saturating most of the
-    target domain contributes a constant to the circuit, not noise.
+    A max held by one row is a rare event. A max held by ten thousand identical
+    rows is a sentinel. The quantiles in section D cannot tell them apart and a
+    min-max scaler treats them the same, so the multiplicity is the diagnostic.
+
+    `detach` only decides which columns get their rows printed. It is a
+    reporting threshold, not a handling one -- every column appears in the
+    summary regardless, and nothing is dropped or flagged for dropping.
     """
-    s, t = observed(source), observed(target)
-    rows = []
-    for col in predictors(s):
-        if col not in t.columns:
-            continue
-        lo, hi = float(s[col].min()), float(s[col].max())
-        x = t[col].to_numpy(dtype=float)
-        if hi <= lo:
-            rows.append({"feature": col, "below": 1.0, "above": 0.0, "saturated": 1.0})
-            continue
-        below = float((x < lo).mean())
-        above = float((x > hi).mean())
-        rows.append({
-            "feature": col,
-            "below": below,
-            "above": above,
-            "saturated": below + above,
-            "source_lo": lo,
-            "source_hi": hi,
-            "target_lo": float(np.min(x)),
-            "target_hi": float(np.max(x)),
-        })
-    return pd.DataFrame(rows).set_index("feature").sort_values(
-        "saturated", ascending=False
-    )
+    cands = [c for c in feat.CANDIDATES if c in df.columns]
+    out = {}
+    for c in cands:
+        s = df[c].dropna()
+        counts = s.value_counts()
+        lo = counts.index.to_series().nsmallest(k)
+        hi = counts.index.to_series().nlargest(k)
+        p50, p999, p001 = s.quantile([0.50, 0.999, 0.001])
+        hi_span, lo_span = p999 - p50, p50 - p001
+        out[c] = {
+            "lowest": [{"value": float(v), "n_rows": int(counts.loc[v])} for v in lo],
+            "highest": [{"value": float(v), "n_rows": int(counts.loc[v])} for v in hi],
+            "p001": float(p001),
+            "p50": float(p50),
+            "p999": float(p999),
+            "n_above_p999": int((s > p999).sum()),
+            "n_below_p001": int((s < p001).sum()),
+            # How far past the bulk the extreme sits, in units of the bulk's
+            # own spread. Large means one end is detached from everything else.
+            "max_detachment": float((s.max() - p999) / hi_span) if hi_span > 0 else None,
+            "min_detachment": float((p001 - s.min()) / lo_span) if lo_span > 0 else None,
+        }
+
+    print(f"\n[H] tails — {k} most extreme distinct values per candidate, with row counts")
+    print(f"  {'column':<14}{'min':>12}{'n':>9}{'max':>12}{'n':>9}{'lo detach':>11}{'hi detach':>11}")
+    for c, d in out.items():
+        lo0, hi0 = d["lowest"][0], d["highest"][0]
+        md, nd = d["max_detachment"], d["min_detachment"]
+        print(
+            f"  {c:<14}{lo0['value']:>12.4g}{lo0['n_rows']:>9,}{hi0['value']:>12.4g}"
+            f"{hi0['n_rows']:>9,}{(-1 if nd is None else nd):>11.1f}"
+            f"{(-1 if md is None else md):>11.1f}"
+        )
+    print("  'n' is how many rows hold that exact value. A large n at an extreme is a")
+    print("  sentinel, not an observation. 'detach' is the gap past p99.9 (or below")
+    print("  p00.1) measured in units of the p50-to-p99.9 spread; -1 means undefined.")
+
+    flagged = [
+        c for c, d in out.items()
+        if (d["max_detachment"] or 0) >= detach or (d["min_detachment"] or 0) >= detach
+    ]
+    print(f"  detached beyond {detach}x  {flagged if flagged else 'none'}")
+
+    for c in flagged:
+        for end in ("highest", "lowest"):
+            vals = [e["value"] for e in out[c][end][:3]]
+            rows = df.loc[df[c].isin(vals), [cfg.TIME_COL, "lat", "lon", c, cfg.TARGET]]
+            rows = rows.sort_values(c, ascending=(end == "lowest")).head(k)
+            print(f"\n  {c} — {end} rows")
+            for _, r in rows.iterrows():
+                print(f"    {str(r[cfg.TIME_COL]):<20}{r['lat']:>8.2f}{r['lon']:>9.2f}"
+                      f"{r[c]:>14.6g}{'  flash=' + str(int(r[cfg.TARGET])):>14}")
+    return out
 
 
 # --------------------------------------------------------------------------
-# Reporting
+# Driver
 # --------------------------------------------------------------------------
-def _pct(v: float) -> str:
-    return "n/a" if not np.isfinite(v) else f"{v * 100:6.2f}%"
+def describe_domain(domain: str) -> dict:
+    df, meta = load(domain)
+    return {
+        "contract": describe_contract(df, meta, domain),
+        "duplicates": describe_duplicates(df, domain),
+        "missingness": describe_missingness(df),
+        "distributions": describe_distributions(df),
+        "target": describe_target(df),
+        "coverage": describe_coverage(df),
+        "redundancy": describe_redundancy(df),
+        "tails": describe_tails(df),
+    }
 
 
-def describe(domain: str, steps: set[str]) -> dict:
-    df = load(domain)
-    print(f"\n{'=' * 70}\n{domain}")
-    report: dict = {"domain": domain}
+def main(argv=None) -> None:
+    ap = argparse.ArgumentParser(description="Stage 1 generic description of the built tables.")
+    ap.add_argument("--domain", choices=sorted(cfg.DOMAINS), help="one domain; default both")
+    ap.add_argument("--no-json", action="store_true",
+                    help=f"print only; otherwise writes {cfg.PROCESSED_DIR}/description_<domain>.json")
+    args = ap.parse_args(argv)
 
-    if "contract" in steps:
-        report["contract"] = contract(df)
-        c = report["contract"]
-        print(f"  {c['n_rows']:,} rows x {c['n_columns']} cols, "
-              f"{c['n_cells']} cells, {c['n_candidates_present']} candidates")
+    domains = [args.domain] if args.domain else sorted(cfg.DOMAINS)
+    results = {d: describe_domain(d) for d in domains}
 
-    if "target" in steps:
-        report["target"] = t = target_shape(df)
-        print(f"\n  -- target")
-        print(f"  observed {t['n_observed']:,}  unobserved {t['n_unobserved']:,}")
-        print(f"  zero share {_pct(t['zero_share_observed'])} observed, "
-              f"{_pct(t['zero_share_all'])} all rows")
-        print(f"  mean {t['mean']:.4f}  var {t['variance']:.2f}  "
-              f"var/mean {t['var_over_mean']:.2f}")
-        print(f"  P(0): observed {t['zero_share_observed']:.4f}  "
-              f"Poisson {t['poisson_implied_p0']:.4f}  "
-              f"NegBin {t['negbin_implied_p0']:.4f}  "
-              f"excess {t['negbin_excess']:+.4f}")
-        print(f"  nonzero skew: raw {t['nonzero_skew_raw']:.2f}  "
-              f"log1p {t['nonzero_skew_log1p']:.2f}")
-
-    if "zeros" in steps:
-        report["zeros"] = z = zero_structure(df)
-        print(f"\n  -- zero structure")
-        for k in ("unconditional", "top_decile_CAPE", "top_decile_CAPE_KX",
-                  "top_decile_CAPE_KX_TCIW", "cell_active_within_3h",
-                  "domain_active_this_hour", "domain_and_cell_active"):
-            if k in z:
-                print(f"  {k:<28} n={z[k]['n']:>9,}  {_pct(z[k]['zero_share'])}")
-        print(f"  diurnal spread {z['diurnal_spread'] * 100:.2f} pts   "
-              f"seasonal spread {z['seasonal_spread'] * 100:.2f} pts")
-
-    if "transforms" in steps:
-        spread = transform_spread(df)
-        report["transforms"] = spread.to_dict(orient="index")
-        print(f"\n  -- share of [0, pi] used, by transform "
-              f"(p98 / p50, higher is better)")
-        cols = [f"{t}_p{int(i * 100)}" for t in TRANSFORMS for i in SPREADS]
-        print(spread[cols].to_string(
-            float_format=lambda v: f"{v * 100:5.1f}"))
-
-    if "redundancy" in steps:
-        matrix, pairs = redundancy(df)
-        report["redundancy_pairs"] = pairs
-        print(f"\n  -- redundant pairs (|spearman| >= {REDUNDANCY_THRESHOLD})")
-        if not pairs:
-            print("  none")
-        for p in pairs:
-            print(f"  {p['a']:<20} {p['b']:<20} {p['spearman']:+.3f}")
-
-    return report
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--domain", choices=sorted(cfg.DOMAINS), default=None)
-    ap.add_argument(
-        "--step",
-        action="append",
-        choices=["contract", "target", "zeros", "transforms", "redundancy", "cross"],
-        help="repeatable; default is every step",
-    )
-    ap.add_argument("--json", action="store_true",
-                    help=f"also write {cfg.PROCESSED_DIR}/description_<domain>.json")
-    args = ap.parse_args()
-
-    steps = set(args.step or
-                ["contract", "target", "zeros", "transforms", "redundancy", "cross"])
-    names = [args.domain] if args.domain else sorted(cfg.DOMAINS)
-
-    reports = {n: describe(n, steps) for n in names}
-
-    if "cross" in steps and len(names) == 2:
-        a, b = names
-        fa, fb = load(a), load(b)
-        for src, tgt, sdf, tdf in ((a, b, fa, fb), (b, a, fb, fa)):
-            table = cross_domain_range(sdf, tdf)
-            reports[src][f"saturation_on_{tgt}"] = table.to_dict(orient="index")
-            print(f"\n{'=' * 70}\n{src} scaler applied to {tgt} rows")
-            print(table[["below", "above", "saturated"]].to_string(
-                float_format=lambda v: f"{v * 100:6.2f}"))
-
-    if args.json:
-        for n, r in reports.items():
-            path = cfg.PROCESSED_DIR / f"description_{n}.json"
-            path.write_text(json.dumps(r, indent=2), encoding="utf-8")
-            print(f"\nwrote {path}")
+    if not args.no_json:
+        for d, r in results.items():
+            p = cfg.PROCESSED_DIR / f"description_{d}.json"
+            p.write_text(json.dumps(r, indent=2), encoding="utf-8")
+            print(f"\n[write] {p}")
+        print("[write] decimal point throughout; the thesis takes commas (INSTRUCTIONS §6)")
 
 
 if __name__ == "__main__":
     main()
-    

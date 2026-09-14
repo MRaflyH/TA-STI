@@ -343,6 +343,9 @@ unverified averaging convention).
 
 ## D-11 — Each domain gets its own feature set, at the same width
 
+**PARKED 2026-09-14 by D-17.** Not in force. Its content returns to the open
+list as S-10. Text below is left as written.
+
 **Decided.** `selection/` runs the screen and the leave-one-out ablation
 **separately on each domain** and writes both rankings to disk as the Bab VI
 evidence. `MODELLED` becomes two lists of **identical length N**, one per
@@ -395,6 +398,9 @@ defensible options, not a measurement.
 ---
 
 ## D-12 — The calendar columns: `hour_sin` and `cos_sza`. Closes O-1
+
+**PARKED 2026-09-14 by D-17.** Not in force. Its content folds into S-3, and
+O-1 reopens with it. Text below is left as written.
 
 **Decided.** Two calendar candidates, `hour_sin` and `cos_sza`. Everything else
 calendar-derived moves to `EXCLUDE`: `month_of_year`, `day_of_year`,
@@ -602,10 +608,133 @@ it irreversible.
 
 ---
 
+## D-17 — The selection component is reset. Parks D-11 and D-12
+
+**Decided.** Four things.
+
+*One.* **D-11 and D-12 are parked.** Neither is in force. Their text stays in
+the record and is not edited; a reader should be able to see what was decided
+and that it stopped being binding. D-11's content returns to the open list as
+S-10 (how many feature sets, and how wide). D-12's content folds into S-3.
+
+*Two.* **The 2026-09-11 measurements are void for selection purposes.** Not
+withdrawn — they were honest measurements of the table that existed that day —
+but they describe a different object and must not be quoted in Bab III, Bab IV
+or Bab VI, and must not be used to justify a handling step.
+
+- *Predictor-side, all of it.* The squashing shares, the cross-domain
+  saturation percentages, the mutual-information rankings, the redundancy
+  pairs. Seven Tier 1 columns joined the table under D-14 after these were
+  taken.
+- *Target-side, most of it.* D-16 left the zero share and the active cell-hour
+  count unchanged, but lowered counts *inside* already-active hours. So
+  anything computed from `flash_count` **values** moved: the negative-binomial
+  `P(0)`, the var/mean ratios, the non-zero skew, the coverage-against-mean-
+  flash Spearman.
+- *Surviving.* Findings about the zero/non-zero **pattern** rather than the
+  values: the six dead tropis cells, the dry-spell run lengths, the diurnal and
+  monthly zero-share spreads, and the non-overlapping coordinate ranges.
+
+*Three.* **`description.py` was deleted, not amended.** Recorded so that its
+absence reads as a decision rather than an accident.
+
+*Four.* **Selection is worked in three stages.**
+
+- **Stage 1 — generic description.** Neutral inventory of both tables. No
+  interpretation, nothing dropped, nothing fitted. Stage 1 never measures a
+  predictor against the target; that is the screen, and the screen is stage 3.
+  Because of that line, stage 1 runs on the whole table with no leakage
+  concern.
+- **Stage 2 — targeted description.** Aimed at problems stage 1 surfaces.
+  Something is stage 2 only if the default handling is **absent or actively
+  wrong** *and* the choice moves a number the thesis reports. Each stage 2 item
+  owes a literature pass, not just a measurement.
+- **Stage 3 — standard steps.** Steps any pipeline needs, justified by the
+  field default or by a paper: transform order, scaling to the encoding range,
+  temporal encoding, the split, the screen, the ablation.
+
+Two rules ride on this structure. **Stage 2's contents are an output of stage
+1, not chosen in advance** — only the zero majority is nameable now, because
+its share is already known and no standard handling for it has been found.
+And **anything fitted is stage 3 by definition, and stage 3 measurements run on
+training rows only.** A whole-table minimum is descriptive; a scaler is fitted.
+
+**Why.** Both parked decisions were proposals accepted rather than argued out,
+and both rest on a table that has been rebuilt twice since — D-14 added the
+Tier 1 columns, D-16 forced the dedup rebuild. D-11's own text asserts that
+both tables carry all 37 columns; they carry 41. D-12's redundancy argument was
+computed on `hour_cos` and `cos_sza` as materialised columns, which D-13
+removed from the table, and D-12's cost paragraph already conceded the number
+would need recomputing.
+
+A literature pass since (2026-09-14) separates the two. Cyclic hour-of-day
+encoding has direct precedent and a published leave-one-out ablation in a
+convective-occurrence model; solar zenith angle has no located precedent as a
+lightning **predictor**, appearing in that literature only as a day/night
+stratification threshold. So `hour_sin` may well survive re-argument and
+`cos_sza` probably will not — but neither should be carried on the old
+reasoning.
+
+The deeper fault is ordering, and it is why the reset is structural rather than
+two amendments. Handling steps were chosen before the measurements that justify
+them existed. The three stages exist to make that impossible: describe, then
+find what has no default, then act.
+
+**Cost.** Everything selection-adjacent restarts. There is no modelled feature
+set, no encoded temporal column, no scaler decision, and no ratified screen
+method. The measurement work of 2026-09-11 is redone against the current
+41-column tables.
+
+§5's method — Spearman and mutual information, never Pearson, confirmed by
+leave-one-out ablation on ridge — is reset with the rest, pending a revision of
+`INSTRUCTIONS.md`. It survived its literature check: the pairing of mutual
+information as primary criterion with a rank correlation as complement, chosen
+because variational circuits are sensitive to input dimensionality and qubit
+scaling, has 2026 precedent. It is reset for want of a written justification,
+not for want of support.
+
+The equal-width assertion in `features.modelled()` stays, and carries a comment
+saying it enforces a parked decision. It cannot fire while `modelled.json` does
+not exist. Leaving it uncommented is the exact shape of fault O-9.
+
+**Reversal.** Unpark by writing a new entry that ratifies D-11 or D-12 against
+measurements taken on the current tables. Nothing is deleted, so the
+reversal is additive.
+
+**Bab.** III (data understanding), IV (pipeline design), VI (the selection
+result).
+
+**Decided by.** Rafly, 2026-09-14, in discussion with Claude.
+
+---
+
 ## Measured
 
 Findings that correct something the archive asserts, or that the thesis will
-need to quote. All `[measured]`, 2026-09-10.
+need to quote.
+
+**Void for selection purposes, per D-17.** Everything dated 2026-09-10 or
+2026-09-11 was measured on a 37-column table with 17 candidates. It is not
+withdrawn — it was honest measurement of the table that existed — but it
+describes a different object, and must not be quoted in Bab III, Bab IV or
+Bab VI, or used to justify a handling step. Specifically:
+
+- **All predictor-side figures are void**: the squashing shares, the
+  cross-domain saturation percentages, the mutual-information rankings, the
+  redundancy pairs. Seven Tier 1 columns joined under D-14 after these were
+  taken.
+- **Target-side figures computed from `flash_count` values are void**: the
+  negative-binomial `P(0)`, the var/mean ratios, the non-zero skew, the
+  coverage-against-mean-flash Spearman. D-16 left the zero share and the
+  active cell-hour count unchanged but lowered counts inside already-active
+  hours.
+- **Findings about the zero/non-zero pattern survive**: the six dead tropis
+  cells, the dry-spell run lengths, the diurnal and monthly zero-share
+  spreads, the non-overlapping coordinate ranges.
+
+The 2026-09-13/14 blocks below are unaffected.
+
+All `[measured]`, 2026-09-10.
 
 - **The PLN export is entirely cloud-to-ground.** 2 242 100 CG rows as
   exported, 0
@@ -874,6 +1003,81 @@ Added 2026-09-11. All `[measured]` unless marked otherwise.
   temporal columns, five intensity statistics at 94,3% / 97,1% missing by
   construction, and bookkeeping.
 
+
+### 2026-09-14 — stage 1 generic description
+
+First run of `selection/description.py` against the current 41-column tables,
+after the D-16 rebuild. All `[measured]`. These supersede the void 2026-09-10
+and 2026-09-11 figures for every quantity they cover.
+
+**Both tables verified.** Rows equal cells x hours exactly in both domains
+(56 x 61 368 and 30 x 61 368). Zero duplicate cell-hours on
+`(lat, lon, time)`. 20 of 20 candidates present, no unclassified columns, and
+no drift between either table and the `.meta.json` that built it.
+
+**No sentinels anywhere, and no second `PRECTOTCORR`.** Every detached maximum
+in the table is held by exactly one row: `PRECTOTCORR` 1194 (n=1), `CAPE`
+22 396 (n=1), `KX` -121,6 (n=1). Nothing repeats, so no fill value survived
+into any candidate.
+
+The extremes are also coherent in space and time, which a fill value is not.
+The two largest subtropis `PRECTOTCORR` rows are the same timestamp in adjacent
+cells; the tropis maximum is 15:00 and 16:00 in one cell on consecutive hours;
+`VIIWD`'s subtropis maximum and minimum are one hour apart on 2021-04-11 with
+26 and 7 flashes, which is divergence reversing across a storm. 2024-06-12
+appears independently in subtropis `PRECTOTCORR`'s upper tail and `VIMDF`'s
+lower tail — one convective event in two variables.
+
+`CAPE` 22 396 is offshore Atlantic in July, where ERA5 produces its largest
+values. `KX` -121,6 has a populated left tail (detachment 0,6), so it is not
+floating free of the distribution. Both stand as ERA5 output.
+
+**`mean_coverage` in the meta files is wrong; the record's bullets were right.**
+Row-weighted 0,8549 tropis and 0,5710 subtropis; cell-month-weighted 0,8560 and
+0,5697. The two weightings differ by under 0,002, so weighting was not the
+source of the disagreement. The meta's 0,6907 and 0,5156 match neither.
+`dataset/` is frozen, so the field is not corrected — **do not quote
+`mean_coverage` from a `.meta.json`.**
+
+**122 304 subtropis rows carry coverage 0** — 2 184 hours x 56 cells, exactly
+the 91 days of the three empty MERLIN months. They are present as rows, not
+absent. Tropis has none.
+
+**The point masses are larger than the quantiles suggest** (share held by the
+single most frequent value, subtropis / tropis): `CRR` 0,605 / 0,393 — its
+subtropis median *is* zero; `TCIW` 0,269 / 0,097; `PRECTOTCORR` 0,222 / 0,066;
+`CAPE` 0,180 / 0,038; `TCLW` 0,058 / 0,002. A monotone transform does not
+touch a point mass, so this is a separate problem from the tails.
+
+**The divergence variables are the most compressed columns in the table.**
+Tropis `VIIWD`: interquartile range 8,1e-07 against a full range of 9,2e-04, so
+the middle half would occupy **0,088% of the rotation range** under plain
+min-max, and the maximum is ~2 900x p75. Subtropis `VIIWD` 0,058%. `VILWD` and
+`VIMDF` are the same shape in both domains. This is a stronger case for a
+bounded transform than `CAPE` is.
+
+**`RH2M` hits its definitional ceiling often** — exactly 100 on 56 512
+subtropis and 9 289 tropis rows. A bound that is physical rather than sampled.
+
+**Target, post-dedup.** Tropis 94,30% zeros, 104 955 non-zero cell-hours,
+2 236 390 flashes, var/mean 170,77, `log1p` skew 6,03, non-zero median 4 and
+max 2 391, 6 dead cells (368 208 rows). Subtropis 97,11% zeros, 99 273 non-zero
+cell-hours, 4 834 772 flashes, var/mean 633,82, `log1p` skew 8,47, non-zero
+median 7 and max 11 777, no dead cells. On coverage > 0 rows only, the
+subtropis zero share is 97,00%; tropis is unchanged.
+
+**Redundancy, Spearman, whole table, no threshold applied.** Strongest pairs
+subtropis: `KX`-`TCWV` 0,914, `CAPE`-`D2M` 0,880, `TCWV`-`D2M` 0,879. Tropis:
+`KX`-`TCWV` 0,903, `T2M`-`RH2M` -0,774, `CAPE`-`D2M` 0,735. `KX`-`TCWV` is the
+top pair in both. Anything dropped on this basis must have it recomputed on
+training rows only.
+
+**Unresolved, small.** Subtropis `CIN` maxes at exactly 1000,0 and tropis at
+999,5, both with detachment 0,0 — the distribution runs to that value and
+stops. Either coincidence or a ceiling in the ERA5 field. Worth settling before
+the `CIN` handling is decided.
+
+---
 
 ## Open
 
@@ -1149,6 +1353,18 @@ A clean list, replacing O-1..O-9. Each item is one decision, what is already
 measured about it, and the options. Nothing here is decided. When one is
 decided it becomes a numbered `D-` entry and drops off this list.
 
+**Staged per D-17.** Stage 1 is generic description and holds no decisions —
+it produces the evidence the rest of this list needs. Stage 2 is targeted, and
+its membership is an output of stage 1 rather than a choice made now; only the
+zero majority (S-1, S-7) can be named in advance. Stage 3 holds the steps any
+pipeline needs (S-3, S-5, S-6, S-8, S-9) plus S-2, which is a leakage and
+transfer argument rather than a description finding. S-4 is a stage 1
+consequence.
+
+**Every figure quoted under these items that is dated 2026-09-10 or
+2026-09-11 is void per D-17** and is retained only to show what was previously
+believed. Nothing on this list may be decided on those numbers.
+
 Order matters a little: S-1 and S-2 change which rows and columns exist, so
 they come before S-5 and S-6, which measure what is left.
 
@@ -1200,9 +1416,33 @@ both and declare the effect. Replace them with a land/sea flag, which is what
 `dataset/` emits raw time only (D-13): `year`, `month_of_year`, `day_of_year`,
 `hour_of_day_utc`, `hour_of_day_local`. `selection/` builds whatever it needs.
 
-**Decided already, in D-12:** `hour_sin` and `cos_sza`. What is left is to
-implement them and check the numbers still hold — the `-0,989` correlation
-between `hour_cos` and `cos_sza` was measured on columns that no longer exist.
+**Fully open.** D-12 chose `hour_sin` and `cos_sza`; D-17 parked it. The
+`-0,989` correlation it rested on was measured on columns that no longer exist.
+
+**Literature, 2026-09-14.** Cyclic hour-of-day encoding has direct precedent
+and a published leave-one-out ablation: Pacey et al. (2026) find their
+cosine-transformed time-of-day predictor is key to reproducing the diurnal
+cycle of convective cells, while removing CAPE leaves that cycle largely
+intact. Against that, a September 2026 downscaling study reports an MLP given
+no explicit temporal input at all reproducing the diurnal cycle from
+environmental variables alone, with roughly a two-hour peak delay — so whether
+a time feature is needed is itself an open ablation question.
+
+Solar zenith angle has **no located precedent as a lightning predictor**. Where
+it appears in convection ML it is a day/night stratification threshold, not a
+model input; as a feature it belongs to solar-irradiance forecasting, a
+different problem. `cos_sza` would need its own defence.
+
+Pan et al. (2013), WWLLN and LIS/OTD: land shows a single diurnal peak at
+1400–1900 LT, ocean a two-peak cycle with an early-morning maximum at
+0100–0300 LT. One hour feature cannot serve both, and much of the subtropis box
+is Atlantic. This bears on S-2 as much as on S-3.
+
+Cosine-of-day-of-year has precedent as a seasonal feature in ensemble
+postprocessing. It does not address the antiphase problem below.
+
+All four citations are 2026-or-earlier preprints or papers whose peer-review
+status is **unverified**; check before any enters Bab II.
 
 **Measured.** Lightning peaks at 16:00 local in tropis and 15:00 in subtropis,
 inside the 1400–1800 LST band the literature reports for continental land. The
@@ -1219,8 +1459,38 @@ committing.
 
 ## S-4 — `CIN` and `CBH` missingness
 
-**Measured.** `CIN` missing on 23,5% of tropis rows and 46,4% of subtropis;
-`CBH` on 1,2% and 8,4%. Structural, not lost: `CIN` is absent on 99,6% / 99,8%
+**Re-measured 2026-09-14.** `CIN` missing on 23,52% of tropis rows and 46,38%
+of subtropis; `CBH` on 1,22% and 8,44%. **The missingness is seasonal, and the
+two domains are antiphase.** Subtropis `CIN` null share runs 0,855 in January
+to 0,017 in July; tropis runs 0,090 in January to 0,595 in August. Stable
+year to year, so nothing broke in one year. `CBH` is largely a subset:
+88,3% of subtropis and 76,5% of tropis `CBH` nulls are also `CIN` null, while
+the reverse is 16,1% and 4,0%. Only 1 808 830 of 3 436 608 subtropis rows
+(52,6%) have every candidate present; tropis 76,2%.
+
+**Row deletion is out, on §4.** The test set is a held-out year and the nulls
+are seasonal, so deleting them before the split silently removes most of one
+season from whichever year becomes the test year. It also entangles with S-1:
+`CIN`-null rows are overwhelmingly non-flash, so deleting them is zero-removal
+by a back door, non-random and differently sized in each domain. Handle at the
+column, never at the row.
+
+**Literature, 2026-09-14.** The governing distinction is that missing data
+should be handled differently for prediction than for description or causal
+explanation (Sperrin, Martin, Sisk & Peek 2020) — most advice against missing
+indicators comes from causal inference, and this is prediction. Within the
+prediction literature, the missing-indicator method improves performance for
+linear models and neural networks when missingness is informative, and harmed
+performance only in high-dimensional settings where uninformative indicators
+caused overfitting. A clinical-prediction simulation (Sisk et al. 2023) found
+indicators harmful specifically when missing data are **not** allowed at
+deployment. Both caveats miss this case: 18-20 features is low-dimensional, and
+future ERA5 hours will also have undefined `CIN`. So the indicator is the
+better-supported option, at one qubit each. Peer-review status of the 2023
+simulation is verified; the rest unverified.
+
+**Superseded figures below.** The following were measured pre-Tier-1 and are
+void per D-17, retained for what they claimed. Structural, not lost: `CIN` is absent on 99,6% / 99,8%
 of rows with zero `CAPE`, `CBH` on 94,3% / 96,0% of rows with no cloud water.
 Only 4,6% / 0,9% of rows that actually recorded a flash lack `CIN`.
 
@@ -1238,7 +1508,25 @@ Impute 0 for `CIN` and rely on `CAPE = 0` to say the same thing. Drop both.
 
 ## S-5 — Whether to transform skew before scaling
 
-**Measured, on 13 predictors — needs redoing on 20.** Under plain min-max to
+**Re-measured 2026-09-14, all 20 predictors.** The compression is worst in the
+divergence variables, not `CAPE`. Tropis `VIIWD` has an interquartile range of
+8,1e-07 against a full range of 9,2e-04 — the middle half would occupy 0,088%
+of the rotation range under plain min-max, and the maximum is ~2 900x p75.
+Subtropis `VIIWD` 0,058%. `VILWD` and `VIMDF` are the same shape in both
+domains.
+
+**A transform does not fix a point mass, and the point masses are large.**
+Share held by the single most frequent value, subtropis / tropis: `CRR` 0,605 /
+0,393, `TCIW` 0,269 / 0,097, `PRECTOTCORR` 0,222 / 0,066, `CAPE` 0,180 / 0,038.
+`CRR`'s subtropis median is zero. Any monotone transform leaves these ties
+intact, so this needs a separate answer from the tail question — and a quantile
+transform is the wrong one, since it would spread 2,08 million tied zeros
+across the output range on tie-breaking alone.
+
+**No sentinels.** Every detached maximum is held by exactly one row, so none of
+the ranges above is set by a fill value.
+
+**Superseded figures below, void per D-17.** Under plain min-max to
 [0, π], the middle 98% of each predictor would occupy: `PRECTOTCORR` 7,4% /
 3,2% of the range, `VIIWD` 3,8% / 6,8%, `VILWD` 6,9% / 4,3%, `TCIW` ~20%,
 `TCLW` ~20%, `CAPE` 35,0% / 17,3%. Six of thirteen below 25% in tropis, seven
@@ -1273,8 +1561,41 @@ subtropis rows outside the tropis range and 25,9% the other way; `T2M` 2,6%;
 `KX` 1,1%; `lat` and `lon` 100%. A poor cross-domain result could be this
 rather than a physical finding.
 
-**Options.** Clip to the source range. Widen the scaler deliberately. Declare
-it as a limitation. Some combination.
+**A fifth option, raised by Rafly 2026-09-14 and not yet argued.** Min-max has
+two fitted parameters, both set by single extreme observations in one sample,
+so it cannot be correct for a domain that has not been seen — a third domain
+(Jawa Tengah was the example) has an unknown maximum, and the model finds out
+by saturating.
+
+The QML encoding literature treats this as two classes of variable. Bounded
+variables are scaled by their **known physical bound** rather than the sample
+extremes; unbounded variables are mapped through a bounded function first and
+then scaled. In quantum reinforcement learning the split is explicit — CartPole
+position and pole angle have finite ranges and are scaled by those, while cart
+velocity and angular velocity have infinite ranges and are passed through
+`arctan` onto a finite interval before scaling (Kölle et al., arXiv:2401.07043).
+Lockwood & Si (arXiv:2008.07524) state the trade-off directly: scaled encoding
+preserves magnitude but requires bounded inputs, so CartPole cannot use it.
+`arctan` is not an improvisation but a named encoding variant — angle rotation
+encoding maps x to `arctan(x)` or `arctan(x²)` before using it as the phase.
+
+**Why it addresses O-3 where min-max cannot.** `arctan` has **no fitted
+parameter**. An unseen `CAPE` of 30 000 still maps above 22 396, still
+monotone, still distinguishable. Min-max with clipping makes them identical.
+The scale inside it, `arctan(x/s)`, would be a stated physical constant, not
+a sample statistic.
+
+**Two costs.** `arctan` compresses the bulk unless `s` is chosen well, and `s`
+is a judgement. And it does nothing about the point masses in S-5. Note also
+that Yeo-Johnson fits λ from data, so Amri's route has the same generalisation
+weakness as min-max — if cross-domain transfer is the point, parameter-free
+transforms are the more defensible family, and that belongs in Bab IV.
+
+Peer-review status of both preprints unverified.
+
+**Options.** Clip to the source range. Widen the scaler deliberately. Physical
+bounds for bounded variables plus a parameter-free bounded map for unbounded
+ones. Declare it as a limitation. Some combination.
 
 ---
 
@@ -1312,10 +1633,28 @@ within the training years. What subsampling, if any, on the 94–97% zeros.
 
 The last step, and the one that writes `features.MODELLED`.
 
-**Fixed by §5.** Screen on Spearman and mutual information, not Pearson —
-Pearson finds only straight lines and would discard a variable that matters
-above a threshold. Confirm with leave-one-out ablation, which is what Bab VI
-leads with.
+**No longer fixed by §5.** D-17 reset the method with the rest of the
+component, and §5 was revised to match: the screen is unratified until it is
+argued here and written into a `D-` entry.
+
+**The method that was reset, and what supports it.** Screen on Spearman and
+mutual information, not Pearson — Pearson finds only straight lines and would
+discard a variable that matters above a threshold. Confirm with leave-one-out
+ablation. This survived its literature check: pairing mutual information as
+the primary criterion with a rank correlation as complement, justified by
+variational circuits' sensitivity to input dimensionality and qubit scaling,
+has 2026 precedent, and that same work reports the low-rank-correlation /
+high-MI pattern seen here in `VIIWD`. It was reset for want of a written
+justification, not for want of support.
+
+**What the field usually does instead.** Reduce to the qubit budget with PCA.
+The distinction that matters for Bab VI: feature selection preserves
+interpretability while feature extraction destroys it, and PCA preserves
+directions of maximum variance rather than maximum target relevance. Amri ran
+PCA and therefore never asked which variable matters. **Do not borrow the
+standard NISQ justification** — fewer qubits, less hardware noise. This project
+runs on a simulator; the cost here is 2^n statevector growth and
+parameter-shift circuit count. State the real reason.
 
 **Supporting evidence already measured.** Amri reports no strong linear
 correlation between any feature and the target, plus multicollinearity, from a
@@ -1325,3 +1664,34 @@ yours are hourly, so they are not comparable quantities.
 
 **Blocked by.** S-1 through S-6. Screening a feature set that is about to
 change is wasted work.
+
+---
+
+## S-10 — How many feature sets, and how wide
+
+Was D-11; parked by D-17 and returned here.
+
+**The decision.** Whether each domain screens and ablates separately and keeps
+its own `MODELLED` list, or both share one list. If separate, whether the two
+lists must be the same length N, and what N is.
+
+**Why width matters if the sets are separate.** One feature, one qubit. A
+12-feature model and a 9-feature model are different-sized circuits, so a
+tropis-subtropis performance gap would confound domain difficulty with model
+capacity — and that gap is the number the thesis reports. Equal width removes
+the confound; it does not remove the difficulty of choosing N.
+
+**Confirmed with Rafly, 2026-09-14.** If the sets are per-domain, they are
+equal width. The assertion enforcing this already exists in
+`features.modelled()` and carries a comment saying it enforces a parked
+decision.
+
+**What D-11 rested on, now void.** A mutual-information ranking taken
+2026-09-11 on the 17-candidate table, in which `KX` ranked 10th in tropis and
+1st in subtropis, `T2M` 18th and 6th, `CAPE` 12th and 4th. Those columns are
+not the current columns and the ranking must be retaken.
+
+**Interacts with.** S-9 (the screen produces the rankings), and the `pooled`
+scenario, which under D-11 took the union of the two lists truncated to N.
+
+**Blocked by.** Stage 1, then S-9.

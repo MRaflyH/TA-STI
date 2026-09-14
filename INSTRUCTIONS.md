@@ -65,7 +65,7 @@ One list, one job.
 | 1 | **Literature** — candidate meteorological variables, one citation each | the Bab II parameter review, and the download spec |
 | 2 | **One acquisition job** — every candidate, both domains, `k_index` among them | `data/raw/` |
 | 3 | **Build** — merge to hourly cell tables | two parquets |
-| 4 | **Feature selection** — Spearman, mutual information, redundancy, leave-one-out ablation on ridge | the Bab VI table, and the modelled feature set |
+| 4 | **Selection** — three stages, see §5 | the Bab III data-understanding section, the Bab VI table, and the modelled feature set |
 | 5 | **Model and train** | results |
 | 6 | **Write** | the document |
 
@@ -170,10 +170,45 @@ The dosen's requirement, and it shapes the document:
 So the candidate list is frozen and written up **before** the ablation results
 are seen.
 
-Screen on **Spearman and mutual information**, not Pearson — Pearson detects
-only straight-line relationships and would discard a variable that matters
-above a threshold. Confirm with **leave-one-out ablation**, which is the
-strongest justification available and what Bab VI should lead with.
+### The three stages
+
+Selection is worked in three stages, and the order is the rule (D-17).
+
+1. **Generic description.** Neutral inventory of both tables — counts,
+   distributions, missingness, duplicates, redundancy among predictors, the
+   two domains' ranges side by side. No interpretation, nothing dropped,
+   nothing fitted. **Stage 1 never measures a predictor against the target**;
+   that is the screen, and the screen is stage 3. That line is what lets
+   stage 1 run on the whole table without a leakage concern.
+2. **Targeted description.** Aimed at problems stage 1 surfaces. An item is
+   stage 2 only if the default handling is **absent or actively wrong** *and*
+   the choice moves a number the thesis reports. Each stage 2 item owes a
+   literature pass, not just a measurement. **Stage 2's membership is an output
+   of stage 1, not chosen in advance** — only the zero majority is nameable
+   now, because its share is known and no standard handling for it has been
+   found.
+3. **Standard steps.** The steps any pipeline needs, each justified by the
+   field default or by a paper: transform order, scaling to the encoding
+   range, temporal encoding, the split, the screen, the ablation.
+
+**Anything fitted is stage 3 by definition, and stage 3 measurements run on
+training rows only.** A whole-table minimum is descriptive; a scaler is fitted.
+
+Every handling step must trace to one of three sources — the data forced it
+(point at a stage 1 number), the target's shape forced it (a stage 2 number
+*and* a paper), or it is standard (a citation). A step that traces to none of
+the three cannot be defended, and finding that out while writing is the point.
+
+### The screen method is unratified
+
+**This section previously prescribed Spearman, mutual information and
+leave-one-out ablation on ridge. D-17 reset it.** There is no ratified screen
+method until one is argued and written into a `D-` entry. What is fixed is the
+requirement above: whatever is chosen is either the field default or backed by
+a paper, and is applied uniformly rather than per-feature.
+
+The reset method is not discredited — see S-9 for what supports it. It is
+unratified because its justification was never written down.
 
 ---
 

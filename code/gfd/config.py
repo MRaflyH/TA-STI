@@ -124,6 +124,30 @@ SUBTROPIS = Domain(
 
 DOMAINS = {d.name: d for d in (TROPIS, SUBTROPIS)}
 
+
+# --------------------------------------------------------------------------
+# The built tables
+# --------------------------------------------------------------------------
+# build.py constructs this same stem at build.py:177. Two subpackages
+# disagreeing about where the built table is would be silent, so the name
+# lives here. build.py keeps its own line until D-15's freeze opens for a real
+# reason; adopting these helpers goes on the list for when it does. Until then
+# a drift surfaces as a missing file rather than a stale one read quietly.
+
+
+def processed_stem(domain: str) -> Path:
+    if domain not in DOMAINS:
+        raise KeyError(f"unknown domain {domain!r}; have {sorted(DOMAINS)}")
+    return PROCESSED_DIR / f"gfd_{domain}_hourly"
+
+
+def processed_table(domain: str) -> Path:
+    return processed_stem(domain).with_suffix(".parquet")
+
+
+def processed_meta(domain: str) -> Path:
+    return processed_stem(domain).with_suffix(".meta.json")
+
 FREQ_NOUN = {"h": "hour", "D": "day", "M": "month"}
 FREQ_SLUG = {"h": "hourly", "D": "daily", "M": "monthly"}
 
