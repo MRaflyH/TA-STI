@@ -1,0 +1,127 @@
+{
+  "within": {
+    "subtropis": {
+      "occurrence": [
+        "KX",
+        "VIIWD",
+        "cos_sza",
+        "VIMDF",
+        "lon",
+        "doy_sin",
+        "lat",
+        "hour_sin",
+        "VILWD",
+        "TCLW",
+        "PS",
+        "TCIW",
+        "doy_cos",
+        "CRR",
+        "RH2M"
+      ],
+      "count": [
+        "lat",
+        "lon",
+        "cos_sza",
+        "doy_sin",
+        "KX",
+        "doy_cos",
+        "VILWD",
+        "VIMDF",
+        "PRECTOTCORR",
+        "VIIWD",
+        "hour_sin",
+        "TOTALX",
+        "CRR",
+        "dewpoint_depression",
+        "CAPE"
+      ]
+    },
+    "tropis": {
+      "occurrence": [
+        "cloud_water",
+        "lat",
+        "VIIWD",
+        "cos_sza",
+        "hour_sin",
+        "PS",
+        "lon",
+        "VILWD",
+        "doy_sin",
+        "VIMDF",
+        "doy_cos",
+        "TOTALX",
+        "CRR",
+        "PRECTOTCORR",
+        "WS2M"
+      ],
+      "count": [
+        "cos_sza",
+        "PS",
+        "hour_sin",
+        "cloud_water",
+        "VIIWD",
+        "lat",
+        "doy_cos",
+        "lon",
+        "doy_sin",
+        "CRR",
+        "PRECTOTCORR",
+        "TCIW",
+        "VILWD",
+        "VIMDF",
+        "CAPE"
+      ]
+    }
+  },
+  "shared": {
+    "occurrence": [
+      "TCIW",
+      "VIIWD",
+      "cos_sza",
+      "hour_sin",
+      "VILWD",
+      "doy_sin",
+      "WS2M",
+      "VIMDF",
+      "doy_cos",
+      "PS",
+      "CRR",
+      "TOTALX",
+      "TCLW",
+      "RH2M",
+      "D2M"
+    ],
+    "count": [
+      "cos_sza",
+      "PS",
+      "TCIW",
+      "VIIWD",
+      "doy_sin",
+      "hour_sin",
+      "CRR",
+      "VIMDF",
+      "CAPE",
+      "PRECTOTCORR",
+      "VILWD",
+      "TOTALX",
+      "doy_cos",
+      "dewpoint_depression",
+      "TCWV"
+    ]
+  },
+  "meta": {
+    "n": 15,
+    "arm": "full",
+    "test_year_held_out": 2024,
+    "seeds": 5,
+    "decisions": [
+      "D-19",
+      "D-21",
+      "D-22",
+      "D-24",
+      "D-25",
+      "D-26",
+      "D-27"
+    ]
+  }
+}

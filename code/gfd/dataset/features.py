@@ -3,10 +3,16 @@
     CANDIDATES    what may be screened -- everything acquired
     RAW_TEMPORAL  raw time, for selection/ to encode as it chooses
     EXCLUDE       never a predictor
-    MODELLED      what survived the ablation, written by selection/
+    MODELLED      what survived selection, written by selection/
 
 The built table is wider than any of these. Read lengths from here or from the
 table; nothing counts features.
+
+A modelled name need not be in `CANDIDATES`. `selection/` derives features
+under D-21 step 2 -- the temporal encodings of D-20, `cloud_water`,
+`dewpoint_depression` -- and those are legitimate predictors that no table
+column carries. What a modelled name may never be is a member of `EXCLUDE`, or
+a raw temporal column used in its raw form.
 """
 
 from __future__ import annotations
@@ -88,38 +94,102 @@ EXCLUDE = TARGET_FAMILY + INTENSITY + BOOKKEEPING
 # --------------------------------------------------------------------------
 # Modelled
 # --------------------------------------------------------------------------
-# D-11: one list per domain, of equal length. selection/ writes this file.
+# Three sets per stage, because three decisions shaped this file's contents:
+#
+#   D-25  two stages -- occurrence and count -- each with its own set.
+#   D-24  15 features wide, equal across domains within a stage.
+#   D-27  the within-domain models use per-domain sets; the transfer arms use
+#         one shared set, so a model trained on one domain can read the other's
+#         feature vector at all.
+#
+# So modelled.json has the shape
+#
+#   {"within": {"tropis":    {"occurrence": [...], "count": [...]},
+#               "subtropis": {"occurrence": [...], "count": [...]}},
+#    "shared":               {"occurrence": [...], "count": [...]}}
+#
+# selection/ writes it, models/ and training/ read it, nothing counts it.
 MODELLED_PATH = Path(__file__).parent / "modelled.json"
 
+STAGES = ("occurrence", "count")
 
-def modelled(domain: str) -> list[str]:
-    """Written by selection/ after the ablation. Doesn't exist yet.
+
+def _load() -> dict:
+    if not MODELLED_PATH.exists():
+        raise FileNotFoundError(
+            f"{MODELLED_PATH} does not exist -- selection hasn't written it. "
+            f"Run gfd.selection.ablate first."
+        )
+    return json.loads(MODELLED_PATH.read_text(encoding="utf-8"))
+
+
+def _checked(names: list[str]) -> list[str]:
+    assert_no_leakage(names)
+    raw = [n for n in names if n in RAW_TEMPORAL]
+    if raw:
+        raise ValueError(
+            f"{raw} are raw temporal columns and cannot be predictors in this "
+            f"form -- an integer hour puts 23:00 and 00:00 23 apart. "
+            f"selection/ encodes them (D-13, D-20)."
+        )
+    return names
+
+
+def modelled(domain: str, stage: str) -> list[str]:
+    """The per-domain set for one stage. The within-domain models read this.
 
     Raises rather than falling back to CANDIDATES: a fallback would let a model
     train on the unfiltered set and report it as the selected one.
     """
-    if not MODELLED_PATH.exists():
-        raise FileNotFoundError(
-            f"{MODELLED_PATH} does not exist -- the ablation hasn't run. "
-            f"Run selection/ first."
-        )
-    sets = json.loads(MODELLED_PATH.read_text(encoding="utf-8"))
-    if domain not in sets:
-        raise KeyError(
-            f"{MODELLED_PATH} has no set for {domain!r}; it has {sorted(sets)}."
-        )
-    names = sets[domain]
+    if stage not in STAGES:
+        raise KeyError(f"unknown stage {stage!r}; have {STAGES}")
+    within = _load()["within"]
+    if domain not in within:
+        raise KeyError(f"{MODELLED_PATH} has no set for {domain!r}; "
+                       f"it has {sorted(within)}.")
+    if stage not in within[domain]:
+        raise KeyError(f"{MODELLED_PATH} has no {stage!r} set for {domain!r}.")
 
-    widths = {d: len(v) for d, v in sets.items()}
+    # D-24: equal width across domains, within a stage. The two stages need not
+    # match each other -- D-25 -- because they are different circuits answering
+    # different questions.
+    widths = {d: len(v[stage]) for d, v in within.items() if stage in v}
     if len(set(widths.values())) > 1:
         raise ValueError(
-            f"D-11 requires equal width across domains, got {widths}. Unequal "
-            f"widths mean unequal qubit counts, and the domain comparison then "
-            f"confounds difficulty with model size."
+            f"D-24 requires equal width across domains for the {stage!r} stage, "
+            f"got {widths}. Unequal widths mean unequal qubit counts, and the "
+            f"domain comparison then confounds difficulty with model size."
         )
+    return _checked(within[domain][stage])
 
-    assert_no_leakage(names)
-    return names
+
+def modelled_shared(stage: str) -> list[str]:
+    """The shared set for one stage. The transfer arms read this (D-27).
+
+    Both directions and both shared-set baselines use the same list in the same
+    order. A trained circuit is N rotations bound to N named variables in a
+    fixed order, so two models cannot exchange feature vectors unless they were
+    trained on the same list.
+    """
+    if stage not in STAGES:
+        raise KeyError(f"unknown stage {stage!r}; have {STAGES}")
+    shared = _load()["shared"]
+    if stage not in shared:
+        raise KeyError(f"{MODELLED_PATH} has no shared {stage!r} set.")
+    names = shared[stage]
+
+    # D-27: lat and lon measure 0,0000 effective resolution across domains --
+    # the boxes do not overlap, so every target row clips to one bound and the
+    # qubit arrives as a constant. Dead qubits would make a poor transfer score
+    # unattributable: domains differing and a frozen circuit look identical.
+    bad = [n for n in names if n in SPATIAL]
+    if bad:
+        raise ValueError(
+            f"{bad} are in the shared transfer set. D-27 excludes them: they "
+            f"carry no information across domains and a constant qubit makes a "
+            f"poor transfer result impossible to attribute."
+        )
+    return _checked(names)
 
 
 # --------------------------------------------------------------------------

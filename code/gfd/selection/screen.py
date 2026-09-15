@@ -6,6 +6,12 @@
 D-21 fixes the sequence and this module runs three of its steps. Nothing is
 selected here -- step 5 needs N and step 6 is the ablation.
 
+Step 5, select, also happens here: the top N of each ordering is written to
+`dataset/modelled.json`, which is the committed output of selection. Three
+kinds of set, because three decisions shaped them — per-domain sets for the two
+within-domain models (D-22, D-24), and one shared set for the transfer arms
+(D-27), each split by stage (D-25).
+
 Step 2, derive. Cyclical time encodings (D-20) plus any other admissible
 derivation: a function of existing columns or of a stated external source, with
 a physical or cited motivation, given a Bab II paragraph, and ranked on equal
@@ -104,6 +110,19 @@ ARMS = {
     "meteorology": "climatological features removed as well",
 }
 
+# D-26: `full` is the model. `meteorology` is measured and reported in Bab VI
+# as the operational number -- what survives when nothing knowable in advance
+# of the weather is allowed -- but no model is built from it.
+MODEL_ARM = "full"
+
+# D-27: the transfer arms read one shared set, ranked on both domains' training
+# rows pooled. `lat` and `lon` are excluded from it: they measure 0,0000
+# effective resolution across domains, so every target row clips to one bound
+# and the qubit arrives as a constant. A frozen qubit and a genuine domain
+# difference produce the same poor score, and the point of the transfer arm is
+# to make degradation attributable.
+SHARED_EXCLUDE = ["lat", "lon"]
+
 
 # --- step 2, derivations --------------------------------------------------
 def solar_zenith_cos(day_of_year, hour_local, lat_deg):
@@ -152,6 +171,8 @@ def build_matrix(df: pd.DataFrame, arm: str = "full") -> pd.DataFrame:
     drop = set(EXCLUDE_UNDEFINED)
     if arm == "meteorology":
         drop |= set(CLIMATOLOGICAL)
+    elif arm == "shared":
+        drop |= set(SHARED_EXCLUDE)
     cols = {c: df[c].to_numpy() for c in feat.CANDIDATES
             if c in df.columns and c not in drop}
     cols.update({k: v for k, v in temporal_candidates(df).items() if k not in drop})
@@ -305,6 +326,85 @@ def screen_domain(domain: str, k: int) -> dict:
     return {arm: screen_arm(train, arm, k) for arm in ARMS}
 
 
+def screen_shared(trains: dict[str, pd.DataFrame], k: int) -> dict:
+    """One ranking on both domains' training rows pooled (D-27).
+
+    The transfer arms need a single list in a single order, because a trained
+    circuit is N rotations bound to N named variables and two models cannot
+    exchange feature vectors unless they were trained on the same list.
+
+    Pooling rather than intersecting: an intersection makes N an output of
+    whatever the two orderings happen to share, which differs by stage and is
+    not a number anyone chose. A pooled ranking keeps N a decision (D-24).
+
+    The two domains contribute unequal row counts -- 2,94 million against 1,58
+    -- so the pooled ranking is weighted toward subtropis by roughly two to
+    one. Stated rather than corrected: reweighting would be a choice with its
+    own justification owed, and this is the ranking the transfer arms actually
+    train on.
+    """
+    frames = []
+    for d, tr in trains.items():
+        X = build_matrix(tr, "shared")
+        X = X.assign(**{cfg.TARGET: tr[cfg.TARGET].to_numpy()})
+        frames.append(X)
+    pooled = pd.concat(frames, ignore_index=True)
+    count = pooled.pop(cfg.TARGET)
+    names = list(pooled.columns)
+    ranks = pooled.rank(method="average").to_numpy(dtype=float)
+
+    flashing = count > 0
+    Xf = pooled[flashing]
+    ranks_f = Xf.rank(method="average").to_numpy(dtype=float)
+
+    print(f"\n{'=' * 78}\nSHARED SET — both domains pooled, for the transfer arms (D-27)"
+          f"\n{'=' * 78}")
+    print(f"  {len(pooled):,} rows from {', '.join(f'{d} {len(t):,}' for d, t in trains.items())}")
+    print(f"  {len(names)} features; {SHARED_EXCLUDE} excluded per D-27")
+
+    return {
+        "n_features": len(names),
+        "occurrence": rank_target(
+            pooled, ranks, names, relevance_occurrence, (count > 0).astype(int),
+            k, "occurrence", "did the hour flash — all pooled training rows"),
+        "count": rank_target(
+            Xf, ranks_f, names, relevance_count, count[flashing],
+            k, "count", "how many, log1p — pooled flashing hours only"),
+    }
+
+
+def write_modelled(results: dict, shared: dict, k: int) -> None:
+    """Step 5. The committed output of selection.
+
+    Only the `full` arm is written (D-26): `meteorology` is a reported
+    comparison, not a model. Both stages, per domain, plus the shared set.
+    """
+    doc = {
+        "within": {d: {st: r[MODEL_ARM][st]["selected"] for st in ("occurrence", "count")}
+                   for d, r in results.items()},
+        "shared": {st: shared[st]["selected"] for st in ("occurrence", "count")},
+        "meta": {
+            "n": k,
+            "arm": MODEL_ARM,
+            "test_year_held_out": TEST_YEAR,
+            "seeds": SEEDS,
+            "decisions": ["D-19", "D-21", "D-22", "D-24", "D-25", "D-26", "D-27"],
+        },
+    }
+    feat.MODELLED_PATH.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+    print(f"\n[write] {feat.MODELLED_PATH}")
+
+    # Read it straight back through the contract. A file the contract cannot
+    # load is worse than no file, because nothing downstream would notice until
+    # it ran.
+    for d in results:
+        for st in ("occurrence", "count"):
+            feat.modelled(d, st)
+    for st in ("occurrence", "count"):
+        feat.modelled_shared(st)
+    print("[check] modelled.json loads through features.py, all six sets")
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description="D-21 steps 2 to 4. Nothing is selected.")
     ap.add_argument("--domain", choices=sorted(cfg.DOMAINS))
@@ -313,7 +413,12 @@ def main(argv=None) -> None:
     args = ap.parse_args(argv)
 
     domains = [args.domain] if args.domain else sorted(cfg.DOMAINS)
-    results = {d: screen_domain(d, args.n) for d in domains}
+    trains = {}
+    results = {}
+    for d in domains:
+        df = pd.read_parquet(cfg.processed_table(d))
+        trains[d] = df[df["year"] != TEST_YEAR]
+        results[d] = screen_domain(d, args.n)
 
     for d in sorted(results):
         print(f"\n{'=' * 78}\n{d.upper()} — TOP {args.n}, BOTH ARMS\n{'=' * 78}")
@@ -328,7 +433,8 @@ def main(argv=None) -> None:
                   f"{r['meteorology']['count']['selected'][i]:<22}")
 
     print(f"\n{'=' * 78}")
-    print("Steps 2-4 only. Nothing is selected and modelled.json is not written.")
+    print("Steps 2-5. modelled.json holds the full-arm sets: two per domain and one")
+    print("shared, all at N =", args.n, "— the committed output of selection.")
     print("Two arms are reported, not one chosen: the gap between them is how much of")
     print("the skill is climatology and how much is the atmosphere, and only the")
     print("ablation can measure that.")
@@ -337,11 +443,21 @@ def main(argv=None) -> None:
     print("predicts better. The ordering is invariant to S-5 and S-6: relevance and")
     print("redundancy are both rank-based.")
 
+    shared = screen_shared(trains, args.n) if len(domains) > 1 else None
+
     if not args.no_json:
+        if shared is not None:
+            write_modelled(results, shared, args.n)
+        else:
+            print("\n[skip] modelled.json needs both domains; run without --domain")
         for d, r in results.items():
             p = cfg.PROCESSED_DIR / f"screen_{d}.json"
             p.write_text(json.dumps(r, indent=2), encoding="utf-8")
-            print(f"\n[write] {p}")
+            print(f"[write] {p}")
+        if shared is not None:
+            p = cfg.PROCESSED_DIR / "screen_shared.json"
+            p.write_text(json.dumps(shared, indent=2), encoding="utf-8")
+            print(f"[write] {p}")
 
 
 if __name__ == "__main__":

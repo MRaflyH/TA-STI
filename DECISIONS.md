@@ -1111,6 +1111,283 @@ to S-1.
 
 ---
 
+## D-24 — N = 15, superseding D-22's width. Closes the reopened part of S-10
+
+**Decided.** The modelled sets are **15 features wide**, not 10. Everything else
+in D-22 stands: two sets, one per domain, overlap unconstrained, equal width,
+and the same set feeding the quantum and classical arms in a given domain.
+
+**Why 15, and why not 18.** The width sweep is the knee, and it is sharp.
+
+| N | tropis occ | subtropis occ | tropis count | subtropis count |
+|---|---|---|---|---|
+| 8 | 0,2741 | 0,2240 | 0,1144 | 0,0321 |
+| 10 | 0,2871 | 0,2240 | 0,1178 | 0,0308 |
+| 12 | 0,3344 | 0,2448 | 0,1215 | 0,0477 |
+| **15** | **0,3620** | **0,2637** | **0,1277** | **0,0655** |
+| 18 | 0,3714 | 0,2712 | 0,1429 | 0,0672 |
+
+10 to 15 buys +26% relative on tropis occurrence, +15% on subtropis
+occurrence, +113% on subtropis count. 15 to 18 buys +2,6%, +2,8% and +2,6% on
+those three curves for **8x the statevector**. Only tropis count is still
+climbing at 18, and that is the curve with a visible noise floor.
+
+**And 15 is the proven number, not a projection.** The archive completed 432
+runs at 15 qubits on 8 September 2026. Feasibility here is measured rather than
+estimated, which is the strongest argument available for a cost this large.
+
+**Where D-22 reasoned wrongly, and it is worth stating.** D-22 stopped at 10
+because seed stability falls off at ranks 11 and 12. That reads the stability
+column backwards. A feature that moves in and out across seeds means **several
+features are near-equivalent at that rank**, not that the chosen one is
+worthless — swapping one near-equivalent for another should cost little, and
+the curve confirms it, since skill keeps climbing well past the point where
+stability drops. Instability is a caveat about *which* features Bab VI names,
+not evidence that the eleventh is dead weight.
+
+D-22 also recorded that pricing N was affordable classically but not
+quantumly, and then declined to do the classical check on the grounds that it
+would say little about a circuit. That was wrong twice over: the check cost
+minutes, and it revealed a 26% gap that no amount of reasoning about seed
+stability would have surfaced.
+
+**Cost.** 2^15 against 2^10 is **32x the statevector**, and the parameter-shift
+circuit count rises with the parameter count. The archive proves this is
+survivable, not that it is cheap.
+
+The curve is ridge and logistic regression. A circuit's capacity scales
+differently from a linear model's, so the 26% classical gain **may not
+transfer**, and Bab IV must say the width was chosen on classical evidence.
+
+Features 11 to 15 are the unstable ones. Bab VI reports the seed stability
+beside the selection rather than presenting fifteen equally confident choices.
+
+**Reversal.** Change N in `selection/`. No rebuild. Both this entry and D-22
+stay readable, so the revision is visible rather than tidied away.
+
+**Bab.** IV (the width and how it was chosen), VI (the sets, with stability).
+
+**Decided by.** Rafly, 2026-09-14, on the width sweep.
+
+---
+
+## D-25 — Two stages: a hurdle. Closes S-7
+
+**Decided.** The model is a **hurdle**. Stage 1 predicts whether the hour
+flashed at all, on every training row. Stage 2 predicts how many, on `log1p`,
+**trained on flashing hours only**. Each stage gets its own feature set from the
+D-21 pipeline and its own circuit. Both arms of the comparison — QNN and
+classical — are built the same way, so the comparison stays clean.
+
+**Why two.** Three reasons, strongest first.
+
+*The two questions want different features, and that is measured.* In the
+subtropis meteorology arm the two stages agree on only **6 of 10**: occurrence
+selects cloud and ice (`TCIW`, `TCLW`, `VIIWD`), count selects temperature and
+instability (`T2M`, `TOTALX`, `dewpoint_depression`). Whether it flashes
+depends on whether there is a storm; how much depends on how strong. One model
+with one input set serves both badly.
+
+*The zeros are switch-like, not merely frequent.* Median consecutive zero run
+within a live cell is 20 hours subtropis and 15 tropis; 90,66% and 74,25% of
+zero rows sit inside runs longer than a day. A process that stays off for
+stretches and then turns on is what a hurdle describes.
+
+*The predecessor architecture matches.* v1 ran `TASK = "hurdle"` by default,
+which keeps the comparison to Amri's work on one axis fewer.
+
+**The argument against, stated rather than buried.** The target is **not
+zero-inflated**: a negative binomial at the observed moments predicts 0,9858
+and 0,9639 zeros against 0,9711 and 0,9430 observed — a *negative* excess in
+both domains. Overdispersion alone over-explains the zeros.
+
+That rules out a zero-inflated **mixture**, and it does not rule out a hurdle.
+The distinction, already recorded under O-6: a ZI mixture claims two processes
+generate the zeros; a hurdle is a **factorisation**, P(y) = P(y>0) · P(y | y>0),
+which is valid whatever produces them. The justification here is the feature
+divergence and the persistence, not an excess of zeros — and Bab IV should say
+so, because "94-97% zeros, therefore a hurdle" is the reasoning a reader will
+assume and it is not the reasoning used.
+
+**Scoring, and this is where v1 was wrong.** The count stage **trains** on
+flashing rows only, which §4 permits — training rows may be subsampled. The
+composed model is **scored on the whole held-out year at its natural class
+ratio**. Scoring the count stage on non-zero test rows alone reshapes the test
+set, which §4 forbids; v1 did exactly that. A per-stage score on flashing test
+rows may be reported as a diagnostic, labelled as one, never as the headline.
+
+Composition follows §4's ordering rule: invert with `expm1` before any
+aggregation, never after.
+
+**Cost.** Two circuits per domain per arm, so roughly double the run matrix
+against a single-stage design. Two 15-qubit circuits, not one 30-qubit one, so
+the statevector cost is 2 x 2^15 rather than 2^30 — cheap relative to the
+alternative, expensive relative to one stage.
+
+Stage 2 trains on far fewer rows: 89 917 tropis and 85 073 subtropis flashing
+hours against 1,58 and 2,94 million. Seed stability is already measurably worse
+in the count rankings for this reason, and Bab VI should report it.
+
+**A contract consequence that is not yet handled.** §3 and `features.py` define
+`MODELLED` as one list per domain. This decision makes it **two** — occurrence
+and count. `features.modelled()` and its equal-width assertion both assume the
+single-list shape. That needs an edit before `modelled.json` is written, and
+the equal-width rule of D-22 should be read as applying **within a stage**: the
+two stages need not be the same width as each other, only the two domains
+within a stage.
+
+**Reversal.** Train one model on `log1p(flash_count)` over all rows and take
+one feature set per domain. No rebuild; a `selection/` and `training/` change.
+
+**Bab.** IV (the architecture and why, including the not-zero-inflated point),
+V (two stages in the code), VI (composed scores, per-stage diagnostics
+labelled).
+
+**Decided by.** Rafly, 2026-09-14, on Claude's recommendation.
+
+---
+
+## D-26 — `full` is the model; `meteorology` is a reported comparison
+
+**Decided.** The models are built from the **`full` pool** — all 25 candidates,
+so `lat`, `lon` and the temporal encodings compete like anything else (D-23).
+The `meteorology` pool, which excludes those seven, is **not a model that gets
+built**. It is a second run of the D-21 ranking whose score is reported in
+Bab VI beside the `full` score.
+
+This takes the selection from eight sets to **four**: occurrence and count, per
+domain, which is what `modelled.json` holds.
+
+**Why `full` is the product.** D-23 settled that the coordinates and the clock
+are legitimate predictors — the test set is the same cells in a different year,
+so a model learning a spatial or diurnal prior has learned something real, not
+leaked anything. And `full` scores higher in tropis at every width tested.
+
+**Why `meteorology` is still reported, and it is not a formality.** §4 says the
+model becomes a forecast when driven by forecast fields from an NWP system. Run
+that substitution: the meteorological variables are replaced by forecast
+values, and `lat`, `hour_sin`, `doy_sin` and the rest **do not change** — they
+are the same numbers in 2030 as in 2018.
+
+So the `meteorology` arm's score is the **operational** number: what the model
+would achieve when the only thing genuinely known about a future hour is the
+forecast weather. The `full` score is an upper bound that includes knowing
+where and when.
+
+At N = 15: tropis 0,3620 full against 0,2637 meteorology; subtropis 0,2712
+against 0,2851. Read operationally — in Florida the model is genuinely
+meteorological, and in West Java about a quarter of its occurrence skill is
+knowing the hour, which is real skill that a climatological lookup table also
+has.
+
+That is the answer to the strongest question an examiner can ask of a
+diagnostic model, and without the second arm the answer is a guess.
+
+**Composition at N = 15**, measured 2026-09-14: **nine meteorological and six
+climatological in all four `full` sets.** `hour_cos` is excluded from every set
+— last in both domains at redundancy 0,988 and 0,993 once `hour_sin` and
+`cos_sza` are chosen — and the remaining six climatological features survive.
+At N = 10 the split was four and six; the five extra slots had only meteorology
+left to fill them.
+
+**A category quota was considered and rejected.** Requiring a minimum number of
+meteorological or temporal features would be a protection, and D-21 step 2
+gives derived features none. The threshold would be arbitrary, it would force a
+knowingly worse set whenever the ranking disagreed with it, and the two-arm
+comparison already *measures* the climatology share rather than legislating it.
+
+**Cost.** One extra ranking and one extra ablation per domain, both classical
+and both cheap. One more column in the Bab VI table. No extra circuits.
+
+**Reversal.** Drop the `meteorology` arm from `selection/screen.py`. The
+product is unchanged; Bab VI loses the operational number.
+
+**Bab.** IV (which pool the model uses), VI (both scores, with the operational
+reading).
+
+**Decided by.** Rafly, 2026-09-14, after questioning why an arm that is not
+shipped should be reported.
+
+---
+
+## D-27 — Per-domain sets within, a shared set across. Closes S-11
+
+**Decided.** Two kinds of feature set, for two different questions.
+
+*Within-domain.* Each domain's own model uses its own 15 features from the D-21
+pipeline, per D-22 and D-24. `tropis_in` and `sub_in` are the headline models
+and answer "how well can lightning be predicted in this domain".
+
+*Cross-domain.* The transfer arms use a **shared set**, ranked once on both
+domains' training rows pooled, 15 wide, identical and in identical order for
+both directions. `tropis_to_sub` and `sub_to_tropis` are trained on this set
+and answer "do the two domains share a mapping from weather to lightning".
+
+This means **two extra models per domain per stage**, trained on the shared set
+purely so the transfer test is well posed.
+
+**Why a transfer arm cannot read a per-domain set.** A trained circuit is 15
+rotations bound to 15 named variables in a fixed order. Tropis occurrence puts
+`cloud_water` on the first qubit; subtropis puts `KX` there. Feeding a Florida
+vector into the West Java model sends `KX` values into a rotation trained on
+`cloud_water`. The arithmetic completes and returns a number that means
+nothing. There is no correct way to align two different lists, so the only
+options were to share a set or to abandon transfer.
+
+**Why this is not the shared-set-everywhere option.** Making all four arms use
+the pooled set would make every number directly comparable, but the two
+headline models would then run on a set neither domain's own ranking chose.
+Per-domain selection is one of this thesis's results — the two domains choose
+differently, and that difference is the cross-domain claim's main evidence.
+Modelling on a set neither chose would report a finding the models do not use.
+
+**What it costs, and it must be declared.** `tropis_in` and `tropis_to_sub` no
+longer use the same features, so the gap between them mixes a feature change
+with a domain change. Bab VI must therefore compare **`tropis_to_sub` against
+`sub_to_tropis`, and each against a shared-set within-domain baseline** trained
+on the same shared set — not against `sub_in`. Comparing a transfer arm to a
+per-domain arm would attribute a feature difference to a domain difference.
+
+So the shared set yields **four** trained models per stage, not two: a
+within-domain and a transfer model on the shared set, per domain.
+
+**`lat` and `lon` are excluded from the shared set.** They measure **0,0000
+effective resolution across domains** — the domains do not overlap in either
+coordinate, so every target row clips to one bound and the qubit arrives as a
+constant. Three of fifteen qubits dead on arrival would make a poor transfer
+score unattributable: a model that transfers badly because the domains differ
+and one that transfers badly because a fifth of its circuit is frozen produce
+the same number. The purpose of the transfer arm is to make degradation
+*mean* something, so features that cannot carry information across domains are
+excluded from it. They remain in the within-domain sets, where they are
+legitimate (D-23).
+
+`cos_sza` is computed from latitude and is therefore partly affected. Its
+cross-domain resolution should be measured before the shared ranking is
+trusted; **not resolved here.**
+
+**Why transfer at all, given the claim.** The purpose is not to build a
+transferable model. It is to use degradation as evidence that the two domains
+are physically different — a model that transfers poorly says the weather-to-
+lightning mapping is not shared. That inverts the usual reading of a transfer
+result, and Bab IV must say so, or a reader will take a poor number as a
+failure rather than as the finding.
+
+**Cost.** Roughly double the run matrix: two stages x two domains x
+{within-domain set, shared set}. Both arms of the QNN-against-classical
+comparison must be built the same way.
+
+**Reversal.** Drop the transfer arms and rest the cross-domain claim on the
+feature selections alone, which was considered and is a coherent thesis. Or
+move every arm onto the shared set.
+
+**Bab.** IV (two set types and why), VI (transfer results, compared against
+shared-set baselines and not against the per-domain models).
+
+**Decided by.** Rafly, 2026-09-14.
+
+---
+
 ## Measured
 
 Findings that correct something the archive asserts, or that the thesis will
@@ -1891,6 +2168,118 @@ sets per domain, and the arms differ).
 
 ---
 
+### 2026-09-14 — the climatology gap across widths
+
+`selection/ablate.py` swept at N = 8, 10, 12, 15, 18. All `[measured]`.
+Provisional on S-8 and S-5/S-6. This separates the two explanations the N = 10
+result could not distinguish, and **they separate by domain**.
+
+**Subtropis: the budget was the constraint, mostly.** The count share collapses
+as N grows — 2,031 at N=10, then 1,916 / 1,423 / 1,092 / 1,058 at 8, 12, 15,
+18. Occurrence: 0,987 / 1,110 / 1,124 / 1,083 / 1,051. At 15 and 18 the two
+arms are within 6% of each other.
+
+So Florida's dramatic N = 10 result was largely artefact: at ten slots the full
+arm had four left for weather and could not fit what it needed. **The earlier
+block's reading — that climatological features are a poor use of the budget in
+subtropis — is correct only at a tight N and must not be quoted without the
+curve.**
+
+The residual is real but small. At every width tested the subtropis meteorology
+arm is at or above the full arm, ending at 1,051 and 1,058. Consistent
+direction, never large once N is adequate. Physically coherent: Florida's
+signal is seasonal, and `doy_sin` / `doy_cos` are a crude proxy for what `T2M`
+and `TOTALX` measure directly.
+
+**Tropis: the climatological features genuinely earn their slots.** Share stays
+between 0,590 and 0,811 at every width and does not trend toward 1. At N = 15
+the full arm scores 0,3620 against the meteorology arm's 0,2678 — **the
+climatological features are worth 26% of occurrence skill**, and more room does
+not erode it.
+
+`hour_sin` is the reason: worth 0,0817 of a 0,2871 baseline alone, and no
+meteorological variable substitutes, because the West Java diurnal cycle is a
+15,9-point swing in zero share that the weather columns do not carry.
+
+**The headline is a contrast, not a verdict.** In West Java, knowing the hour is
+worth about a quarter of the model. In Florida, knowing the calendar is worth
+nothing once there is enough weather. Same method, same budget, opposite
+answers, and each with a physical explanation already measured. That is a
+better Bab VI result than either domain alone.
+
+**N = 10 costs real skill, and D-22 did not have this curve.** Tropis
+occurrence: 0,2871 at N=10, 0,3620 at 15, 0,3714 at 18 — a 26% relative gain
+from 10 to 15. Subtropis occurrence gains 18% over the same range. Count gains
+are larger still in subtropis, 0,0308 to 0,0672.
+
+**A noise floor to respect.** Tropis occurrence share runs 0,791, 0,740, then
+back up to 0,811 at N = 18. Non-monotone, so differences in share below roughly
+0,05 should not be read as signal.
+
+**S-items moved.** S-10 is **reopened** — D-22 fixed N = 10 on seed stability
+and simulation cost, and the measured cost of that choice is now on the record.
+S-7 unchanged; S-11 unchanged.
+
+---
+
+### 2026-09-14 — the selected sets. `modelled.json` written
+
+`selection/screen.py` at N = 15, D-21 steps 2 to 5. All `[measured]`. Six sets
+written to `dataset/modelled.json` and read straight back through
+`features.py`: occurrence and count per domain from the `full` arm (D-26), plus
+the shared pair for the transfer arms (D-27). **This is the committed output of
+selection**, and §2 step 4 is complete.
+
+**Composition is nine meteorological to six climatological in all four
+per-domain sets.** `hour_cos` is excluded from every one — last in both domains
+at redundancy 0,988 and 0,993 once `hour_sin` and `cos_sza` are chosen — and
+the remaining six climatological features survive. At N = 10 the split was four
+and six; the five extra slots of D-24 had only meteorology left to fill them.
+The concern that the sets would be dominated by time is answered by the
+arithmetic: there are only seven climatological candidates, so N = 15 forces at
+least eight meteorological.
+
+**The two stages agree less in the `full` arm than in the `meteorology` arm.**
+Subtropis 11 of 15 full against 14 of 15 meteorology; tropis 13 of 15 against
+**15 of 15**. Without the calendar the two questions want nearly the same
+weather; with it they diverge. So the stage divergence that supported D-25 is
+partly a climatology effect — the hurdle's justification rests on the
+persistence measurement and on the full-arm divergence, and Bab IV should not
+overstate it.
+
+**The pooled shared set resembles neither domain.** `TCIW` leads the shared
+occurrence ranking while ranking 12th in subtropis and 18th in tropis
+individually; `KX` falls to 17th despite leading subtropis. The pooling is
+unweighted, so it carries 2 944 704 subtropis rows against 1 577 520 tropis —
+roughly 2:1 toward Florida — and that interacts with the redundancy penalty.
+This is the design working as intended: the transfer arms train on a compromise
+set, which is what makes the two directions comparable. It is also the reason
+D-27 requires transfer results to be compared against shared-set baselines
+rather than against the per-domain models.
+
+**The shared set's last slots are unsettled, and this must be reported.**
+Seed stability in the shared occurrence ranking: `TCLW` 0,60, `cloud_water`
+0,40 — the latter with a mean position of 11,8 despite ranking 19th on averaged
+relevance, so it lands inside the top fifteen in two runs of five and outside
+in three. Shared count: `TCWV` 0,60, `WS2M` 0,40. The per-domain sets are far
+more stable — everything 1,00 except `WS2M` / `CAPE` at 0,80 / 0,20 at tropis
+rank 15, which is one swap.
+
+**Unmeasured, and it bears on D-27.** `cos_sza` is in both shared sets and is
+computed from latitude. D-27 excluded `lat` and `lon` from the shared set
+because they carry 0,0000 effective resolution across domains. Whether
+`cos_sza` inherits that has **not been measured**, and it should be before any
+transfer result is trusted.
+
+**Contract.** `features.py` now holds three sets per stage — `modelled(domain,
+stage)` and `modelled_shared(stage)` — with the equal-width check applying
+within a stage (D-24, D-25) and an assertion that `lat` and `lon` never appear
+in the shared set (D-27). `screen.py` reads the file back through the contract
+after writing it, so a file the contract cannot load fails at write time rather
+than at training time.
+
+---
+
 ## Open
 
 **O-1 to O-9 are superseded by the S-list below, 2026-09-14.** They are kept
@@ -2420,7 +2809,7 @@ ones. Declare it as a limitation. Some combination.
 
 ---
 
-## S-7 — One model or two stages
+## S-7 — One model or two stages — CLOSED 2026-09-14 by D-25
 
 **Measured.** Median run of consecutive zero-flash hours within a live cell:
 15 hours tropis, 20 subtropis. p90: 50 and 164 hours. 40,6% and 66,6% of zero
@@ -2493,7 +2882,13 @@ change is wasted work.
 
 ---
 
-## S-10 — How many feature sets, and how wide — CLOSED 2026-09-14 by D-22
+## S-10 — How many feature sets, and how wide — CLOSED by D-22 and D-24
+
+D-22's per-domain and equal-width decisions stand. **N is reopened.** It was
+fixed at 10 on seed stability and simulation cost, before the width sweep
+measured what that costs: tropis occurrence gains 26% relative going from 10
+to 15, subtropis 18%. The decision is not wrong, but it was taken without
+this figure and should be retaken with it.
 
 Was D-11; parked by D-17 and returned here.
 
@@ -2524,7 +2919,7 @@ scenario, which under D-11 took the union of the two lists truncated to N.
 
 ---
 
-## S-11 — What the cross-domain arm reads
+## S-11 — What the cross-domain arm reads — CLOSED 2026-09-14 by D-27
 
 Opened by D-22. Two per-domain sets of equal width mean the transfer arms have
 no defined input: a tropis-trained model reads qubit 2 as `cos_sza`, and a
