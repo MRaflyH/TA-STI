@@ -80,14 +80,17 @@ set freezes after the ablation, and is a config change with no rebuild.
 
 **One installable package.** `code/` holds one package, `gfd`, with one
 `pyproject.toml`. Install it once with `pip install -e code/`. Every command is
-`python3 -m gfd.<subpackage>` and runs from anywhere in the repo — no directory
-is special, and a replay from a clean checkout is install-then-run.
+`python3 -m gfd.<subpackage>.<module>` — `gfd.dataset.build`,
+`gfd.selection.screen` — and runs from anywhere in the repo. There is no
+`__main__.py` anywhere; each entry point is a module with its own
+`if __name__` block. No directory is special, and a replay from a clean
+checkout is install-then-run.
 
 ```
 gfd/
 ├── config.py      shared truths: paths, domains, grid, time key, target
 ├── dataset/       acquisition, gridding, the join, the column contract
-├── selection/     step 4 — screening and ablation
+├── selection/     step 4 — describe, diagnose, prepare, screen, ablate
 ├── models/        estimator definitions only — never fits, never scores
 ├── training/      folds, subsampling, scaling, the one shared loop
 ├── evaluation/    metrics, aggregation, the thesis tables
@@ -109,10 +112,12 @@ shapes and ansatz reps are local. Paths, the grid, the time key and the target
 are not.
 
 **`dataset/features.py` owns the column contract, and nothing else defines
-one.** Three lists: `EXCLUDE`, never a predictor, covering the target and its
+one.** Four lists: `EXCLUDE`, never a predictor, covering the target and its
 deterministic functions, the intensity statistics, `year`, `days_in_month` and
 `coverage`; `CANDIDATES`, everything acquired, frozen at the raw freeze;
-`MODELLED`, what survives the ablation. `selection/` writes `MODELLED`,
+`RAW_TEMPORAL`, raw clock and calendar columns that are neither, which
+`selection/` encodes as it chooses (D-13); `MODELLED`, what survives the
+ablation. `selection/` writes `MODELLED`,
 `models/` reads it, nothing counts it. The leakage assertion raises rather than
 warns, and is never bypassed.
 
@@ -199,16 +204,30 @@ Every handling step must trace to one of three sources — the data forced it
 *and* a paper), or it is standard (a citation). A step that traces to none of
 the three cannot be defended, and finding that out while writing is the point.
 
-### The screen method is unratified
+### The pipeline
 
-**This section previously prescribed Spearman, mutual information and
-leave-one-out ablation on ridge. D-17 reset it.** There is no ratified screen
-method until one is argued and written into a `D-` entry. What is fixed is the
-requirement above: whatever is chosen is either the field default or backed by
-a paper, and is applied uniformly rather than per-feature.
+D-17 reset the screen method and D-21 ratified its replacement. Selection is
+one fixed sequence, every feature goes through every step, and no feature gets
+an argument of its own:
 
-The reset method is not discredited — see S-9 for what supports it. It is
-unratified because its justification was never written down.
+| | step | the rule |
+|---|---|---|
+| 1 | **Start** | `CANDIDATES`, frozen at the raw freeze |
+| 2 | **Derive** | a function of existing columns or of a stated external source, with a physical or cited motivation, given a Bab II paragraph, ranked with no protection |
+| 3 | **Exclude** | structurally undefined columns only (D-19). D-21's location rule was withdrawn by D-23 |
+| 4 | **Rank** | mRMR, per domain, on training rows only |
+| 5 | **Select** | top N, N stated once |
+| 6 | **Confirm** | leave-one-out ablation, reported in Bab VI |
+
+Relevance is mutual information — not Pearson, which finds only straight lines
+and would discard a variable that matters above a threshold. Redundancy is the
+rank R² of a candidate against the already-chosen set, which is multivariate
+where a correlation matrix is only pairwise. Both are rank-based, so the
+ordering survives any monotone rescaling.
+
+Leave-one-out **confirms, and does not select.** It systematically undervalues
+correlated features, because removing one lets its partner absorb the job. Bab
+VI states that limitation rather than leaving it to an examiner.
 
 ---
 

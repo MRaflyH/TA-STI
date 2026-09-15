@@ -759,6 +759,358 @@ lost but the guarantee that three consumers see one chain.
 
 ---
 
+## D-19 — Structurally undefined predictors are dropped, not imputed. Closes S-4 and O-8
+
+**Decided.** A candidate whose field is **undefined** — the physical quantity
+does not exist, so there is no value that failed to be recorded — is dropped
+from the modelled set rather than imputed. It is dropped from **both** domains
+regardless of which domain triggered it, so the two arms carry the same
+predictors.
+
+Two candidates meet this: `CIN`, undefined where no parcel reaches a level of
+free convection, and `CBH`, undefined where there is no cloud. The modelled set
+is drawn from the remaining **18 candidates, with no imputed value anywhere in
+either table.**
+
+`CANDIDATES` is unchanged and stays at 20. §3 freezes it at the raw freeze and
+§5 requires Bab II to review every variable tested including the ones that
+fail. `CIN` and `CBH` are reviewed in Bab II and dropped in Bab VI **with this
+reason stated** — a variable dropped in silence looks buried.
+
+**Why a rule and not a judgement.** The requirement was a standardised handling
+step, either the field default or backed by a paper, applied uniformly with no
+per-feature exceptions. The field default is mean or median imputation, and it
+is wrong here on measured grounds: the null means "no convective layer", and
+the mean asserts a layer that did not exist. Rejecting a default on evidence is
+part of the justification, not a gap in it.
+
+Three alternatives were considered and set aside:
+
+*Impute at the ceiling* — `CIN` to 1000, `CBH` to maximum, on the physical
+reading that no LFC means unbounded inhibition. Defensible physically, but it
+has no citation, it is a bespoke argument constructed for these two columns,
+and it is exactly the per-feature exception the instruction forbids. It would
+also create a 46% point mass in subtropis, so nearly half of Florida would
+arrive at that qubit as one identical angle.
+
+*Missing indicator* — the literature's answer for informative missingness, and
+the conditions fit (low-dimensional, missingness allowed at deployment). Set
+aside on two grounds: two qubits of fifteen, and the measurement in the
+2026-09-14 diagnosis showing the blank is a threshold on `CAPE`, which is
+already a candidate. The indicator would largely duplicate a feature the model
+already has.
+
+*A missingness percentage threshold* — rejected because `CIN` is 46,4% in
+subtropis and 23,5% in tropis, so any threshold between those two drops it in
+one domain and keeps it in the other. Asymmetric predictors across the two arms
+would confound the comparison this thesis reports.
+
+**Cost, and it is the highest-ranked feature in one domain.** Imputed `CIN`
+ranks **1st** on mutual information in subtropis, 0,3470 against `KX`'s 0,2266.
+This decision discards it. The defence is that the rank is not established as
+new information: the blank is a `CAPE` threshold, so imputed-`CIN` may be a
+better-shaped `CAPE` rather than a distinct signal, and the screen cannot tell
+the two apart.
+
+**That defence must be tested, not asserted.** Run the leave-one-out ablation
+once on complete-case rows with `CIN` and `CBH` present, as a side measurement
+outside the main pipeline, and report what their removal cost. A stated
+limitation with a number beside it, rather than a gap.
+
+**Second cost.** Complete-case rows are not a random sample. Subtropis
+occurrence is 0,0289 over all rows and 0,0536 among complete ones, so the side
+measurement above is itself computed on a convective sub-population and must
+say so.
+
+**Reversal.** Both columns remain in `CANDIDATES` and in both built tables.
+Reversing means writing a new entry that chooses an imputation, with no rebuild.
+
+**Bab.** II (both reviewed as candidates), IV (the rule), VI (dropped, with the
+reason and the ablation's price).
+
+**Decided by.** Rafly, 2026-09-14, after rejecting Claude's impute-at-ceiling
+recommendation for failing the standardised-handling requirement.
+
+---
+
+## D-20 — Five temporal candidates, decided by ablation rather than in advance. Narrows S-3
+
+**Decided.** `selection/` builds five temporal features and all five enter the
+ablation as candidates: `hour_sin`, `hour_cos`, `doy_sin`, `doy_cos`,
+`cos_sza`. Which survive is the ablation's answer, not this entry's. They are
+built in `selection/` per D-13 and are not materialised in either table.
+
+`month_sin` and `month_cos` are excluded. Month is a coarsened day-of-year, the
+two pairs are near-collinear, and day-of-year is the form with precedent. Their
+screen ranks were close to the day-of-year pair in both domains, so nothing is
+lost by taking the citable one.
+
+**Why all five rather than a choice now.** The screen and the literature point
+different ways on one feature, and neither is strong enough to settle it.
+
+*The literature favours sine-cosine pairs.* Cyclical encoding of hour-of-day is
+the documented standard — an integer hour puts 23:00 and 00:00 23 apart, and
+the sine-cosine pair removes the discontinuity. Pacey et al. (2026) confirm it
+by ablation in a convective-occurrence model: their cosine time-of-day
+predictor was key to reproducing the diurnal cycle, while removing `CAPE` was
+not. Cosine of day-of-year has its own precedent as a seasonal predictor in
+ensemble postprocessing.
+
+*The screen favours `cos_sza`,* which ranks 5th in tropis complete-case and 8th
+in subtropis, beating `hour_sin` by twelve places in the domain whose signal is
+seasonal. That is physically coherent: solar elevation carries hour and season
+in one column, where `hour_sin` carries only hour.
+
+*But the disagreement is weaker than it looks.* **No study found `cos_sza`
+useless for lightning. None tested it.** Absence of precedent is a gap in the
+literature, not a result against the measurement. And a screen rank is a
+candidate for testing, not a finding — `lat` ranks 2nd on mutual information in
+tropis, and that is dead-cell leakage scoring well.
+
+So there is no result here that contradicts the literature yet. There is a
+hint, and §5 names the instrument for turning a hint into a result.
+
+**What each option would have cost.** `cos_sza` alone is one qubit and carries
+both cycles, but solar elevation is symmetric about solar noon and the
+lightning cycle is not — peaks run 15:00-17:00 local in both domains, two to
+three hours after peak insolation, so `cos_sza` cannot express the lag.
+`hour_sin` supplies exactly that asymmetry. Both pairs complete is four qubits,
+27% of a fifteen-qubit budget spent on time.
+
+**Cost.** Five temporal columns during the ablation against the 18 meteorological
+candidates of D-19. Temporary — only the survivors are modelled — but it
+lengthens the ablation and, if several survive, it competes directly with
+meteorology for qubits.
+
+**What Bab II owes.** A paragraph for each of the five, and the `cos_sza`
+paragraph must state that its precedent is in solar-irradiance forecasting and
+that no lightning study was located using it as a predictor. §5 requires every
+tested variable reviewed, and an unprecedented one is reviewed by saying so.
+
+**What Bab VI owes.** Which survived and what each cost. A well-supported
+feature that fails is reported as failing. `cos_sza` surviving would be a small
+original finding; `cos_sza` failing closes a gap nobody had checked.
+
+**Reversal.** Remove a name from the temporal candidate list in `selection/`.
+No rebuild, nothing materialised.
+
+**Bab.** II (five paragraphs), IV (encoding lives in `selection/`), VI (the
+ablation result).
+
+**Decided by.** Rafly, 2026-09-14, choosing to test rather than to pick.
+
+---
+
+## D-21 — The selection pipeline. Six steps, one rule each. Narrows S-9
+
+**Decided.** Selection is one fixed sequence. Every feature goes through every
+step and no feature gets an argument of its own.
+
+| | step | the rule |
+|---|---|---|
+| 1 | **Start** | `CANDIDATES`, 20, frozen at the raw freeze |
+| 2 | **Derive** | admissible derived features are added as candidates |
+| 3 | **Exclude** | two rules, below |
+| 4 | **Rank** | mRMR, per domain, on training rows only |
+| 5 | **Select** | top N, N stated once |
+| 6 | **Confirm** | leave-one-out ablation, reported in Bab VI |
+
+**Step 2 — what may be derived.** A derived feature is admissible if it is a
+function of existing columns or of a stated external source, it has a physical
+or cited motivation, and it is given a Bab II paragraph like any other
+candidate. It then enters the ranking on equal terms and gets **no protection**
+— a derived feature that ranks badly is dropped like any other.
+
+The Bab II paragraph is the brake. Under §5 every tested variable must be
+reviewed, so each derivation costs a paragraph and the list cannot inflate
+quietly. The five temporal encodings of D-20 are one instance of this step, not
+a special case.
+
+**Step 3 — two exclusion rules, applied before ranking.**
+
+*Structurally undefined* (D-19): the field has no value because the quantity
+does not exist. `CIN`, `CBH`.
+
+*Location-identifying*: a predictor that identifies **where** a row is rather
+than describing **what the weather was** is excluded. This is not a redundancy
+rule and no correlation method can find it — a cell identifier is both highly
+relevant and not redundant with anything, so mRMR would keep it.
+
+The measurement that forces this rule: `lat` contributes 0,0147 PR-AUC in the
+tropis ablation, 4th of 23, with a Spearman of -0,0446. It is not that lower
+latitudes flash more; it is that six cells never flash, and `lat` names them.
+That skill cannot transfer to Florida, and in the cross-domain arms `lat` and
+`lon` deliver **0,0000 effective resolution** — two constants occupying two
+qubits.
+
+`PS` is the ambiguous case. It ranks 2nd in the tropis ablation at 0,0244, and
+it is nearly static per cell because it is terrain, so it may be acting as a
+cell identifier by another route. But surface pressure is also a real
+meteorological variable. **Not resolved here.** It needs its own entry.
+
+**Step 4 — why mRMR rather than ranking by relevance.** Ranking on relevance
+alone tends to select redundant features, because it never considers the
+feature-to-feature relationship. That is measured here: `KX` and `TCWV` correlate
+at 0,914 in subtropis and 0,903 in tropis, and both rank in the screen's top
+five. mRMR subtracts a redundancy penalty, so once one is selected the other's
+score falls.
+
+The formulation is Peng, Long & Ding (IEEE TPAMI, 2005), maximising mean
+relevance minus mean pairwise redundancy over the selected set. Relevance by
+mutual information, redundancy by Spearman — the pairing §5 already requires,
+combined by a standard algorithm instead of read off two tables side by side.
+
+**Step 6 — why the ablation moves from selecting to confirming.**
+Leave-one-out systematically undervalues correlated features: remove one and its
+partner absorbs the job. The 2026-09-14 ablation shows this at scale — in
+subtropis the largest single contribution is 0,0098 of a 0,2912 baseline, and
+eleven of 23 features score negative. That is not 23 useless features, it is
+collinearity. So leave-one-out cannot be the selector. It remains the
+confirmation §5 asks for, and Bab VI must state this limitation rather than let
+an examiner find it.
+
+**Cost.** Step 5 needs an N that is chosen rather than derived, and mRMR gives
+no principled stopping point. Step 3's second rule is a judgement about what a
+diagnostic model may use, not a measurement, and `PS` sits on its boundary.
+
+**Reversal.** Any step is replaceable in `selection/`; nothing is materialised.
+
+**Bab.** IV (the pipeline), VI (the result and the leave-one-out limitation).
+
+**Decided by.** Rafly, 2026-09-14, requiring a standardised sequence with no
+per-feature exceptions.
+
+---
+
+## D-22 — Two feature sets, one per domain, equal width at N = 10. Closes S-10
+
+**Decided.** Each domain gets its own modelled set, selected by the D-21
+pipeline on its own training rows. The two sets are **not** constrained to
+differ or to overlap — whatever mRMR returns is what they are. On the
+2026-09-14 ordering they share ten of twelve, which is an outcome, not a rule.
+
+Both sets are **N = 10**. The same ten features feed the quantum and classical
+arms in a given domain: a QNN-against-classical gap must not be a feature-count
+gap.
+
+**Why per-domain rather than shared.** The mRMR ordering weakened D-11's
+premise considerably — most of the apparent disagreement between domains was
+the two of them selecting different members of one redundant cluster. But
+weakened is not refuted, and `KX` and `TCIW` in subtropis against `PS` and
+`cos_sza` in tropis are real differences that a shared set would suppress in
+both directions. Selecting per domain lets the pipeline answer rather than
+being told.
+
+**Why equal width.** One feature, one qubit. Sets of different size are
+circuits of different size, and a tropis-subtropis performance gap would then
+confound domain difficulty with model capacity — which is the number this
+thesis reports.
+
+**Why 10.** Three considerations, none of them a derivation.
+
+*Stability.* Across five seeds, ranks above 10 are stable at 1,00 while ranks
+11 and 12 wobble — `hour_cos` and `PRECTOTCORR` at 0,80 in subtropis, `WS2M`
+and `TCLW` at 0,80 and 0,20 in tropis. A feature that moves between seeds is a
+weak selection, and 12 would import several.
+
+*The zero crossing is not used as the rule.* mRMR scores go negative at rank 9
+subtropis and 8 tropis. That is suggestive but partly mechanical: the
+redundancy penalty is a mean over a growing set, so something goes negative
+eventually regardless. Taking 8 would read more into it than it carries.
+
+*Cost.* Statevector simulation is 2^n. Ten against the archive's fifteen is
+roughly an eighth of the state, and the parameter-shift circuit count falls
+with the parameter count too.
+
+**mRMR has no principled stopping rule.** That is a property of the method, not
+a gap in this analysis, and D-21 already records that step 5 takes a chosen
+number. Bab IV must say so plainly: N was set at 10 because ranks above it are
+seed-stable and ranks below are not, and because a larger circuit costs
+exponentially more to simulate.
+
+**Considered and dropped: pricing N by running 8, 10 and 12.** Affordable
+classically — the ablation is ridge and logistic regression, minutes per run —
+but not quantumly, where the archive's 432 runs would triple. A
+classical-only sensitivity check was then rejected on its own merits: the
+classical ladder being flat across 8 to 12 says little about whether a circuit
+is, since capacity scales differently, so it would have bought a footnote
+carrying its own caveat.
+
+**Cost.** N is the weakest link in the pipeline and stays weak. And the two
+sets differing at all means the **cross-domain arm has no defined input** — a
+tropis-trained model reads qubit 2 as `cos_sza` where subtropis has `KX`, and
+feeding one into the other is not a weak result but a meaningless one. D-11
+never resolved this and its `pooled` gesture did not either. **Left open** as
+S-11; the ten-feature intersection is the obvious candidate but it is a
+separate decision.
+
+**Reversal.** Change N or the per-domain flag in `selection/`. No rebuild.
+
+**Bab.** IV (the rule and the choice of N), VI (the two tables).
+
+**Decided by.** Rafly, 2026-09-14. Per-domain and unconstrained overlap his;
+N = 10 on Claude's recommendation.
+
+---
+
+## D-23 — `lat` and `lon` are ordinary candidates. Removes D-21 step 3's second rule. Closes S-2 in part
+
+**Decided.** The location-identifying exclusion rule is **withdrawn**. `lat`
+and `lon` go through the D-21 pipeline like every other candidate: ranked by
+mRMR, confirmed or rejected by the ablation, kept if they earn a place. Step 3
+now holds one rule only — structurally undefined columns are dropped (D-19).
+
+`PS` ceases to be an ambiguous case, because there is no longer a boundary for
+it to sit on. The `*` flag comes out of `selection/screen.py`.
+
+**Why the rule was wrong.** It rested on calling `lat`'s contribution leakage.
+It is not. Leakage is test information reaching training, and the test set here
+is **the same cells in a different year**. A model that learns from 2018-2023
+that a particular cell never flashes, and applies that to 2024, has learned a
+spatial prior — which is legitimate, and is what a diagnostic model over a
+fixed grid is entitled to do. It would be leakage only if the test cells were
+unseen, and they are not.
+
+So `lat` entering 4th in the tropis ordering on relevance 0,1174 with redundancy
+0,0286 is the method working, not failing. And the literature supports a spatial
+effect: M. Zhou et al. (2023) find latitude correlates with flash density along
+the China-Laos railway, Soriano et al. (2002) find linear correlation with both
+coordinates across Iberia, and the predecessor carried both columns.
+
+**What was actually measured, stated narrowly.** `lat` and `lon` deliver
+**0,0000 effective resolution in the cross-domain arms** — the domains do not
+overlap in either coordinate and no monotone map repairs that, so every target
+row pins to one bound. That is a transfer limitation, not a validity problem,
+and it is the kind of thing the ablation should report rather than a rule
+should pre-empt.
+
+**Why that makes the withdrawal the better position.** It converts a claim into
+a measurement. "Features that contribute within a domain and contribute nothing
+across domains" is a finding for Bab VI, and arguably a more interesting one
+than a clean result — it isolates what a transfer experiment can and cannot
+carry.
+
+**Cost.** If both are selected in both domains, the cross-domain arms spend 2
+of 10 qubits on constants: 20% of the circuit doing nothing. That is now a
+measured outcome rather than a prevented one, and it bears directly on S-11.
+Bab VI must report it.
+
+**Also simpler.** One exclusion rule instead of two, and the remaining one is
+a property of the data rather than a judgement about what a model may use.
+That is the standardisation this pipeline was rebuilt for.
+
+**Still open.** The six dead tropis cells — 368 208 rows, 20% of the domain,
+guaranteed zero. That is a question about **rows**, not features, and belongs
+to S-1.
+
+**Reversal.** Reinstate `EXCLUDE_LOCATION` in `selection/screen.py`.
+
+**Bab.** IV (one exclusion rule), VI (what the coordinates cost across domains).
+
+**Decided by.** Rafly, 2026-09-14, rejecting Claude's leakage framing.
+
+---
+
 ## Measured
 
 Findings that correct something the archive asserts, or that the thesis will
@@ -1272,6 +1624,216 @@ still if the domains need different kinds of feature).
 
 ---
 
+### 2026-09-14 — provisional screen
+
+`selection/screen.py`, 27 features per domain: the 20 candidates plus seven
+temporary temporal encodings built in memory and discarded. All `[measured]`.
+**Provisional** — the split is S-8, the `CIN`/`CBH` handling is S-4, the
+temporal features are S-3. Nothing is selected.
+
+Train 2018-2023, 2024 held out and not read. Spearman against the count on all
+training rows; normalised mutual information against occurrence on 200 000
+sampled rows, filtered for completeness before sampling.
+
+**`CIN` ranks 1st imputed and 13th complete-case, in subtropis.** MI 0,3470
+against `KX` 0,2266 — 53% ahead of the next feature — when the blanks are
+filled at the ceiling; 0,0531 when the blank rows are dropped. Same column,
+same domain, rank 1 or rank 13 depending only on whether the missingness is
+kept. Tropis: 3rd imputed (0,1205), 10th complete-case (0,0554).
+
+**The information is in the missingness, not the value.** Which also means
+imputing at the ceiling and adding a missing indicator are the same operation
+by two routes — the ranking cannot distinguish them.
+
+**Unresolved by the screen, and only the ablation can settle it.** The blank is
+a threshold on `CAPE`, so imputed-`CIN` may carry information `CAPE` lacks, or
+may simply be a better-shaped `CAPE`. `CAPE` itself ranks 6th subtropis and
+12th tropis imputed. Drop `CIN` with `CAPE` present and see what moves.
+
+**Two reading caveats.**
+
+*Complete-case ranks a sub-population, not a domain.* Subtropis occurrence rate
+is 0,0289 over all training rows but **0,0536** among complete rows — where
+`CIN` is defined, the atmosphere is convective and lightning is nearly twice as
+likely. Tropis 0,0570 against 0,0708. The complete-case block answers "among
+hours where `CIN` exists, what matters", which is a real question and not S-4's.
+
+*Do not compare MI values between the two blocks, only ranks.* Every subtropis
+imputed MI is roughly double its complete-case counterpart across all 27
+features. That is the lower occurrence rate raising normalised MI uniformly,
+not 27 features each becoming more informative.
+
+**The domains rank the meteorology very differently** (subtropis / tropis,
+imputed): `KX` 2 / 13, `TCWV` 4 / 17, `CAPE` 6 / 12, `T2M` 10 / 25, `D2M`
+14 / 26, against `TCLW` 16 / 1 and `TCIW` 3 / 2. Spearman's top three barely
+overlap. This is D-11's premise, re-measured on the current table, and much
+sharper than the void 2026-09-11 version.
+
+**The temporal split holds, and `cos_sza` outperforms expectation.**
+`hour_sin` ranks 6th tropis and 24th subtropis imputed; `month_cos` 14th tropis
+and 9th subtropis. Diurnal matters in West Java, seasonal in Florida, as the
+diagnosis predicted.
+
+But `cos_sza` ranks **5th in tropis complete-case** and 8th subtropis, above
+`hour_sin` in subtropis by twelve places. This is evidence **against** the
+2026-09-14 literature note in S-3, which found no precedent for solar zenith
+angle as a lightning predictor and concluded `cos_sza` was the weaker half of
+D-12. On this ranking it is the better temporal feature in the domain whose
+signal is seasonal — which is physically coherent, since solar elevation
+carries hour and season together where `hour_sin` carries only hour. D-12 may
+survive re-argument better than the note suggested.
+
+**`lat` ranks 2nd on MI in tropis complete-case with a Spearman of -0,0446.**
+Strongly informative, not monotone — which is the dead-cell leakage appearing
+as a good score, exactly as S-2 predicts. `PS` at 1st is terrain, and probably
+a relative of the same effect. Contrast `VIIWD`, 4th on MI in subtropis with
+Spearman 0,0202: the same high-MI, near-zero-rank signature, but physically
+sensible, since ice divergence matters in both signs. **A high MI rank is not
+a recommendation, and these two cases are why.**
+
+**S-items moved, none decided.** S-4 (both handlings priced; the `CAPE`
+confound is now the open question), S-3 (`cos_sza` strengthened, the diurnal /
+seasonal split confirmed), S-2 (leakage visible in the ranking), S-10 (the
+domains disagree sharply), S-9 (method demonstrated end to end).
+
+---
+
+### 2026-09-14 — mRMR ordering, D-21 steps 2 to 4
+
+`selection/screen.py`. 23 features per domain after step 3, five seeds, 2024
+held out. All `[measured]`. Nothing selected.
+
+**The domains agree far more than every earlier method said. Ten of the top
+twelve are shared.** Only `KX` and `TCIW` are subtropis-only; only `PS` and
+`cos_sza` are tropis-only.
+
+Every prior ranking said the opposite. The relevance-only screen had `KX` 2nd
+subtropis and 13th tropis, `TCWV` 4th and 17th. The ablation had `TCIW` 1st and
+12th, and `PS` dead in subtropis but 2nd in tropis.
+
+**The explanation is redundancy, and it matters for S-10.** `KX`, `TCWV`,
+`CAPE`, `TOTALX`, `T2M` and `D2M` all measure one warm-moist-unstable axis. The
+two domains were selecting **different members of a single redundant cluster**,
+which reads as disagreement until something penalises redundancy. mRMR takes
+one member and suppresses the rest, and most of the disagreement disappears.
+
+So D-11's premise — that the domains need different feature sets — rested on
+rankings that had not controlled for redundancy. It is substantially weaker
+now, and a single shared set is a live option for the first time.
+
+**A derived feature won, and another failed.** `cloud_water` (`TCLW` + `TCIW`)
+ranks **1st in tropis**, ahead of both parents — `TCLW` 13th, `TCIW` 17th — and
+10th in subtropis. The phase-agnostic sum beats either phase alone.
+`dewpoint_depression` **failed**: 22nd and 16th, relevance 0,017 and 0,015,
+below both parents. A physically motivated derivation that did not pay, which
+is worth reporting in Bab VI — it shows step 2 is not free.
+
+**`lat` and `lon` confirm D-21's second exclusion rule empirically.** In the
+comparison pass, `lat` enters **4th in tropis** with relevance 0,1174 and
+redundancy 0,0286: highly relevant, redundant with nothing, and therefore
+exactly what mRMR is built to select. A correlation method cannot see that the
+relevance is six dead cells being memorised. Including the pair displaces `KX`,
+`TCIW` and `TOTALX` from the tropis top twelve.
+
+**The divergence variables dominate, and the ablation had missed them.**
+`VIIWD`, `VILWD` and `VIMDF` are all top-nine in both domains. The ridge
+ablation put them 13th to 19th. This is the linear under-valuation D-21 step 6
+warns about, now measured: mutual information sees them, ridge cannot, and a
+circuit may. Bab VI should report both and the disagreement between them.
+
+**Stability across five seeds.** Most features are 1,00 — always in or always
+out. The unstable ones are `cos_sza` in subtropis (0,20), `TCLW` and `TOTALX`
+in tropis (0,20), `hour_cos` and `PRECTOTCORR` (0,80). An unstable feature is a
+weak selection and should be reported as one rather than presented as chosen.
+
+**On reading the score column.** The printed score is the greedy criterion at
+the moment of the pick, and it is **not monotone down the list**. Redundancy is
+the *mean* correlation against the chosen set, so admitting a member that is
+nearly uncorrelated with a waiting candidate lowers that candidate's average
+and raises its score. Subtropis rank 4 outscoring rank 3 is this, not an error:
+`doy_sin` was penalised against {`KX`, `VIIWD`} at step 3, then `hour_cos`
+joined at |rho| about 0,06 and pulled its mean down. Claude first reported this
+as a bug; it is a property of the mean-based formulation.
+
+**S-items moved, none decided.** S-10 (a shared set is now viable; D-11's
+premise weakened), S-2 (the leakage mechanism measured directly), S-9 (mRMR
+demonstrated end to end).
+
+---
+
+### 2026-09-14 — mRMR with multivariate redundancy, two targets, two arms
+
+Third and final form of `selection/screen.py`. All `[measured]`. Nothing
+selected. Supersedes the earlier 2026-09-14 mRMR block for every quantity it
+covers; that block used pairwise redundancy and ranked against occurrence only.
+
+**Pairwise redundancy had a hole, and it was visible in the output.** Mean
+absolute Spearman against each chosen feature cannot see dependence involving
+three or more variables. `cos_sza` is a function of day-of-year, hour and
+latitude, so its correlation with any one of them is modest and mRMR admitted
+all four as independent — four columns of time in a set of ten.
+
+Redundancy is now the **rank R-squared of the candidate regressed on the
+already-chosen set**: how much of it the set can already explain. With one
+chosen feature this is exactly rho-squared, so the pairwise form is the special
+case. Still rank-based, so still invariant to S-5 and S-6.
+
+It works. `hour_cos` redundancy is now 0,988 subtropis and 0,993 tropis — with
+`hour_sin` and `cos_sza` chosen, the set explains essentially all of it — and it
+falls to last in both domains.
+
+**Two targets are ranked, not one.** Occurrence, on all training rows; count on
+`log1p`, on flashing hours only (85 073 subtropis, 89 917 tropis). §4 names the
+target as `flash_count`, and ranking only against occurrence measures half of
+it. Count relevance is normalised by the largest value in its own ranking,
+since continuous-target MI has no entropy to divide by — **ranks are comparable,
+magnitudes are not**, and not across domains either.
+
+**Two arms are reported, and this is the finding.** `full` is all 25 candidates.
+`meteorology` removes `lat`, `lon` and the five temporal encodings: seven
+features that are known in advance for any date, forever, and that no NWP
+system would supply. §4 calls the model a diagnostic that becomes a forecast
+when driven by forecast fields; a set built largely on these is a
+**climatology**, predicting the average lightning for a place and time of year.
+Real skill, and the same answer every year regardless of the weather.
+
+**The meteorology arm recovers the instability indices completely.** Subtropis
+count goes from `lat`, `lon`, `cos_sza`, `doy_sin` to **`T2M`, `KX`, `TOTALX`,
+`WS2M`, `CRR`, `PS`**. `T2M` moves 21st to 1st, `TOTALX` 12th to 3rd. Tropis
+count: `PS`, `cloud_water`, `VIIWD`, `CRR`, `TCIW`, `WS2M`, with `CAPE` at 9th
+and 6th.
+
+So those variables were never uninformative. The calendar was explaining them
+away, correctly — `CAPE` at 15:00 in July at 28°N is largely predictable from
+15:00, July and 28°N. That is the mechanism behind every earlier ranking in
+which the meteorology sat at the bottom.
+
+**Correction: `dewpoint_depression` did not fail.** The earlier block recorded
+it 22nd and 16th and called it a derivation that did not pay. In the
+meteorology arm it is **8th in subtropis count with relevance 0,8638**, the
+second-highest raw relevance in that ranking. Both its parents are heavily
+climatological; remove the calendar and their difference becomes one of the
+strongest count predictors in Florida. The earlier reading was an artefact of
+the full arm, and the negative result recorded there should not be quoted.
+
+**The two stages diverge once climatology is gone.** In subtropis meteorology
+they agree on only **6 of 10**: occurrence wants cloud and ice (`TCIW`, `TCLW`,
+`VIIWD`), count wants temperature and instability (`T2M`, `TOTALX`,
+`dewpoint_depression`). Whether it flashes depends on whether there is a storm;
+how much depends on how strong. That is support for a two-stage model, and it
+was invisible until the calendar was removed.
+
+**Caveats.** Redundancy stays high throughout the meteorology arm — `TCWV`
+0,92, `T2M` 0,96 in tropis occurrence — because sixteen variables measure a few
+physical quantities, and no selection method removes that. Seed stability is
+worse in the count arm (several at 0,60 and 0,80): fewer rows, noisier MI.
+
+**S-items moved, none decided.** S-7 (the hurdle has measured support now),
+S-3 (`hour_cos` is redundant given `hour_sin` and `cos_sza`), S-11 (four
+candidate sets per domain, not two).
+
+---
+
 ## Open
 
 **O-1 to O-9 are superseded by the S-list below, 2026-09-14.** They are kept
@@ -1583,7 +2145,11 @@ dropped from training only, and the held-out year stays whole.
 
 ---
 
-## S-2 — `lat`, `lon`, and the six dead cells
+## S-2 — `lat`, `lon`, and the six dead cells — PART CLOSED 2026-09-14 by D-23
+
+The coordinates are ordinary candidates and that part is settled. What remains
+is the six dead tropis cells — 368 208 rows, guaranteed zero — which is a
+question about rows, not features, and moves to S-1.
 
 **Measured.** 6 of 30 tropis cells never flash in 61 368 hours — 368 208 rows,
 20% of the domain. Subtropis has none. All six sit in the two outermost
@@ -1604,7 +2170,12 @@ both and declare the effect. Replace them with a land/sea flag, which is what
 
 ---
 
-## S-3 — How to encode time
+## S-3 — How to encode time — NARROWED 2026-09-14 by D-20
+
+The candidate list is settled: `hour_sin`, `hour_cos`, `doy_sin`, `doy_cos`,
+`cos_sza`. What remains is which survive the ablation, and the unresolved
+land-sea spread in subtropis, where sixteen distinct per-cell peak hours mean
+no single temporal column serves the domain. That part is S-2's to answer.
 
 `dataset/` emits raw time only (D-13): `year`, `month_of_year`, `day_of_year`,
 `hour_of_day_utc`, `hour_of_day_local`. `selection/` builds whatever it needs.
@@ -1650,7 +2221,7 @@ committing.
 
 ---
 
-## S-4 — `CIN` and `CBH` missingness
+## S-4 — `CIN` and `CBH` missingness — CLOSED 2026-09-14 by D-19
 
 **Re-measured 2026-09-14.** `CIN` missing on 23,52% of tropis rows and 46,38%
 of subtropis; `CBH` on 1,22% and 8,44%. **The missingness is seasonal, and the
@@ -1822,7 +2393,12 @@ within the training years. What subsampling, if any, on the 94–97% zeros.
 
 ---
 
-## S-9 — Screening and ablation
+## S-9 — Screening and ablation — NARROWED 2026-09-14 by D-21
+
+The method is mRMR: relevance by mutual information, redundancy by Spearman,
+per domain, on training rows only. Leave-one-out moves from selecting to
+confirming. What remains is N (S-10) and whether `PS` falls under step 3's
+location-identifying rule.
 
 The last step, and the one that writes `features.MODELLED`.
 
@@ -1860,7 +2436,7 @@ change is wasted work.
 
 ---
 
-## S-10 — How many feature sets, and how wide
+## S-10 — How many feature sets, and how wide — CLOSED 2026-09-14 by D-22
 
 Was D-11; parked by D-17 and returned here.
 
@@ -1888,3 +2464,25 @@ not the current columns and the ranking must be retaken.
 scenario, which under D-11 took the union of the two lists truncated to N.
 
 **Blocked by.** Stage 1, then S-9.
+
+---
+
+## S-11 — What the cross-domain arm reads
+
+Opened by D-22. Two per-domain sets of equal width mean the transfer arms have
+no defined input: a tropis-trained model reads qubit 2 as `cos_sza`, and a
+subtropis feature vector has `KX` there. Feeding one into the other produces a
+meaningless number, not a weak one.
+
+**Measured.** The 2026-09-14 mRMR ordering shares ten of twelve between
+domains. `KX` and `TCIW` are subtropis-only; `PS` and `cos_sza` tropis-only.
+
+**Options.** The intersection, which on current evidence is close to ten and
+would make transfer trivial but forces N to be an output rather than a choice.
+A pooled set ranked on the combined training rows and used by every arm. Source
+features throughout, with the target domain's values read into the source's
+slots. Or train the transfer arms separately on a shared set, and report
+per-domain arms on per-domain sets.
+
+**Blocks.** Every cross-domain result. Does not block the within-domain arms,
+which can proceed on D-22's sets.
