@@ -1,0 +1,49 @@
+\begingroup
+\footnotesize
+\begin{longtable}{| p{2.3cm} | p{3.3cm} | p{1.8cm} | p{4.6cm} |}
+\caption{Kandidat variabel prediktor}
+\label{tbl:tabelKandidatVariabel} \\
+\hline
+\textbf{Kelompok} & \textbf{Variabel} & \textbf{Sumber} & \textbf{Rujukan utama} \\
+\hline
+\endfirsthead
+\hline
+\textbf{Kelompok} & \textbf{Variabel} & \textbf{Sumber} & \textbf{Rujukan utama} \\
+\hline
+\endhead
+\hline
+\endfoot
+Ketidakstabilan & CAPE & ERA5 & \cite{cheng2024MLLP, shanTBDMLI} \\
+ & CIN\textsuperscript{a} & ERA5 & \cite{sobash2025MLP, ecmwf2026era5doc} \\
+ & KX & ERA5 & \cite{fadhil2025} \\
+ & TOTALX & ERA5 & belum ada \\
+\hline
+Kelembapan & RH2M & NASA POWER & \cite{shanTBDMLI, kalashnikov2024PCG} \\
+ & D2M & ERA5 & \cite{cheng2024MLLP, sobash2025MLP} \\
+ & TCWV & ERA5 & \cite{haywardTBD, kalashnikov2024PCG} \\
+ & VIMDF & ERA5 & belum ada \\
+ & \texttt{dewpoint\_\allowbreak depression}\textsuperscript{b} & turunan & \cite{shanTBDMLI, sobash2025MLP} \\
+ & CBH\textsuperscript{a} & ERA5 & \cite{shanTBDMLI, ecmwf2015cy41r1} \\
+\hline
+Air dan es awan & TCLW & ERA5 & \cite{cheng2024MLLP, shanTBDMLI} \\
+ & TCIW & ERA5 & \cite{cheng2024MLLP, sobash2025MLP} \\
+ & \texttt{cloud\_water}\textsuperscript{b} & turunan & \cite{shanTBDMLI} \\
+ & VIIWD & ERA5 & \cite{fadhil2025} \\
+ & VILWD & ERA5 & \cite{fadhil2025} \\
+\hline
+Hujan & PRECTOTCORR & NASA POWER & \cite{cheng2024MLLP, shanTBDMLI} \\
+ & CRR & ERA5 & \cite{cheng2024MLLP, wang2023} \\
+\hline
+Permukaan & PS & NASA POWER & \cite{shanTBDMLI, sobash2025MLP} \\
+ & T2M & NASA POWER & \cite{cheng2024MLLP, sobash2025MLP} \\
+ & WS2M & NASA POWER & \cite{shanTBDMLI} \\
+\hline
+Lokasi & \texttt{lat}, \texttt{lon} & grid & \cite{sobash2025MLP, fadhil2025} \\
+\hline
+Waktu & \texttt{hour\_sin}, \texttt{hour\_cos} & turunan & \cite{sobash2025MLP, pacey2026} \\
+ & \texttt{doy\_sin}, \texttt{doy\_cos} & turunan & \cite{sobash2025MLP} \\
+ & \texttt{cos\_sza} & turunan & tanpa preseden \\
+\hline
+\multicolumn{4}{l}{\textsuperscript{a}Tidak dimodelkan karena tidak terdefinisi pada sebagian kolom. \textsuperscript{b}Variabel turunan.} \\
+\end{longtable}
+\endgroup

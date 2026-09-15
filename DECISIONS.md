@@ -1834,6 +1834,63 @@ candidate sets per domain, not two).
 
 ---
 
+### 2026-09-14 — ablation on the selected sets, and the climatology gap
+
+`selection/ablate.py`, D-21 step 6. Four sets per domain at N = 10, ridge and
+logistic regression, 2024 held out whole. All `[measured]`. **Provisional**: the
+split is S-8, the scaling S-5/S-6. Nothing selected; `modelled.json` not written.
+
+**In subtropis the meteorology arm beats the full arm.** Occurrence PR-AUC
+0,2547 against 0,2295; count R² **0,0626 against 0,0308 — double**. Removing
+`lat`, `lon` and the calendar made Florida better, and by a wide margin.
+
+Tropis runs the other way: occurrence 0,2871 full against 0,2577 meteorology
+(share 0,898), count 0,1178 against 0,0797 (share 0,676). Climatology carries
+about 10% of occurrence skill and 32% of count skill in West Java.
+
+**This is not a bug, and the framing matters.** The two arms are not one model
+with features removed — they are **two different selections of ten**. The full
+arm spends six of its ten slots on space and time; the meteorology arm spends
+all ten on weather. So in Florida, ten meteorological variables beat four
+meteorological plus six climatological ones.
+
+The correct statement is therefore **not** "removing climatology helps". It is:
+**at a fixed budget of ten, climatological features are a poor use of the budget
+in subtropis and a mildly good one in tropis.** mRMR admitted them because they
+are mutually non-redundant, not because they earn a slot — a known consequence
+of relevance-minus-redundancy scoring, which has no notion of opportunity cost.
+
+**The diurnal asymmetry is confirmed at full strength.** `hour_sin` is worth
+0,0817 of a 0,2871 tropis occurrence baseline — **28% of the model's entire
+skill in one feature** — and 0,0411 of 0,1178 on count. The largest single
+subtropis contributor is `KX` at 0,0717, and its diurnal features are worth
+about 0,02. Every earlier measurement said West Java is diurnally driven and
+Florida is not; this is the strongest form of it.
+
+**N = 10 is expensive, and D-22 did not know that.** The 23-feature ablation
+earlier the same day scored 0,2912 subtropis and 0,3855 tropis on occurrence.
+The ten-feature full arm scores 0,2295 and 0,2871. Restricting to ten costs
+roughly 0,06 and 0,10 of PR-AUC in the two domains. D-22 fixed N on seed
+stability and simulation cost without this figure in front of it. **Not
+reopened here** — recorded so the choice is revisited on evidence rather than
+inherited.
+
+**Per-feature notes.** `PS` is the largest single contributor in three of the
+four tropis sets (0,0472 and 0,0456 on occurrence, 0,0189 on meteorology
+count), which is consistent with it standing in for terrain. `VIIWD` is
+negative or near zero in six of eight sets despite ranking top-three on mutual
+information in both domains — the linear under-valuation D-21 step 6 warns
+about, and the clearest case for reading the ablation beside the screen rather
+than instead of it. `dewpoint_depression` contributes 0,0012 in subtropis
+meteorology count, small but positive, against the earlier full-arm reading
+that it failed.
+
+**S-items moved, none decided.** S-7 (the two stages are measured separately
+for the first time), S-10 (N = 10 has a measured cost now), S-11 (four candidate
+sets per domain, and the arms differ).
+
+---
+
 ## Open
 
 **O-1 to O-9 are superseded by the S-list below, 2026-09-14.** They are kept

@@ -1,0 +1,25 @@
+% VERIFIKASI: kolom "Waktu" untuk cheng2024MLLP ("agregat", bulanan--tahunan
+% menurut kalashnikov2024PCG) dan fadhil2025 ("bulanan", disimpulkan dari
+% 2.520 baris = 30 titik x 84 bulan). Cek langsung ke kedua dokumen.
+\begin{table}[h]
+\centering
+\captionsetup{justification=centering}
+\caption{\textit{Concept matrix} penelitian terdahulu}
+\label{tbl:tabelConceptMatrix}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{| p{2.3cm} | p{2.3cm} | p{1.5cm} | p{2.3cm} | p{1.8cm} | p{1.5cm} |}
+\hline
+\textbf{Studi} & \textbf{Wilayah} & \textbf{Waktu} & \textbf{Target} & \textbf{Model} & \textbf{Kuantum} \\
+\hline
+\cite{cheng2024MLLP} & AS daratan & agregat & densitas sambaran & RF, NN, CNN & Tidak \\
+\cite{shanTBDMLI} & AS (Great Plains) & per jam & kejadian petir & RF & Tidak \\
+\cite{song2023LNAI} & AS daratan & per jam & kejadian petir & LightGBM & Tidak \\
+\cite{kalashnikov2024PCG} & AS bagian barat & harian & hari petir CG & CNN & Tidak \\
+\cite{sobash2025MLP} & AS daratan & per jam & kilat CG & NN & Tidak \\
+\cite{oliveira2024QNN} & California & menit--jam & iradiasi matahari & QNN & Ya \\
+\cite{fadhil2025} & Jawa Barat, Florida & bulanan & kerapatan petir & QSVR & Ya \\
+Penelitian ini & Jawa Barat, Florida & per jam & jumlah kilat CG & QNN, klasik & Ya \\
+\hline
+\end{tabular}
+\end{table}

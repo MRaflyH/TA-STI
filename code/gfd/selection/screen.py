@@ -253,7 +253,7 @@ def rank_target(X, ranks, names, rel_fn, y, k, label, note):
         print(f"  {i:>3}  {c:<22}{st['relevance']:>11.4f}{st['redundancy']:>12.4f}"
               f"{st['score']:>10.4f}{stability[c]:>10.2f}{pos[c]:>10.1f}"
               f"{'  <' if i == k else ''}")
-    print(f"  '<' marks position {k}, the D-22 width. 'redundancy' is the share of this")
+    print(f"  '<' marks position {k}, the D-24 width. 'redundancy' is the share of this")
     print(f"  feature's rank variance the already-chosen set explains.")
 
     return {"meta": meta, "order": order, "steps": steps,
@@ -308,7 +308,7 @@ def screen_domain(domain: str, k: int) -> dict:
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description="D-21 steps 2 to 4. Nothing is selected.")
     ap.add_argument("--domain", choices=sorted(cfg.DOMAINS))
-    ap.add_argument("--n", type=int, default=10, help="width; D-22 sets it at 10")
+    ap.add_argument("--n", type=int, default=15, help="width; D-24 sets it at 15")
     ap.add_argument("--no-json", action="store_true")
     args = ap.parse_args(argv)
 

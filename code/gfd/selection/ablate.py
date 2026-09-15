@@ -1,33 +1,56 @@
-"""Leave-one-out ablation. What each feature is worth.
+"""Step 6. Leave-one-out ablation on the selected sets, and the climatology gap.
 
     python3 -m gfd.selection.ablate
-    python3 -m gfd.selection.ablate --domain tropis
+    python3 -m gfd.selection.ablate --domain tropis --n 10
 
-Fit the model on every feature, then refit 23 more times with one feature
-removed each time. The drop in skill is what that feature was worth. This is
-the strongest justification available (INSTRUCTIONS §5) and what Bab VI leads
-with.
+Three things happen here, and the third is the headline.
 
-PROVISIONAL. Two inputs are unsettled:
+**Leave-one-out.** Fit on the selected set, then refit once per feature with
+that feature removed. The drop in skill is what the feature was worth. This is
+the confirmation step of D-21, not the selector: leave-one-out systematically
+undervalues correlated features, because removing one lets its partner absorb
+the job, and the 2026-09-14 run showed that at scale. Bab VI states the
+limitation.
 
-  * the split is 2018-2023 train, 2024 test. S-8.
-  * features are standardised on training rows. S-5 and S-6 are open, and
-    ridge is scale-sensitive, so a coefficient-based method would move with
-    that choice. Leave-one-out is more stable than it looks -- each pair is
-    the same model with and without one column, scaled identically -- but a
-    feature whose verdict flips once scaling is settled is itself telling you
-    that the scaling choice matters more than assumed.
+**The climatology gap.** The `full` arm may use `lat`, `lon` and the calendar;
+the `meteorology` arm may not. Nothing in the second arm is known in advance of
+the weather, so the difference between them is how much of the model's skill is
+climatology -- the average lightning for a place and time of year -- and how
+much is the atmosphere. §4 calls the model a diagnostic that becomes a forecast
+when driven by an NWP system, and only the second arm would survive that
+substitution.
 
-The estimator is ridge, per §5, not the QNN. It is a stand-in whose job is to
-rank contributions cheaply and reproducibly. A feature that a linear model
-cannot use may still matter to a circuit, so this under-values non-monotone
-features -- which is exactly why the screen reports mutual information
-alongside, and why both go in Bab VI rather than either alone.
+Both arms are scored on the same rows with the same estimator, so the gap is a
+like-for-like comparison.
 
-Two targets are scored because they answer different questions. Occurrence is
-did it flash at all, and at 94-97% zeros that is most of the problem. Count is
-how much, on log1p, and is scored on flashing hours only -- averaged over all
-rows it would be swamped by zeros and report almost nothing.
+**The sweep over N.** The two arms are not one model with features removed --
+they are two different selections of the same width, so the comparison is only
+fair at a width where both arms can fit what they want. At N = 10 the full arm
+spends six slots on space and time and has four left for weather, which is
+why "climatology hurts" and "ten slots is too tight" produce the same
+signature. Running several widths separates them: if the gap closes as N grows,
+the budget was the constraint; if it holds, the climatological features are
+genuinely a poor use of a slot.
+
+The sweep also prices N itself. D-22 fixed N = 10 on seed stability and
+simulation cost, before the 2026-09-14 ablation showed that ten features score
+roughly 0,06 to 0,10 of PR-AUC below twenty-three. Bab IV has to defend that
+number, and it is cheaper to defend with the curve beside it.
+
+PROVISIONAL, in two ways that are open on the S-list:
+
+  * the split is 2018-2023 train, 2024 test whole and unreshaped (S-8).
+  * features are standardised on training rows (S-5, S-6). Leave-one-out is
+    more robust to this than a coefficient method -- each pair is the same
+    model with and without one column, scaled identically -- but a feature
+    whose verdict flips once scaling is settled is itself telling you the
+    scaling choice matters more than assumed.
+
+The estimator is ridge and logistic regression, not the QNN. A feature a linear
+model cannot use may still matter to a circuit, so this under-values
+non-monotone features -- `VIIWD` is the standing example, high on mutual
+information and near zero on Spearman. Read it beside the screen, not instead
+of it.
 """
 
 from __future__ import annotations
@@ -41,129 +64,171 @@ from sklearn.linear_model import Ridge, LogisticRegression
 from sklearn.metrics import average_precision_score, roc_auc_score
 
 from .. import config as cfg
-from ..dataset import features as feat
-from .screen import TEST_YEAR, temporal_candidates
+from .screen import TEST_YEAR, ARMS, build_matrix, screen_arm
 
-# D-19: structurally undefined, dropped from both domains, never imputed.
-DROPPED = ["CIN", "CBH"]
-
-# D-20: all five enter the ablation; the ablation decides which survive.
-TEMPORAL = ["hour_sin", "hour_cos", "doy_sin", "doy_cos", "cos_sza"]
-
-# Occurrence is fitted on a subsample because logistic regression on millions
-# of rows is slow and adds nothing. Training rows may be subsampled (§4); test
-# rows never are.
+# Training rows may be subsampled (§4); test rows never are.
 FIT_ROWS = 400_000
 
 
-def build(df: pd.DataFrame) -> pd.DataFrame:
-    cols = {c: df[c].to_numpy()
-            for c in feat.CANDIDATES if c in df.columns and c not in DROPPED}
-    temps = temporal_candidates(df)
-    cols.update({k: v for k, v in temps.items() if k in TEMPORAL})
-    return pd.DataFrame(cols, index=df.index)
+def fit_score(Xtr, ytr, Xte, yte, kind, seed):
+    """Standardise on training rows, fit, score on the test year.
 
-
-def score_once(Xtr, ytr_occ, ytr_cnt, Xte, yte_occ, yte_cnt, seed):
-    """Fit both heads on the given columns and score on the test year."""
+    `kind` is 'occurrence' -- logistic regression against whether the hour
+    flashed, scored by PR-AUC because positives are rare and ROC-AUC flatters
+    a rare-positive problem -- or 'count', ridge on log1p over flashing hours
+    only, scored by R-squared. Averaged over all rows the count score would be
+    swamped by zeros and report almost nothing.
+    """
     mu, sd = Xtr.mean(axis=0), Xtr.std(axis=0)
     sd = np.where(sd > 0, sd, 1.0)
     Ztr, Zte = (Xtr - mu) / sd, (Xte - mu) / sd
 
-    clf = LogisticRegression(max_iter=2000, random_state=seed)
-    clf.fit(Ztr, ytr_occ)
-    p = clf.predict_proba(Zte)[:, 1]
+    if kind == "occurrence":
+        m = LogisticRegression(max_iter=2000, random_state=seed)
+        m.fit(Ztr, (ytr > 0).astype(int))
+        p = m.predict_proba(Zte)[:, 1]
+        o = (yte > 0).astype(int)
+        return {"pr_auc": float(average_precision_score(o, p)),
+                "roc_auc": float(roc_auc_score(o, p))}
 
-    # Count head on flashing hours only, on log1p per §4.
-    m_tr, m_te = ytr_cnt > 0, yte_cnt > 0
-    reg = Ridge(alpha=1.0, random_state=seed)
-    reg.fit(Ztr[m_tr], np.log1p(ytr_cnt[m_tr]))
-    pred = reg.predict(Zte[m_te])
-    truth = np.log1p(yte_cnt[m_te])
+    tr, te = ytr > 0, yte > 0
+    m = Ridge(alpha=1.0, random_state=seed)
+    m.fit(Ztr[tr], np.log1p(ytr[tr]))
+    pred, truth = m.predict(Zte[te]), np.log1p(yte[te])
     ss_res = float(((truth - pred) ** 2).sum())
     ss_tot = float(((truth - truth.mean()) ** 2).sum())
-
-    return {
-        "pr_auc": float(average_precision_score(yte_occ, p)),
-        "roc_auc": float(roc_auc_score(yte_occ, p)),
-        "r2_count_nonzero": float(1 - ss_res / ss_tot) if ss_tot > 0 else None,
-    }
+    return {"r2": float(1 - ss_res / ss_tot) if ss_tot > 0 else None,
+            "n_scored": int(te.sum())}
 
 
-def ablate_domain(domain: str) -> dict:
+def primary(kind: str) -> str:
+    return "pr_auc" if kind == "occurrence" else "r2"
+
+
+def ablate_set(train, test, names, kind, seed):
+    """Full model, then one refit per feature with it removed."""
+    Xtr_all = build_matrix(train)[names]
+    Xte_all = build_matrix(test)[names]
+
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(len(Xtr_all), size=min(FIT_ROWS, len(Xtr_all)), replace=False)
+    A = Xtr_all.iloc[idx].to_numpy(dtype=float)
+    ytr = train[cfg.TARGET].to_numpy()[idx]
+    B = Xte_all.to_numpy(dtype=float)
+    yte = test[cfg.TARGET].to_numpy()
+
+    key = primary(kind)
+    full = fit_score(A, ytr, B, yte, kind, seed)
+    rows = {}
+    for i, n in enumerate(names):
+        keep = [j for j in range(len(names)) if j != i]
+        s = fit_score(A[:, keep], ytr, B[:, keep], yte, kind, seed)
+        rows[n] = {"without": s, "delta": full[key] - s[key]}
+    return {"full": full, "features": rows,
+            "order": sorted(rows, key=lambda n: -rows[n]["delta"])}
+
+
+def climatology_gap(out: dict, k: int) -> dict:
+    print(f"\n  --- the climatology gap, N = {k} ---")
+    print(f"  {'target':<14}{'full':>12}{'meteorology':>14}{'gap':>12}{'share':>10}")
+    gaps = {}
+    for kind in ("occurrence", "count"):
+        key = primary(kind)
+        f = out[f"full/{kind}"]["full"][key]
+        m = out[f"meteorology/{kind}"]["full"][key]
+        gaps[kind] = {"full": f, "meteorology": m, "gap": f - m,
+                      "meteorology_share": (m / f) if f else None}
+        print(f"  {kind:<14}{f:>12.4f}{m:>14.4f}{f - m:>12.4f}"
+              f"{(m / f if f else 0):>10.3f}")
+    print("  'share' is how much of the full model's skill survives when nothing known")
+    print("  in advance of the weather is allowed. Above 1 means the meteorology arm")
+    print("  scored higher, which at a tight N means the climatological features were")
+    print("  displacing better predictors rather than adding to them.")
+    return gaps
+
+
+def run_width(train, test, k: int, verbose: bool) -> dict:
+    # The selection is re-derived rather than read from a file, so the ablation
+    # can never score a set the screen did not produce (§3). Its printing is
+    # suppressed -- the screen's own command is where that output belongs.
+    import io, contextlib
+    with contextlib.redirect_stdout(io.StringIO()):
+        sel = {arm: screen_arm(train, arm, k) for arm in ARMS}
+
+    out = {}
+    for arm in ARMS:
+        for kind in ("occurrence", "count"):
+            names = sel[arm][kind]["selected"]
+            r = ablate_set(train, test, names, kind, cfg.RANDOM_SEED)
+            out[f"{arm}/{kind}"] = {"features": names, **r}
+            if not verbose:
+                continue
+            key = primary(kind)
+            print(f"\n  --- {arm} / {kind} — {len(names)} features ---")
+            print(f"  full model {key} {r['full'][key]:.4f}")
+            print(f"  {'feature':<22}{'delta ' + key:>14}{'':>6}")
+            for n in r["order"]:
+                d = r["features"][n]["delta"]
+                print(f"  {n:<22}{d:>14.5f}{'  <-' if d <= 0 else '':>6}")
+            print("  positive means the model got worse without it; '<-' means its removal")
+            print("  left the model equal or better, so it paid for no qubit.")
+
+    out["climatology_gap"] = climatology_gap(out, k)
+    return out
+
+
+def run_domain(domain: str, k: int, widths: list[int]) -> dict:
     path = cfg.processed_table(domain)
     if not path.exists():
         raise FileNotFoundError(f"{path} does not exist -- run gfd.dataset.build first.")
     df = pd.read_parquet(path)
-
-    tr_mask = df["year"] != TEST_YEAR
-    train, test = df[tr_mask], df[~tr_mask]
-    Xtr_all, Xte_all = build(train), build(test)
-    names = list(Xtr_all.columns)
-
-    rng = np.random.default_rng(cfg.RANDOM_SEED)
-    idx = rng.choice(len(Xtr_all), size=min(FIT_ROWS, len(Xtr_all)), replace=False)
-    Xtr_all = Xtr_all.iloc[idx]
-    ytr = train[cfg.TARGET].to_numpy()[idx]
-    yte = test[cfg.TARGET].to_numpy()
+    train, test = df[df["year"] != TEST_YEAR], df[df["year"] == TEST_YEAR]
 
     print(f"\n{'=' * 80}\n{domain.upper()} — {cfg.DOMAINS[domain].label}\n{'=' * 80}")
-    print(f"  train {len(Xtr_all):,} sampled from {int(tr_mask.sum()):,} rows, "
-          f"2018-{TEST_YEAR - 1}")
-    print(f"  test  {len(test):,} rows, {TEST_YEAR}, whole and unreshaped (§4)")
-    print(f"  features {len(names)} — {len(names) - len(TEMPORAL)} meteorological "
-          f"+ {len(TEMPORAL)} temporal")
-    print(f"  test zero share {float((yte == 0).mean()):.4f}, "
-          f"flashing hours {int((yte > 0).sum()):,}")
+    print(f"  train {len(train):,} rows 2018-{TEST_YEAR - 1}, "
+          f"subsampled to {min(FIT_ROWS, len(train)):,} for fitting")
+    print(f"  test  {len(test):,} rows {TEST_YEAR}, whole and unreshaped (§4); "
+          f"zero share {float((test[cfg.TARGET] == 0).mean()):.4f}")
 
-    A = Xtr_all.to_numpy(dtype=float)
-    B = Xte_all.to_numpy(dtype=float)
-    otr, ote = (ytr > 0).astype(int), (yte > 0).astype(int)
+    out = {f"N={k}": run_width(train, test, k, verbose=True)}
+    for w in widths:
+        if w != k:
+            print(f"\n  ...sweeping N = {w}")
+            out[f"N={w}"] = run_width(train, test, w, verbose=False)
 
-    full = score_once(A, otr, ytr, B, ote, yte, cfg.RANDOM_SEED)
-    print(f"\n  full model   PR-AUC {full['pr_auc']:.4f}   ROC-AUC {full['roc_auc']:.4f}"
-          f"   R2(count|flash) {full['r2_count_nonzero']:.4f}")
-
-    rows = {}
-    for i, name in enumerate(names):
-        keep = [j for j in range(len(names)) if j != i]
-        s = score_once(A[:, keep], otr, ytr, B[:, keep], ote, yte, cfg.RANDOM_SEED)
-        rows[name] = {
-            "without": s,
-            "delta_pr_auc": full["pr_auc"] - s["pr_auc"],
-            "delta_roc_auc": full["roc_auc"] - s["roc_auc"],
-            "delta_r2": (full["r2_count_nonzero"] - s["r2_count_nonzero"])
-            if full["r2_count_nonzero"] is not None else None,
-        }
-
-    order = sorted(rows, key=lambda k: -rows[k]["delta_pr_auc"])
-    print(f"\n  leave-one-out — drop in skill when the feature is removed")
-    print(f"  {'feature':<14}{'d PR-AUC':>12}{'d ROC-AUC':>12}{'d R2':>12}{'':>4}")
-    for n in order:
-        r = rows[n]
-        flag = "  <-" if r["delta_pr_auc"] <= 0 else ""
-        print(f"  {n:<14}{r['delta_pr_auc']:>12.5f}{r['delta_roc_auc']:>12.5f}"
-              f"{(r['delta_r2'] or 0):>12.5f}{flag}")
-    print("  positive means the model got worse without it. '<-' marks features whose")
-    print("  removal left occurrence skill equal or better — they paid for no qubit.")
-
-    return {"full": full, "n_features": len(names), "features": rows, "order": order}
+    print(f"\n  --- the gap across widths ---")
+    print(f"  {'N':>4}{'occ full':>11}{'occ meteo':>11}{'occ share':>11}"
+          f"{'cnt full':>11}{'cnt meteo':>11}{'cnt share':>11}")
+    for w in sorted({k, *widths}):
+        g = out[f"N={w}"]["climatology_gap"]
+        o, c = g["occurrence"], g["count"]
+        print(f"  {w:>4}{o['full']:>11.4f}{o['meteorology']:>11.4f}"
+              f"{o['meteorology_share']:>11.3f}{c['full']:>11.4f}"
+              f"{c['meteorology']:>11.4f}{c['meteorology_share']:>11.3f}")
+    print("  a share that falls toward 1 as N grows means the budget was the constraint,")
+    print("  not the climatological features. a share that holds means they are a poor")
+    print("  use of a slot at any width.")
+    return out
 
 
 def main(argv=None) -> None:
-    ap = argparse.ArgumentParser(description="Provisional leave-one-out ablation.")
-    ap.add_argument("--domain", choices=sorted(cfg.DOMAINS), help="one domain; default both")
+    ap = argparse.ArgumentParser(description="D-21 step 6, on the selected sets.")
+    ap.add_argument("--domain", choices=sorted(cfg.DOMAINS))
+    ap.add_argument("--n", type=int, default=15, help="width reported in full; D-24 sets it at 15")
+    ap.add_argument("--sweep", type=int, nargs="*", default=[8, 12, 15, 18],
+                    help="extra widths for the gap curve; the meteorology arm has 18 features")
     ap.add_argument("--no-json", action="store_true")
     args = ap.parse_args(argv)
 
     domains = [args.domain] if args.domain else sorted(cfg.DOMAINS)
-    results = {d: ablate_domain(d) for d in domains}
+    results = {d: run_domain(d, args.n, args.sweep) for d in domains}
 
     print(f"\n{'=' * 80}")
-    print("PROVISIONAL. The split is S-8 and the scaling is S-5/S-6. Ridge is a stand-in")
-    print("for the QNN and under-values non-monotone features — read beside the screen's")
-    print("mutual information, not instead of it. Nothing is selected; modelled.json is")
-    print("not written.")
+    print("PROVISIONAL. The split is S-8 and the scaling is S-5/S-6. Ridge and logistic")
+    print("regression stand in for the QNN and under-value non-monotone features, so")
+    print("read this beside the screen's mutual information. Leave-one-out confirms and")
+    print("does not select (D-21 step 6): it undervalues correlated features, because")
+    print("removing one lets its partner absorb the job. modelled.json is not written.")
 
     if not args.no_json:
         for d, r in results.items():

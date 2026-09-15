@@ -1,66 +1,10 @@
-% =====================================================================
-% daftar-pustaka.bib  --  paper/Rafly TA/  (II4092)
-%
-% Ported 10 September 2026 from paper/Rafly Final Proposal/daftar-pustaka.bib,
-% replacing the Template Baskara dummy file.
-% BibLaTeX + biber + biblatex-chicago (author-date).
-%
-% 60 entries. Every repair below was verified against a published source;
-% nothing was filled in from memory. See DECISIONS.md D-N12.
-%
-% --- Repaired: the four broken entries in components/05-paper.md 5.1 ---
-%   haywardTBD         author surnames were WRONG (Watson/Pucik/Davila ->
-%                      Whitworth/Pepin/Dorling). NHESS 20(9), 2463-2482, 2020.
-%   shanTBDMLI         author surnames were WRONG (Adams/Prein ->
-%                      Allen/Pickering; Lapierre was missing). Title was
-%                      truncated. ACP 23(22), 14547-14560, 2023.
-%   dualGOES_TBD       had no author. Rudlosky & Virts, Mon. Wea. Rev.
-%                      149(4), 979-998, 2021.
-%   schultz2021DLNWP   was mgstbd2020DLNWP. Author {M. G. S. et al.} is
-%                      Schultz et al., eight authors. YEAR WAS WRONG: 2021,
-%                      not 2020. Citekey renamed to match the corrected year.
-%
-% --- Repaired: found during the port, not in the brief ---
-%   lightningcast2022  had no author. Cintineo, Pavolonis & Sieglaff,
-%                      Wea. Forecasting 37(7), 1239-1257, 2022.
-%   nag2023LAP         DELETED. Duplicate of nag2023, which is the complete
-%                      entry. Entry count is therefore 60, not 61.
-%   silva2025          journal added: Brazilian Journal of Physics.
-%                      Volume/number not yet assigned at the time of checking.
-%                      Also on arXiv as 2509.01422.
-%   pandey2025QIML     journal added: Scientific Reports 15, art. 28443.
-%                      Author order corrected. SECOND AUTHOR IS AMBIGUOUS:
-%                      the byline reads Ravalekar, the author-contributions
-%                      paragraph of the same paper reads Rajasekar. The
-%                      byline spelling is used here.
-%   munasinghe2024     was @article; it is a CONFERENCE paper. Retyped as
-%                      @inproceedings, IEEE BigData 2024.
-%   mitarai2018QCL     journal added: Phys. Rev. A 98(3), 032309, 2018.
-%                      NOT a preprint.
-%   kyriienko2020SNDE  journal added: Phys. Rev. A 103(5), 052416.
-%                      YEAR CORRECTED to 2021; the citekey still says 2020
-%                      (the arXiv year) and was left alone.
-%   sahin2025QiskitML  is a genuine arXiv preprint (2505.17756). Journal set
-%                      to arXiv e-prints. "Code contributors" is kept as an
-%                      author because it appears on the paper's own byline.
-%
-% --- Deliberately not done ---
-%   The other 56 entries are NOT bulk-verified. Verify an entry when a
-%   chapter actually cites it. Two of the four entries flagged in the brief
-%   carried plausible but WRONG author surnames, so this file's provenance
-%   is not uniform -- see D-N12.
-%   Citekey `füllekrugey2021` contains a non-ASCII character. Left alone.
-% =====================================================================
-
 @inproceedings{denov2022,
-  author = {Bryan Denov and Syarif Hidayat and Reynaldo Zoro and Suwarno},
-  booktitle = {2022 36th International Conference On Lightning Protection (ICLP)},
-  editor = {},
-  title = {Tropical Lightning Peak Current Measurement at West Java, Indonesia},
-  year = {2022},
+  author    = {Bryan Denov and Syarif Hidayat and Reynaldo Zoro and Suwarno},
+  booktitle = {2022 36th International Conference on Lightning Protection ({ICLP})},
+  title     = {Tropical Lightning Peak Current Measurement at {West Java}, {Indonesia}},
+  year      = {2022},
   publisher = {IEEE},
-  doi = {10.1109/ICLP56858.2022.9942478},
-  url = {https://www.researchgate.net/publication/365444699},
+  doi       = {10.1109/ICLP56858.2022.9942478}
 }
 
 @article{rith2025,
@@ -75,44 +19,45 @@
 }
 
 @article{pangestu2024,
-  author = {Juliyanto Pangestu and Danial and Managam Rajagukguk},
+  author  = {Juliyanto Pangestu and Danial and Managam Rajagukguk},
   journal = {Jurnal Studi Multidisipliner},
-  number = {11},
-  title = {Penggunaan Machine Learning Untuk Estimasi Kepadatan Sambaran Petir Kota Pontianak},
-  volume = {8},
-  year = {2024},
-  month = {11},
+  number  = {11},
+  pages   = {180--204},
+  title   = {Penggunaan Machine Learning Untuk Estimasi Kepadatan Sambaran Petir Kota Pontianak},
+  volume  = {8},
+  year    = {2024},
+  month   = {11}
 }
 
 @article{nicora2024,
-  author = {Martino Nicora and Mauro Tucci and Sami Barmada and Massimo Brignone and Renato Procopio},
+  author  = {Martino Nicora and Mauro Tucci and Sami Barmada and Massimo Brignone and Renato Procopio},
   journal = {IEEE Transactions on Electromagnetic Compatibility},
-  number = {66},
-  title = {Lightning Location and Peak Current Estimation From Lightning-Induced Voltages on Transmission Lines With a Machine Learning Approach},
-  volume = {3},
-  year = {2024},
-  month = {6},
+  number  = {3},
+  pages   = {890--899},
+  title   = {Lightning Location and Peak Current Estimation From Lightning-Induced Voltages on Transmission Lines With a Machine Learning Approach},
+  volume  = {66},
+  year    = {2024},
+  month   = {6},
+  doi     = {10.1109/TEMC.2024.3375452}
 }
 
 @article{füllekrugey2021,
-  author = {Martin Füllekrug},
+  author  = {Martin Füllekrug},
   journal = {Journal of Geophysical Research: Atmospheres},
-  number = {e2020JD033201},
-  title = {Global Lightning Quanta},
-  volume = {126},
-  year = {2021},
-  month = {3},
-  doi = {10.1029/2020JD033201},
+  pages   = {e2020JD033201},
+  title   = {Global Lightning Quanta},
+  volume  = {126},
+  year    = {2021},
+  doi     = {10.1029/2020JD033201}
 }
 
-@article{silva2025,
-  author = {Maria Helóisa F. da Silva and Gleydson F. de Jesus and Christiano M. S. Nascimento and Valéria L. da Silva and Clebson S. Cruz},
-  doi = {10.1007/s13538-025-01941-4},
-  journal = {Brazilian Journal of Physics},
-  number = {},
-  title = {Exploring Quantum Machine Learning for Weather Forecasting},
-  volume = {},
-  year = {2025}
+@misc{silva2025,
+  author       = {Maria Heloísa F. da Silva and Gleydson F. de Jesus and Christiano M. S. Nascimento and Valéria L. da Silva and Clebson S. Cruz},
+  title        = {Exploring Quantum Machine Learning for Weather Forecasting},
+  howpublished = {arXiv preprint},
+  eprint       = {2509.01422},
+  eprinttype   = {arXiv},
+  year         = {2025}
 }
 
 @article{ramadan2024,
@@ -127,146 +72,149 @@
 }
 
 @article{wang2023,
-  author = {Wang, X. and Hu, K. and Wu, Y. and Zhou, W.},
+  author  = {Xupeng Wang and Keyong Hu and Yongling Wu and Wei Zhou},
   journal = {Atmosphere},
-  number = {1698},
-  title = {A Survey of Deep Learning-Based Lightning Prediction},
-  volume = {14},
-  year = {2023},
-  month = {11},
+  number  = {11},
+  pages   = {1698},
+  title   = {A Survey of Deep Learning-Based Lightning Prediction},
+  volume  = {14},
+  year    = {2023},
+  doi     = {10.3390/atmos14111698}
 }
 
 @article{denov2023,
-  author = {Bryan Denov and Syarif Hidayat and Reynaldo Zoro and Suwarno},
+  author  = {Bryan Denov and Syarif Hidayat and Suwarno and Reynaldo Zoro},
   journal = {Energies},
-  number = {6342},
-  title = {A Method to Obtain Lightning Peak Current in Indonesia},
-  volume = {16},
-  year = {2023},
-  month = {9},
+  number  = {17},
+  pages   = {6342},
+  title   = {A Method to Obtain Lightning Peak Current in {Indonesia}},
+  volume  = {16},
+  year    = {2023},
+  doi     = {10.3390/en16176342}
 }
 
 @inproceedings{habib2020,
-  author = {Abdul Hamid Al Habib and Eleazar Bangalino and Muhammad Ryan},
-  booktitle = {Seminar Nasional Sains Atmosfer (SNSA) 2020: Sinergi Nasional dalam Sains dan Teknologi Atmosfer serta Aplikasinya untuk Mendukung Pembangunan Berkelanjutan},
-  editor = {},
-  title = {Rancang Bangun Model Artificial Neural Network Untuk Prediksi Probabilistik Kejadian Thunderstorm Di Wilayah Manado},
-  year = {2020},
-  pages = {1--18},
+  author    = {Abdul Hamid {Al Habib} and Eleazar Bangalino and Muhammad Ryan},
+  booktitle = {Prosiding Seminar Nasional Sains Atmosfer ({SNSA}) 2020: Sinergi Nasional dalam Sains dan Teknologi Atmosfer serta Aplikasinya untuk Mendukung Pembangunan Berkelanjutan},
+  publisher = {Lembaga Penerbangan dan Antariksa Nasional},
+  title     = {Rancang Bangun Model Artificial Neural Network Untuk Prediksi Probabilistik Kejadian Thunderstorm Di Wilayah Manado},
+  year      = {2020},
+  pages     = {1--9}
 }
 
 @inproceedings{praja2020,
-  author = {Alfan S. Praja and Hastuadi Harsa and Erwin Eka S. Makmur and Rahayu Sapta S. Sudewi and Donaldi S. Permana},
-  booktitle = {Seminar Nasional Sains Atmosfer (SNSA) 2020: Sinergi Nasional dalam Sains dan Teknologi Atmosfer serta Aplikasinya untuk Mendukung Pembangunan Berkelanjutan},
-  editor = {},
-  title = {Performa Prediksi Curah Hujan Menggunakan Arima Musiman Pada Tiga Tipe Pola Hujan Di Indonesia},
-  year = {2020},
-  pages = {77--83},
+  author    = {Alfan S. Praja and Hastuadi Harsa and Erwin Eka S. Makmur and Rahayu Sapta S. Sudewi and Donaldi S. Permana},
+  booktitle = {Prosiding Seminar Nasional Sains Atmosfer ({SNSA}) 2020: Sinergi Nasional dalam Sains dan Teknologi Atmosfer serta Aplikasinya untuk Mendukung Pembangunan Berkelanjutan},
+  publisher = {Lembaga Penerbangan dan Antariksa Nasional},
+  title     = {Performa Prediksi Curah Hujan Menggunakan {ARIMA} Musiman Pada Tiga Tipe Pola Hujan Di Indonesia},
+  year      = {2020},
+  pages     = {77--83}
 }
 
 @phdthesis{syarifa2025,
-  author = {Syarifa Dwi Purnamasari},
-  school = {Institut Teknologi Bandung},
-  title = {Penerapan Quantum Support Vector Classifier (QSVC) Pada Klasifikasi Petir},
-  year = {2024},
-  type = {Skripsi},
+  author  = {Syarifa Dwi Purnamasari},
+  school  = {Institut Teknologi Bandung},
+  title   = {Penerapan Quantum Support Vector Classifier ({QSVC}) Pada Klasifikasi Petir},
+  year    = {2025},
+  type    = {Tugas Akhir},
+  url     = {https://scholar.itb.ac.id/thesis/penerapan-quantum-support-vector-classifier-qsvc-p_100751},
+  urldate = {2026-09-15}
 }
 
 @phdthesis{gyan2025,
   author = {Gyan Maiziko},
   school = {Institut Teknologi Bandung},
-  title = {Pengembangan Sistem Informasi Berbasis Web untuk Otomatisasi Pengukuran Arus Puncak Petir Tropis dari Data Audio Menggunakan Pemrosesan Sinyal},
-  year = {2024},
-  type = {Skripsi},
+  title  = {Pengembangan Sistem Informasi Berbasis Web untuk Otomatisasi Pengukuran Arus Puncak Petir Tropis dari Data Audio Menggunakan Pemrosesan Sinyal},
+  year   = {2025},
+  type   = {Tugas Akhir}
 }
 
 @phdthesis{fadhil2025,
   author = {Muhammad Fadhil Amri},
   school = {Institut Teknologi Bandung},
-  title = {Prediksi Kerapatan Petiru Menggunakan Quantum Support Vector Regression},
-  year = {2024},
-  type = {Skripsi},
+  title  = {Prediksi Kerapatan Petir Menggunakan Quantum Support Vector Regression},
+  year   = {2025},
+  type   = {Tugas Akhir}
 }
 
-@book{rakov2003,
-  author = {Rakov, Vladimir A. and Uman, Martin A.},
-  editor = {},
-  publisher = {Cambridge University Press},
-  title = {Lightning: Physics and Effects},
-  year = {2003}
-}
-
-@misc{ams2022,
-  author = {American Meteorology Society},
-  howpublished = {\url{https://glossary.ametsoc.org/wiki/Lightning}},
-  title = {Lightning},
-  year = {2022}
+@online{ams2022,
+  author     = {{American Meteorological Society}},
+  title      = {Lightning},
+  titleaddon = {Glossary of Meteorology},
+  year       = {2022},
+  url        = {https://glossary.ametsoc.org/wiki/Lightning},
+  urldate    = {2026-09-15}
 }
 
 @article{karta2020,
-  author = {Arif Karta dan Achmad Imam Agung dan Mahendra Widyartono},
+  author  = {Arif Karta and Achmad Imam Agung and Mahendra Widyartono and Aditya Chandra H.},
   journal = {Jurnal Teknik Elektro},
-  number = {3},
-  title = {Analisis Kebutuhan Sistem Proteksi Sambaran Petir Pada Gedung Bertingkat},
-  volume = {9},
-  year = {2020}
+  number  = {3},
+  pages   = {773--780},
+  title   = {Analisis Kebutuhan Sistem Proteksi Sambaran Petir Pada Gedung Bertingkat},
+  volume  = {9},
+  year    = {2020}
 }
 
 @article{zhou2020DLN,
-author = {Zhou, K. and Zheng, Y. and Dong, W. and Wang, T.},
-journal = {Journal of Atmospheric and Oceanic Technology},
-number = {5},
-title = {{A deep learning network for cloud-to-ground lightning nowcasting with multisource data}},
-volume = {37},
-year = {2020}
+  author  = {Kanghui Zhou and Yongguang Zheng and Wansheng Dong and Tingbo Wang},
+  journal = {Journal of Atmospheric and Oceanic Technology},
+  number  = {5},
+  pages   = {927--942},
+  title   = {A Deep Learning Network for Cloud-to-Ground Lightning Nowcasting with Multisource Data},
+  volume  = {37},
+  year    = {2020},
+  doi     = {10.1175/JTECH-D-19-0146.1}
 }
 
 @article{peterson2021LISOTD,
-author = {Peterson, Michael and Mach, Douglas and Buechler, Dennis},
-journal = {Journal of Geophysical Research: Atmospheres},
-number = {},
-title = {{A Global LIS/OTD Climatology of Lightning Flash Extent Density}},
-volume = {},
-year = {2021}
+  author  = {Michael Peterson and Douglas Mach and Dennis Buechler},
+  title   = {A Global {LIS/OTD} Climatology of Lightning Flash Extent Density},
+  journal = {Journal of Geophysical Research: Atmospheres},
+  volume  = {126},
+  pages   = {e2020JD033885},
+  year    = {2021},
+  doi     = {10.1029/2020JD033885}
 }
 
 @article{pandey2025QIML,
-author = {Pandey, Trilok Nath and Ravalekar, Vishvajeet and Nair, Sidharth D. and Pradhan, Sunil Kumar},
-doi = {10.1038/s41598-025-12515-4},
-journal = {Scientific Reports},
-number = {28443},
-title = {{A comparative analysis of classical machine learning models with quantum-inspired models for predicting world surface temperature}},
-volume = {15},
-year = {2025}
+  author  = {Trilok Nath Pandey and Vishvajeet Ravalekar and Sidharth D. Nair and Sunil Kumar Pradhan},
+  journal = {Scientific Reports},
+  pages   = {28443},
+  title   = {A comparative analysis of classical machine learning models with quantum-inspired models for predicting world surface temperature},
+  volume  = {15},
+  year    = {2025},
+  doi     = {10.1038/s41598-025-12515-4}
 }
 
 @article{haywardTBD,
-author = {Hayward, L. and Whitworth, M. and Pepin, N. and Dorling, S.},
-doi = {10.5194/nhess-20-2463-2020},
-journal = {Natural Hazards and Earth System Sciences},
-number = {9},
-pages = {2463--2482},
-title = {{Review article: A comprehensive review of datasets and methodologies employed to produce thunderstorm climatologies}},
-volume = {20},
-year = {2020}
+  author  = {Leah Hayward and Malcolm Whitworth and Nick Pepin and Steve Dorling},
+  journal = {Natural Hazards and Earth System Sciences},
+  number  = {9},
+  pages   = {2463--2482},
+  title   = {Review article: A comprehensive review of datasets and methodologies employed to produce thunderstorm climatologies},
+  volume  = {20},
+  year    = {2020},
+  doi     = {10.5194/nhess-20-2463-2020}
 }
 
 @article{vahid2024MLT,
-author = {Vahid Yousefnia, Kianusch and Bölle, Tobias and Zöbisch, Isabella and Gerz, Thomas},
-journal = {Quarterly Journal of the Royal Meteorological Society},
-number = {763},
-title = {{A machine-learning approach to thunderstorm forecasting through post-processing of simulation data}},
-volume = {150},
-year = {2024}
+  author  = {Kianusch {Vahid Yousefnia} and Tobias Bölle and Isabella Zöbisch and Thomas Gerz},
+  journal = {Quarterly Journal of the Royal Meteorological Society},
+  number  = {763},
+  pages   = {3495--3510},
+  title   = {A machine-learning approach to thunderstorm forecasting through post-processing of simulation data},
+  volume  = {150},
+  year    = {2024},
+  doi     = {10.1002/qj.4777}
 }
 
-@article{oliveira2024QNN,
-author = {Oliveira Santos, Victor and Pinto Marinho, Felipe and Costa Rocha, Paulo Alexandre and Van Griensven Th\'{e}, Jesse and Gharabaghi, Bahram},
-journal = {Energies},
-number = {14},
-title = {{Application of Quantum Neural Network for Solar Irradiance Forecasting: A Case Study Using the Folsom Dataset, California}},
-volume = {17},
-year = {2024}
+@misc{oliveira2024QNN,
+  author       = {Victor {Oliveira Santos} and Felipe {Pinto Marinho} and Paulo Alexandre {Costa Rocha} and Jesse {Van Griensven Th\'{e}} and Bahram Gharabaghi},
+  title        = {Application of Quantum Neural Network for Solar Irradiance Forecasting: A Case Study Using the Folsom Dataset, California},
+  howpublished = {Preprints.org},
+  year         = {2024},
+  doi          = {10.20944/preprints202407.0109.v1}
 }
 
 @inproceedings{munasinghe2024,
@@ -279,7 +227,7 @@ year = {2024}
 }
 
 @article{schultz2021DLNWP,
-author = {Schultz, M. G. and Betancourt, C. and Gong, B. and Kleinert, F. and Langguth, M. and Leufen, L. H. and Mozaffari, A. and Stadtler, S.},
+author = {M. G. Schultz and C. Betancourt and B. Gong and F. Kleinert and M. Langguth and L. H. Leufen and A. Mozaffari and S. Stadtler},
 doi = {10.1098/rsta.2020.0097},
 journal = {Philosophical Transactions of the Royal Society A: Mathematical, Physical and Engineering Sciences},
 number = {2194},
@@ -290,91 +238,99 @@ year = {2021}
 }
 
 @book{sutor2019DWQ,
-author = {Sutor, Robert S.},
-editor = {},
-publisher = {Packt Publishing},
-title = {{Dancing with Qubits}},
-year = {2019}
+  author    = {Robert S. Sutor},
+  title     = {Dancing with Qubits},
+  subtitle  = {How Quantum Computing Works and How It Can Change the World},
+  publisher = {Packt Publishing},
+  address   = {Birmingham},
+  year      = {2019}
 }
 
 @article{dualGOES_TBD,
-author = {Rudlosky, S. D. and Virts, K. S.},
-doi = {10.1175/MWR-D-20-0242.1},
-journal = {Monthly Weather Review},
-number = {4},
-pages = {979--998},
-title = {{Dual Geostationary Lightning Mapper Observations}},
-volume = {149},
-year = {2021}
+  author  = {Scott D. Rudlosky and Katrina S. Virts},
+  journal = {Monthly Weather Review},
+  number  = {4},
+  pages   = {979--998},
+  title   = {Dual Geostationary Lightning Mapper Observations},
+  volume  = {149},
+  year    = {2021},
+  doi     = {10.1175/MWR-D-20-0242.1}
 }
 
 @article{sobash2025MLP,
-author = {Sobash, R. A. and Ahijevych, D. and Coauthors},
-journal = {Weather and Forecasting},
-number = {},
-title = {{Evaluating Machine Learning–Based Probabilistic [Lightning]}},
-volume = {},
-year = {2025}
+  author  = {Ryan A. Sobash and David A. Ahijevych},
+  title   = {Evaluating Machine Learning–Based Probabilistic Lightning Forecasts Using the {HRRR}: A Comparison to Three Forecast Baselines},
+  journal = {Weather and Forecasting},
+  volume  = {40},
+  pages   = {759--774},
+  year    = {2025},
+  doi     = {10.1175/WAF-D-24-0140.1}
 }
 
 @article{chuang2022ISUAL,
-author = {Chuang, Chia-Wen and Chen, Alfred Bing-Chih},
-journal = {Journal of Geophysical Research: Atmospheres},
-number = {},
-title = {{Global Distribution and Spectral Features of Intense Lightning by the ISUAL Experiment}},
-volume = {},
-year = {2022}
+  author  = {Chia-Wen Chuang and Alfred Bing-Chih Chen},
+  journal = {Journal of Geophysical Research: Atmospheres},
+  pages   = {e2022JD036473},
+  title   = {Global Distribution and Spectral Features of Intense Lightning by the {ISUAL} Experiment},
+  volume  = {127},
+  year    = {2022},
+  doi     = {10.1029/2022JD036473}
 }
 
 @article{hong2025HQNN,
-author = {Hong, Y.-Y. and Santos, J.B.D.},
-journal = {Energies},
-number = {1771},
-title = {{Implementing a Hybrid Quantum Neural Network for Wind Speed Forecasting: Insights from Quantum Simulator Experiences}},
-volume = {18},
-year = {2025}
+  author  = {Ying-Yi Hong and Jay Bhie D. Santos},
+  journal = {Energies},
+  number  = {7},
+  pages   = {1771},
+  title   = {Implementing a Hybrid Quantum Neural Network for Wind Speed Forecasting: Insights from Quantum Simulator Experiences},
+  volume  = {18},
+  year    = {2025},
+  doi     = {10.3390/en18071771}
 }
 
 @article{song2023LNAI,
-author = {Song, G. and Li, S. and Jiang, X.},
-journal = {npj Climate and Atmospheric Science},
-number = {},
-title = {{Lightning nowcasting with aerosol-informed machine learning}},
-volume = {},
-year = {2023}
+  author  = {Ge Song and Siwei Li and Jia Xing},
+  title   = {Lightning nowcasting with aerosol-informed machine learning and satellite-enriched dataset},
+  journal = {npj Climate and Atmospheric Science},
+  volume  = {6},
+  pages   = {126},
+  year    = {2023},
+  doi     = {10.1038/s41612-023-00451-x}
 }
 
 @article{cheng2024MLLP,
-author = {{Cheng, W.-Y. and Kim, D. and Ham, Y.-G. and Henderson, T. E.}},
-journal = {{Artificial Intelligence for the Earth Systems}},
-number = {e230024},
-title = {{Machine Learning–Based Lightning Parameterizations for the CONUS}},
-volume = {},
-year = {2024}
+  author  = {Wei-Yi Cheng and Daehyun Kim and Scott Henderson and Yoo-Geun Ham and Jeong-Hwan Kim and Robert H. Holzworth},
+  title   = {Machine Learning–Based Lightning Parameterizations for the {CONUS}},
+  journal = {Artificial Intelligence for the Earth Systems},
+  volume  = {3},
+  pages   = {e230024},
+  year    = {2024},
+  doi     = {10.1175/AIES-D-23-0024.1}
 }
 
 @article{shanTBDMLI,
-author = {Shan, S. and Allen, D. and Li, Z. and Pickering, K. and Lapierre, J.},
-doi = {10.5194/acp-23-14547-2023},
-journal = {Atmospheric Chemistry and Physics},
-number = {22},
-pages = {14547--14560},
-title = {{Machine-learning-based investigation of the variables affecting summertime lightning occurrence over the Southern Great Plains}},
-volume = {23},
-year = {2023}
+  author  = {Siyu Shan and Dale Allen and Zhanqing Li and Kenneth Pickering and Jeff Lapierre},
+  doi     = {10.5194/acp-23-14547-2023},
+  journal = {Atmospheric Chemistry and Physics},
+  number  = {22},
+  pages   = {14547--14560},
+  title   = {Machine-learning-based investigation of the variables affecting summertime lightning occurrence over the {Southern Great Plains}},
+  volume  = {23},
+  year    = {2023}
 }
 
 @article{kalashnikov2024PCG,
-author = {{Kalashnikov, D. A. et al.}},
-journal = {Journal of Geophysical Research: Atmospheres},
-number = {},
-title = {{Predicting Cloud-To-Ground Lightning in the Western United States From the [NAM]}},
-volume = {},
-year = {2024}
+  author  = {D. A. Kalashnikov and Frances V. Davenport and Zachary M. Labe and Paul C. Loikith and John T. Abatzoglou and Deepti Singh},
+  title   = {Predicting cloud-to-ground lightning in the western {United States} from the large-scale environment using explainable neural networks},
+  journal = {Journal of Geophysical Research: Atmospheres},
+  volume  = {129},
+  pages   = {e2024JD042147},
+  year    = {2024},
+  doi     = {10.1029/2024JD042147}
 }
 
 @article{lightningcast2022,
-author = {Cintineo, J. L. and Pavolonis, M. J. and Sieglaff, J. M.},
+author = {J. L. Cintineo and M. J. Pavolonis and J. M. Sieglaff},
 doi = {10.1175/WAF-D-22-0019.1},
 journal = {Weather and Forecasting},
 number = {7},
@@ -385,7 +341,7 @@ year = {2022}
 }
 
 @article{mitarai2018QCL,
-author = {Mitarai, K. and Negoro, M. and Kitagawa, M. and Fujii, K.},
+author = {K. Mitarai and M. Negoro and M. Kitagawa and K. Fujii},
 doi = {10.1103/PhysRevA.98.032309},
 journal = {Physical Review A},
 number = {3},
@@ -396,138 +352,154 @@ year = {2018}
 }
 
 @article{palmer2023QCWC,
-author = {Palmer, T. N. and Coauthors},
-journal = {Bulletin of the American Meteorological Society},
-number = {},
-title = {{Quantum Computers for Weather and Climate Prediction}},
-volume = {},
-year = {2023}
+  author  = {F. Tennie and T. N. Palmer},
+  journal = {Bulletin of the American Meteorological Society},
+  pages   = {E488--E500},
+  title   = {Quantum Computers for Weather and Climate Prediction: The Good, the Bad, and the Noisy},
+  year    = {2023},
+  doi     = {10.1175/BAMS-D-22-0031.1}
 }
 
 @misc{javadi2024Qiskit,
-author = {Javadi-Abhari, A. and et al.},
-howpublished = {},
-title = {{Quantum computing with Qiskit}},
-year = {2024}
+  author       = {Ali Javadi-Abhari and Matthew Treinish and Kevin Krsulich and Christopher J. Wood and Jake Lishman and Julien Gacon and Simon Martiel and Paul D. Nation and Lev S. Bishop and Andrew W. Cross and Blake R. Johnson and Jay M. Gambetta},
+  title        = {Quantum computing with {Qiskit}},
+  howpublished = {arXiv preprint},
+  eprint       = {2405.08810},
+  eprinttype   = {arXiv},
+  year         = {2024}
 }
 
 @article{strata2025QMLe,
-author = {Strata, F. and Migliori, L. and Gebran, N. and Guarino, N. and Colombo, C. G. and Pezzuolo, S. and Luzietti, E.},
-journal = {Front. Quantum Sci. Technol.},
-number = {1653104},
-title = {{Quantum machine learning early opportunities for the energy industry: a scoping review}},
-volume = {4},
-year = {2025}
+  author  = {Francesco Strata and Luca Migliori and Nour Gebran and Nicolina Guarino and Giacomo Carlo Colombo and Sara Pezzuolo and Emiliano Luzietti},
+  journal = {Front. Quantum Sci. Technol.},
+  pages   = {1653104},
+  title   = {Quantum machine learning early opportunities for the energy industry: a scoping review},
+  volume  = {4},
+  year    = {2025},
+  doi     = {10.3389/frqst.2025.1653104}
 }
 
 @article{devadas2025QML,
-author = {Devadas, Raghavendra M and Sowmya, T},
-journal = {MethodsX},
-number = {103318},
-title = {{Quantum machine learning: A comprehensive review of integrating AI with quantum computing for computational advancements}},
-volume = {14},
-year = {2025}
+  author  = {Raghavendra M Devadas and Sowmya T},
+  journal = {MethodsX},
+  pages   = {103318},
+  title   = {Quantum machine learning: A comprehensive review of integrating {AI} with quantum computing for computational advancements},
+  volume  = {14},
+  year    = {2025},
+  doi     = {10.1016/j.mex.2025.103318}
 }
 
 @article{denov2025RNFPA,
-author = {Denov, Bryan and Zoro, Reynaldo},
-journal = {Energies},
-number = {4002},
-title = {{Review of NFPA 780 Standard Compliance for Improved Lightning Protection in Indonesia’s Oil and Gas Industry}},
-volume = {18},
-year = {2025}
+  author  = {Bryan Denov and Reynaldo Zoro},
+  title   = {Review of {NFPA} 780 Standard Compliance for Improved Lightning Protection in {Indonesia}'s Oil and Gas Industry},
+  journal = {Energies},
+  volume  = {18},
+  pages   = {4002},
+  year    = {2025},
+  doi     = {10.3390/en18154002}
 }
 
-@article{kyriienko2020SNDE,
-author = {Kyriienko, O. and Paine, A. E. and Elfving, V. E.},
-doi = {10.1103/PhysRevA.103.052416},
-journal = {Physical Review A},
-number = {5},
-pages = {052416},
-title = {{Solving nonlinear differential equations with differentiable quantum circuits}},
-volume = {103},
-year = {2021}
+@misc{kyriienko2020SNDE,
+  author       = {Oleksandr Kyriienko and Annie E. Paine and Vincent E. Elfving},
+  title        = {Solving nonlinear differential equations with differentiable quantum circuits},
+  howpublished = {arXiv preprint},
+  eprint       = {2011.10395},
+  eprinttype   = {arXiv},
+  year         = {2021}
 }
 
 @misc{schuld2021SQML,
-author = {Schuld, Maria},
-howpublished = {},
-title = {{Supervised quantum machine learning models are kernel methods}},
-year = {2021}
+  author       = {Maria Schuld},
+  title        = {Supervised quantum machine learning models are kernel methods},
+  howpublished = {arXiv preprint},
+  eprint       = {2101.11020},
+  eprinttype   = {arXiv},
+  year         = {2021}
 }
 
 @article{raheem2023TLPR,
-author = {Raheem, Babatunte Dauda and Ogbuju, Emeka and Oladipo, Francisca and Abiodun, Taiwo},
-journal = {Ukrainian Journal of Educational Studies and Information Technology},
-number = {4},
-title = {{Techniques for lightning prediction: A review}},
-volume = {11},
-year = {2023}
+  author  = {Babatunte Dauda Raheem and Emeka Ogbuju and Francisca Oladipo and Taiwo Abiodun},
+  journal = {Ukrainian Journal of Educational Studies and Information Technology},
+  number  = {4},
+  pages   = {227--241},
+  title   = {Techniques for lightning prediction: A review},
+  volume  = {11},
+  year    = {2023},
+  doi     = {10.32919/uesit.2023.04.01}
 }
 
 @article{abbas2021PQNN,
-author = {Abbas, A. and Sutter, D. and Zoufal, C. and Lucchi, A. and Figalli, A. and Woerner, S.},
-journal = {Nature Computational Science},
-number = {6},
-title = {{The power of quantum neural networks}},
-volume = {1},
-year = {2021}
+  author  = {Amira Abbas and David Sutter and Christa Zoufal and Aurelien Lucchi and Alessio Figalli and Stefan Woerner},
+  journal = {Nature Computational Science},
+  number  = {6},
+  pages   = {403--409},
+  title   = {The power of quantum neural networks},
+  volume  = {1},
+  year    = {2021}
 }
 
 @article{leinonen2023TNDL,
-author = {Leinonen, Jussi and Hamann, Ulrich and Sideris, Ioannis V. and Germann, Urs},
-journal = {Geophysical Research Letters},
-number = {},
-title = {{Thunderstorm Nowcasting With Deep Learning: A Multi-Hazard Data Fusion Model}},
-volume = {},
-year = {2023}
+  author  = {Jussi Leinonen and Ulrich Hamann and Ioannis V. Sideris and Urs Germann},
+  journal = {Geophysical Research Letters},
+  pages   = {e2022GL101626},
+  title   = {Thunderstorm Nowcasting With Deep Learning: A Multi-Hazard Data Fusion Model},
+  volume  = {50},
+  year    = {2023},
+  doi     = {10.1029/2022GL101626}
 }
 
 @article{beer2020TDQNN,
-author = {Beer, K. and et al.},
-journal = {Nature Communications},
-number = {},
-title = {{Training deep quantum neural networks}},
-volume = {},
-year = {2020}
+  author  = {Kerstin Beer and Dmytro Bondarenko and Terry Farrelly and Tobias J. Osborne and Robert Salzmann and Daniel Scheiermann and Ramona Wolf},
+  journal = {Nature Communications},
+  pages   = {808},
+  title   = {Training deep quantum neural networks},
+  volume  = {11},
+  year    = {2020},
+  doi     = {10.1038/s41467-020-14454-2}
 }
 
 @article{cerezo2021VQA,
-author = {Cerezo, M. and et al.},
-journal = {Nature Reviews Physics},
-number = {9},
-title = {{Variational quantum algorithms}},
-volume = {3},
-year = {2021}
+  author  = {M. Cerezo and Andrew Arrasmith and Ryan Babbush and Simon C. Benjamin and Suguru Endo and Keisuke Fujii and Jarrod R. McClean and Kosuke Mitarai and Xiao Yuan and Lukasz Cincio and Patrick J. Coles},
+  journal = {Nature Reviews Physics},
+  number  = {9},
+  pages   = {625--644},
+  title   = {Variational quantum algorithms},
+  volume  = {3},
+  year    = {2021},
+  doi     = {10.1038/s42254-021-00348-9}
 }
 
 @article{kaplan2022WWLLN,
-author = {Kaplan, J. O. and Lau, K. H.-K.},
-journal = {Earth Syst. Sci. Data},
-number = {},
-title = {{World Wide Lightning Location Network (WWLLN) Global Lightning Climatology (WGLC) and time series}},
-volume = {14},
-year = {2022}
+  author  = {Jed O. Kaplan and Katie Hong-Kiu Lau},
+  title   = {World Wide Lightning Location Network ({WWLLN}) Global Lightning Climatology ({WGLC}) and time series, 2022 update},
+  journal = {Earth System Science Data},
+  volume  = {14},
+  pages   = {5665--5670},
+  year    = {2022},
+  doi     = {10.5194/essd-14-5665-2022}
 }
 
 @article{nag2023,
-author = {Nag, Amitabh and Khounate, Hamza and Cummins, Kenneth L. and Goldberg, Dylan J. and Imam, Abdullah Y. and Plaisir, Mathieu N. and Rassoul, Hamid K.},
-journal = {Geophysical Research Letters},
-number = {e2023GL104196},
-title = {Parameters of the Lightning Attachment Processes in a Negative Cloud-To-Ground Stroke Observed on a Microsecond Timescale},
-volume = {50},
-year = {2023}
+  author  = {Amitabh Nag and Hamza Khounate and Kenneth L. Cummins and Dylan J. Goldberg and Abdullah Y. Imam and Mathieu N. Plaisir and Hamid K. Rassoul},
+  journal = {Geophysical Research Letters},
+  pages   = {e2023GL104196},
+  title   = {Parameters of the Lightning Attachment Processes in a Negative Cloud-To-Ground Stroke Observed on a Microsecond Timescale},
+  volume  = {50},
+  year    = {2023},
+  doi     = {10.1029/2023GL104196}
 }
 
 @misc{tennie2023,
-author = {Tennie, F. and Palmer, T. N.},
-howpublished = {Review Article/Manuscript (Affiliation: University of Oxford)},
-title = {Quantum Computers for Weather and Climate Prediction: The Good, the Bad and the Noisy},
-year = {2023}
+  author       = {F. Tennie and T. N. Palmer},
+  title        = {Quantum Computers for Weather and Climate Prediction: The Good, the Bad and the Noisy},
+  howpublished = {arXiv preprint},
+  eprint       = {2210.17460},
+  eprinttype   = {arXiv},
+  year         = {2022}
 }
 
 @article{makela2011,
-  author = {M{\"a}kel{\"a}, Antti and Rossi, Pekka and Schultz, David M.},
+  author = {Antti M{\"a}kel{\"a} and Pekka Rossi and David M. Schultz},
   journal = {Monthly Weather Review},
   number = {5},
   title = {The Daily Cloud-to-Ground Lightning Flash Density in the Contiguous United States and Finland},
@@ -537,127 +509,108 @@ year = {2023}
   doi = {10.1175/2010MWR3517.1}
 }
 
-@article{webster2002,
-  author = {Webster, Jane and Watson, Richard T.},
-  journal = {MIS Quarterly},
-  number = {2},
-  title = {Analyzing the Past to Prepare for the Future: Writing a Literature Review},
-  volume = {26},
-  year = {2002},
-  pages = {xiii--xxiii}
-}
-
-@article{li2025,
-author = {Zhelun Li and Koji Terashi},
-journal = {International Center for Elementary Particle Physics (ICEPP)},
-number = {},
-title = {Quantum decision trees with information entropy},
-volume = {},
-year = {2025}
+@misc{li2025,
+  author       = {Zhelun Li and Koji Terashi},
+  title        = {Quantum decision trees with information entropy},
+  howpublished = {arXiv preprint},
+  eprint       = {2502.11412},
+  eprinttype   = {arXiv},
+  year         = {2025}
 }
 
 @misc{nokhwal2023,
-author = {Sahil Nokhwal and Suman Nokhwal and Saurabh Pahune and Ankit Chaudhary},
-howpublished = {Pioneering research paper exploring synergistic fusion of classical and quantum computing paradigms within Generative Adversarial Networks (GANs)},
-title = {Quantum Generative Adversarial Networks: Bridging Classical and Quantum Realms},
-year = {2023}
+  author       = {Sahil Nokhwal and Suman Nokhwal and Saurabh Pahune and Ankit Chaudhary},
+  title        = {Quantum Generative Adversarial Networks: Bridging Classical and Quantum Realms},
+  howpublished = {arXiv preprint},
+  eprint       = {2312.09939},
+  eprinttype   = {arXiv},
+  year         = {2023}
 }
 
 @misc{basheer2024,
-author = {Afrad Basheer and A. Afham and Sandeep K. Goyal},
-howpublished = {Study presented at Centre for Quantum Software and Information, University of Technology, Sydney},
-title = {Quantum k nearest neighbors algorithm},
-year = {2024}
+  author       = {Afrad Basheer and A. Afham and Sandeep K. Goyal},
+  title        = {Quantum k nearest neighbors algorithm},
+  howpublished = {arXiv preprint},
+  eprint       = {2003.09187},
+  eprinttype   = {arXiv},
+  year         = {2021}
 }
 
 @misc{tscharke2024,
-author = {Kilian Tscharke and Maximilian Wendlinger and Sebastian Issel and Pascal Debus},
-howpublished = {Fraunhofer Institute for Applied and Integrated Security (AISEC)},
-title = {Quantum Support Vector Regression for Robust Anomaly Detection},
-year = {2024}
+  author       = {Kilian Tscharke and Maximilian Wendlinger and Sebastian Issel and Pascal Debus},
+  title        = {Anomaly Detection with Quantum {SVR} in the {NISQ} Era: Limits of Robustness to Noise and Adversarial Attacks},
+  howpublished = {arXiv preprint},
+  eprint       = {2505.01012},
+  eprinttype   = {arXiv},
+  year         = {2025}
 }
 
-@misc{beer2022,
-author = {Kerstin Beer},
-howpublished = {Dissertation, Gottfried Wilhelm Leibniz Universität Hannover},
-title = {Quantum neural networks},
-year = {2022}
+@phdthesis{beer2022,
+  author     = {Kerstin Beer},
+  title      = {Quantum neural networks},
+  school     = {Gottfried Wilhelm Leibniz Universität Hannover},
+  type       = {Dissertation},
+  year       = {2022},
+  eprint     = {2205.08154},
+  eprinttype = {arXiv}
 }
 
 @article{sahin2025QiskitML,
-author = {Sahin, M. Emre and Altamura, Edoardo and Wallis, Oscar and Wood, Stephen P. and Dekusar, Anton and Millar, Declan A. and Imamichi, Takashi and Matsuo, Atsushi and Mensa, Stefano and Code contributors},
+author = {M. Emre Sahin and Edoardo Altamura and Oscar Wallis and Stephen P. Wood and Anton Dekusar and Declan A. Millar and Takashi Imamichi and Atsushi Matsuo and Stefano Mensa and Code contributors},
 doi = {10.48550/arXiv.2505.17756},
 eprint = {2505.17756},
 eprinttype = {arXiv},
 journal = {arXiv e-prints},
-number = {},
 title = {{Qiskit Machine Learning: an open-source library for quantum machine learning tasks at scale on quantum hardware and classical simulators}},
-volume = {},
 year = {2025}
 }
 
-@inproceedings{marella2020,
-author = {Surya Teja Marella and Hemanth Sai Kumar Parisa},
-booktitle = {Selection of our books indexed in the Book Citation Index},
-editor = {},
-title = {{Introduction to Quantum Computing}},
-year = {2020}
+@misc{marella2020,
+  author       = {Surya Teja Marella and Hemanth Sai Kumar Parisa},
+  title        = {Introduction to Quantum Computing},
+  howpublished = {IntechOpen},
+  year         = {2020},
+  doi          = {10.5772/intechopen.94103}
 }
 
 @article{romps2018CAPEP,
-author = {{Romps, David M. and Charn, Alexander B. and Holzworth, Robert H. and Lawrence, William E. and Molinari, John and Vollaro, David}},
-journal = {{Geophysical Research Letters}},
-number = {{22}},
-pages = {{12623--12630}},
-title = {{CAPE Times P Explains Lightning Over Land But Not the Land--Ocean Contrast}},
-volume = {{45}},
-doi = {{10.1029/2018GL080267}},
+author = {David M. Romps and Alexander B. Charn and Robert H. Holzworth and William E. Lawrence and John Molinari and David Vollaro},
+journal = {Geophysical Research Letters},
+number = {22},
+pages = {12623--12630},
+title = {{CAPE} Times {P} Explains Lightning Over Land But Not the Land--Ocean Contrast},
+volume = {45},
+doi = {10.1029/2018GL080267},
 year = {2018}
 }
 
-@article{song2024ILFF,
-author = {{Song, Sida and Zhou, Xiao and Yuan, Shangbo and Cheng, Pengle and Liu, Xiaodong}},
-journal = {{Journal of Atmospheric and Solar-Terrestrial Physics}},
-title = {{Interpretable artificial intelligence models for predicting lightning prone to inducing forest fires}},
-volume = {{}},
-year = {2024}
-}
-
-@article{saha2025BLM,
-author = {{Saha, Kumarjit and Bisht, Deepak Singh and Ashrit, R.}},
-journal = {{Journal of Atmospheric and Solar-Terrestrial Physics}},
-title = {{Prediction of lightning events over Bangladesh: A machine learning perspective}},
-volume = {{268}},
-year = {2025}
-}
-
 @article{lopez2016LPECMWF,
-author = {{Lopez, Philippe}},
-journal = {{Monthly Weather Review}},
-number = {{9}},
-pages = {{3057--3075}},
-title = {{A Lightning Parameterization for the ECMWF Integrated Forecasting System}},
-volume = {{144}},
-doi = {{10.1175/MWR-D-16-0026.1}},
+author = {Philippe Lopez},
+journal = {Monthly Weather Review},
+number = {9},
+pages = {3057--3075},
+title = {A Lightning Parameterization for the {ECMWF} Integrated Forecasting System},
+volume = {144},
+doi = {10.1175/MWR-D-16-0026.1},
 year = {2016}
 }
 
 @article{morgenstern2022DLWS,
-author = {{Morgenstern, Deborah and Stucke, Isabell and Simon, Thorsten and Mayr, Georg J. and Zeileis, Achim}},
-journal = {{Weather and Climate Dynamics}},
-pages = {{361--375}},
-title = {{Differentiating lightning in winter and summer with characteristics of the wind field and mass field}},
-volume = {{3}},
-doi = {{10.5194/wcd-3-361-2022}},
+author = {Deborah Morgenstern and Isabell Stucke and Thorsten Simon and Georg J. Mayr and Achim Zeileis},
+journal = {Weather and Climate Dynamics},
+pages = {361--375},
+title = {Differentiating lightning in winter and summer with characteristics of the wind field and mass field},
+volume = {3},
+doi = {10.5194/wcd-3-361-2022},
 year = {2022}
 }
 
 @inproceedings{gow2021ELSF,
-author = {{Gow, Daniel and Lerat, Julien and Warren, Rob and Blockley, Ivor}},
-booktitle = {{Proceedings of the 24th International Congress on Modelling and Simulation (MODSIM2021)}},
-address = {{Sydney, NSW, Australia}},
-pages = {{651--657}},
-title = {{Enhancement of lightning strike forecasts using a machine learning approach}},
+author = {Daniel Gow and Julien Lerat and Rob Warren and Ivor Blockley},
+booktitle = {Proceedings of the 24th International Congress on Modelling and Simulation ({MODSIM2021})},
+address = {Sydney, NSW, Australia},
+pages = {651--657},
+title = {Enhancement of lightning strike forecasts using a machine learning approach},
 year = {2021}
 }
 
@@ -671,18 +624,67 @@ year = {2021}
   urldate   = {2026-09-10}
 }
  
-@misc{nasapower,
+@online{nasapower,
   author  = {{NASA Langley Research Center}},
-  title   = {{NASA POWER} Data Access Viewer},
+  title   = {{NASA} Prediction of Worldwide Energy Resources ({POWER}) Data Access Viewer},
   year    = {2026},
   url     = {https://power.larc.nasa.gov/data-access-viewer},
   urldate = {2026-09-10}
 }
 
-@misc{ksc2026merlin,
+@online{ksc2026merlin,
   author  = {{NASA Kennedy Space Center}},
   title   = {{Merlin} Cloud to Ground Lightning System ({MERLIN C-G}) Archive},
   year    = {2026},
   url     = {https://kscweather.ksc.nasa.gov/wxarchive/MerlinCloudToGround},
   urldate = {2026-09-10}
+}
+
+@article{hersbach2020era5,
+  author  = {Hans Hersbach and Bill Bell and Paul Berrisford and Shoji Hirahara and Andr{\'a}s Hor{\'a}nyi and Joaqu{\'i}n Mu{\~n}oz-Sabater and Julien Nicolas and Carole Peubey and Raluca Radu and Dinand Schepers and Adrian Simmons and Cornel Soci and others},
+  title   = {The {ERA5} global reanalysis},
+  journal = {Quarterly Journal of the Royal Meteorological Society},
+  volume  = {146},
+  number  = {730},
+  pages   = {1999--2049},
+  year    = {2020},
+  doi     = {10.1002/qj.3803}
+}
+
+@online{ecmwf2026era5doc,
+  author  = {{ECMWF}},
+  title   = {{ERA5}: data documentation},
+  url     = {https://confluence.ecmwf.int/display/CKB/ERA5%3A+data+documentation},
+  urldate = {2026-09-15},
+  year    = {2026}
+}
+
+@online{ecmwf2015cy41r1,
+  author  = {{ECMWF}},
+  title   = {Cycle 41r1: detailed description of the upgrade},
+  url     = {https://www.ecmwf.int/en/forecasts/documentation-and-support/changes-ecmwf-model/cycle-41r1},
+  urldate = {2026-09-15},
+  year    = {2015}
+}
+
+@misc{pacey2026,
+  author       = {George Pacey and Stephan Pfahl and Lisa Schielicke},
+  title        = {Modelling convective cell occurrence in proximity to cold fronts using extreme gradient boosting},
+  howpublished = {arXiv preprint},
+  eprint       = {2606.26699},
+  eprinttype   = {arXiv},
+  year         = {2026}
+}
+% CATATAN: PDF artikel ini tidak dimiliki (tidak tersedia gratis). Rujukan
+% dipertahankan karena artikel ini merupakan sumber asal metode concept matrix
+% yang dirujuk oleh banyak artikel lain. Klaim yang memakainya di Bab II hanya
+% menyebut penggunaan concept matrix, bukan isi rinci artikel.
+@article{webster2002,
+  author  = {Jane Webster and Richard T. Watson},
+  journal = {MIS Quarterly},
+  number  = {2},
+  title   = {Analyzing the Past to Prepare for the Future: Writing a Literature Review},
+  volume  = {26},
+  year    = {2002},
+  pages   = {xiii--xxiii}
 }
