@@ -8,10 +8,10 @@ allowed to put a predictor against the target to find out. It still only
 measures: nothing here is fitted, filtered or imputed, and no handling follows
 from it automatically.
 
-Four concerns, one per section. The cross-domain section (3) would normally
-wait on the scaler choice, which has not been made; it breaks the circularity
-by measuring **both** candidate maps side by side, so it compares two options
-rather than describing one. Nothing in it presupposes which is chosen.
+Four concerns, one per section. Section 3 would normally wait on the scaler
+choice, which has not been made; it breaks the circularity by measuring **all
+three** candidate maps side by side, so it compares options rather than
+describing one. Nothing in it presupposes which is chosen.
 
 Note on the target. Stage 1's rule is that it never puts a predictor against
 the target, which is what lets it run on the whole table safely. Stage 2 breaks
@@ -31,6 +31,7 @@ import pandas as pd
 
 from .. import config as cfg
 from ..dataset import features as feat
+from .prepare import with_derived
 
 # --------------------------------------------------------------------------
 # 1. Missingness — what the blank means
@@ -336,85 +337,125 @@ def diagnose_zeros(df: pd.DataFrame) -> dict:
 
 
 # --------------------------------------------------------------------------
-# 3. Cross-domain — what each candidate map costs the other domain
+# 3. Which map turns a value into an angle
 # --------------------------------------------------------------------------
-# Two maps are compared, source-fitted and applied to the target domain, which
-# is what the transfer arms do and what O-3 is about.
+# Three candidate maps, compared on the same rows. All are fitted on the source
+# domain only, which is what the transfer arms do and what S-6 is about.
 #
-#   min-max + clip  two fitted parameters, both single extreme observations.
-#                   Anything outside the source range collapses onto a bound.
-#   arctan(x / s)   monotone and bounded, so nothing collapses. Needs a scale
-#                   s, and s is the whole design question.
+#   minmax      the standard recommendation. Two fitted parameters, and both
+#               are single extreme observations -- `CAPE` 22 396 is one row out
+#               of 3,4 million and it sets the denominator for all of them.
+#   quantile    the same map fitted on p1 and p99 instead, then clipped. One
+#               rule, applied uniformly, and a quantile estimated from millions
+#               of rows is a stable statistic where a maximum is an accident.
+#   arctan      monotone and bounded, so nothing collapses onto a bound. Needs
+#               a scale s, taken here as the source interquartile range --
+#               a fitted quantity, so this measures whether bounding helps, not
+#               whether a parameter-free version would.
 #
-# s is taken here as the SOURCE interquartile range. That is a fitted scale,
-# and it is used only to make the comparison concrete -- a real deployment
-# would use a stated physical constant, which is the point of the option. The
-# comparison is fair because both maps are fitted on the source alone.
+# A variable with a definitional bound uses that bound instead of any fitted
+# one, under every map. `RH2M` is the only candidate that has one.
 #
 # The quantity reported is effective resolution: the share of the output range
-# the target domain's middle 50% occupies. A feature that arrives at the
-# circuit spread over 2% of the dial is close to a constant no matter which map
-# produced it.
+# a domain's middle 50% occupies. A feature arriving at the circuit spread over
+# 2% of the dial is close to a constant whatever produced it. Reported both
+# within domain and across, because most arms are within-domain and the
+# compression problem exists there too.
 
-def _minmax_clip(x: np.ndarray, lo: float, hi: float) -> np.ndarray:
+PHYSICAL_BOUNDS = {"RH2M": (0.0, 100.0)}
+
+
+def _minmax(x, lo, hi):
     if hi <= lo:
         return np.zeros_like(x)
     return np.clip((x - lo) / (hi - lo), 0.0, 1.0)
 
 
-def _arctan(x: np.ndarray, centre: float, s: float) -> np.ndarray:
+def _arctan(x, centre, s):
     if s <= 0:
         return np.full_like(x, 0.5)
     return np.arctan((x - centre) / s) / np.pi + 0.5
 
 
-def cross_domain(frames: dict[str, pd.DataFrame], candidates: list[str]) -> dict:
+def _maps(src: np.ndarray, col: str):
+    """Fit all three on the source. Returns name -> callable."""
+    lo_p, hi_p = PHYSICAL_BOUNDS.get(col, (None, None))
+    lo_x, hi_x = (lo_p, hi_p) if lo_p is not None else (float(src.min()), float(src.max()))
+    q1, q99 = np.quantile(src, [0.01, 0.99])
+    lo_q, hi_q = (lo_p, hi_p) if lo_p is not None else (float(q1), float(q99))
+    med = float(np.median(src))
+    iqr = float(np.quantile(src, 0.75) - np.quantile(src, 0.25))
+    return {
+        "minmax": lambda v: _minmax(v, lo_x, hi_x),
+        "quantile": lambda v: _minmax(v, lo_q, hi_q),
+        "arctan": lambda v: _arctan(v, med, iqr),
+    }, {"physical": lo_p is not None, "extremes": [lo_x, hi_x],
+        "quantiles": [lo_q, hi_q], "centre": med, "iqr": iqr}
+
+
+def _resolution(y: np.ndarray) -> tuple[float, float]:
+    """IQR share of the output range, and the share pinned at an extreme."""
+    q1, q3 = np.quantile(y, [0.25, 0.75])
+    pinned = float(((y <= 1e-12) | (y >= 1.0 - 1e-12)).mean())
+    return float(q3 - q1), pinned
+
+
+def encoding_maps(frames: dict[str, pd.DataFrame], candidates: list[str]) -> dict:
     names = sorted(frames)
-    if len(names) < 2:
-        return {}
     out = {}
-    for src, tgt in ((names[0], names[1]), (names[1], names[0])):
-        a, b = frames[src], frames[tgt]
-        arm = {}
+
+    print(f"\n{'=' * 90}\nENCODING MAPS — effective resolution, three candidates (S-6)\n{'=' * 90}")
+
+    for src in names:
+        a = frames[src]
+        others = [d for d in names if d != src]
+        print(f"\n  fitted on {src}")
+        print(f"  {'column':<14}{'within: mm':>12}{'qt':>9}{'at':>9}"
+              + "".join(f"{tgt[:5] + ': mm':>12}{'qt':>9}{'at':>9}" for tgt in others))
         for c in candidates:
             xa = a[c].dropna().to_numpy()
-            xb = b[c].dropna().to_numpy()
-            if not len(xa) or not len(xb):
+            if not len(xa):
                 continue
-            lo, hi = float(xa.min()), float(xa.max())
-            q1, q3 = np.quantile(xa, [0.25, 0.75])
-            centre, s = float(np.median(xa)), float(q3 - q1)
+            fns, fit = _maps(xa, c)
+            row = {"fit": fit, "within": {}, "cross": {}}
+            for m, fn in fns.items():
+                r, p = _resolution(fn(xa))
+                row["within"][m] = {"iqr_share": r, "pinned": p}
+            line = f"  {c:<14}" + "".join(
+                f"{row['within'][m]['iqr_share']:>12.4f}" if m == "minmax"
+                else f"{row['within'][m]['iqr_share']:>9.4f}"
+                for m in ("minmax", "quantile", "arctan"))
+            for tgt in others:
+                xb = frames[tgt][c].dropna().to_numpy()
+                row["cross"][tgt] = {}
+                for m, fn in fns.items():
+                    r, p = _resolution(fn(xb))
+                    row["cross"][tgt][m] = {"iqr_share": r, "pinned": p}
+                line += "".join(
+                    f"{row['cross'][tgt][m]['iqr_share']:>12.4f}" if m == "minmax"
+                    else f"{row['cross'][tgt][m]['iqr_share']:>9.4f}"
+                    for m in ("minmax", "quantile", "arctan"))
+            print(line)
+            out[f"{src}/{c}"] = row
+        print("  mm = min-max on extremes, qt = min-max on p1/p99 then clip, at = arctan(x/IQR).")
+        print("  each number is the share of the output range that domain's middle 50% occupies.")
+        print("  higher is better; RH2M uses its definitional bound under all three.")
 
-            mm = _minmax_clip(xb, lo, hi)
-            at = _arctan(xb, centre, s)
-            mm_q = np.quantile(mm, [0.25, 0.75])
-            at_q = np.quantile(at, [0.25, 0.75])
-            arm[c] = {
-                "source_range": [lo, hi],
-                "target_outside_source_range": float(((xb < lo) | (xb > hi)).mean()),
-                "minmax": {
-                    "saturated_at_a_bound": float(((mm <= 0.0) | (mm >= 1.0)).mean()),
-                    "iqr_share_of_output": float(mm_q[1] - mm_q[0]),
-                },
-                "arctan": {
-                    "scale_s_source_iqr": s,
-                    "in_extreme_1pct_of_output": float(((at < 0.01) | (at > 0.99)).mean()),
-                    "iqr_share_of_output": float(at_q[1] - at_q[0]),
-                },
-            }
-        out[f"{src}_to_{tgt}"] = arm
-
-        print(f"\n[3] cross-domain — scaler fitted on {src}, applied to {tgt}")
-        print(f"  {'column':<14}{'outside':>9}{'mm sat':>9}{'mm iqr':>9}{'at ext':>9}{'at iqr':>9}")
-        for c, d in arm.items():
-            print(f"  {c:<14}{d['target_outside_source_range']:>9.4f}"
-                  f"{d['minmax']['saturated_at_a_bound']:>9.4f}"
-                  f"{d['minmax']['iqr_share_of_output']:>9.4f}"
-                  f"{d['arctan']['in_extreme_1pct_of_output']:>9.4f}"
-                  f"{d['arctan']['iqr_share_of_output']:>9.4f}")
-        print("  'outside' is the share of target rows beyond the source's range.")
-        print("  'sat'/'ext' are shares pinned at an output extreme; 'iqr' is the share of")
-        print("  the output range the target's middle 50% occupies. Higher iqr is better.")
+    # A summary is what the decision turns on, so it prints rather than needing
+    # the JSON to be read.
+    print(f"\n  --- mean resolution over all candidates ---")
+    print(f"  {'':<14}{'minmax':>12}{'quantile':>12}{'arctan':>12}")
+    for scope in ("within", "cross"):
+        vals = {m: [] for m in ("minmax", "quantile", "arctan")}
+        for k, row in out.items():
+            for m in vals:
+                if scope == "within":
+                    vals[m].append(row["within"][m]["iqr_share"])
+                else:
+                    for tgt in row["cross"]:
+                        vals[m].append(row["cross"][tgt][m]["iqr_share"])
+        print(f"  {scope:<14}" + "".join(f"{np.mean(vals[m]):>12.4f}"
+                                         for m in ("minmax", "quantile", "arctan")))
     return out
 
 
@@ -536,8 +577,15 @@ def main(argv=None) -> None:
     frames = {d: load(d) for d in domains}
     results = {d: diagnose_domain(d, frames[d]) for d in domains}
 
-    cands = [c for c in feat.CANDIDATES if c in frames[domains[0]].columns]
-    cross = cross_domain(frames, cands) if len(domains) > 1 else {}
+    # Derived features are scaled and encoded like any other, so they belong in
+    # this comparison. `cos_sza` in particular: D-27 excluded `lat` and `lon`
+    # from the shared transfer set for carrying no cross-domain information,
+    # and `cos_sza` is computed from latitude. Whether it inherits that was
+    # left unmeasured by D-27 and is answered here.
+    frames = {d: with_derived(f).assign(**{c: f[c] for c in ("lat", "lon")})
+              for d, f in frames.items()}
+    cands = list(frames[domains[0]].columns)
+    cross = encoding_maps(frames, cands) if len(domains) > 1 else {}
 
     if not args.no_json:
         for d, r in results.items():
@@ -545,7 +593,7 @@ def main(argv=None) -> None:
             p.write_text(json.dumps(r, indent=2), encoding="utf-8")
             print(f"\n[write] {p}")
         if cross:
-            p = cfg.PROCESSED_DIR / "diagnosis_cross_domain.json"
+            p = cfg.PROCESSED_DIR / "diagnosis_encoding_maps.json"
             p.write_text(json.dumps(cross, indent=2), encoding="utf-8")
             print(f"[write] {p}")
 

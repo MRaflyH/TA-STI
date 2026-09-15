@@ -1388,6 +1388,237 @@ shared-set baselines and not against the per-domain models).
 
 ---
 
+## D-28 — Two scaling classes: physical bounds, else `arctan(x / IQR)`. Closes S-6
+
+**Decided.** Every predictor is scaled by one of two rules, and which rule
+applies is a property of the variable rather than a judgement.
+
+*A variable with a definitional bound* is scaled by that bound. `RH2M` is
+[0, 100] by definition; the cyclic temporal encodings are [-1, 1] by
+construction. No fitted parameter, and the same map in every domain and every
+future domain.
+
+*Everything else* goes through `arctan((x - median) / IQR)`, with the median
+and IQR fitted on **training rows only**, then mapped onto the rotation range.
+
+`selection/prepare.py` declares this; `training/` fits and applies it per fold
+(D-18).
+
+**Why bounded rather than min-max.** The measured cross-domain resolution is
+0,0959 for min-max on extremes, 0,1846 for min-max on p1/p99, and 0,2390 for
+`arctan`. But resolution is not the deciding argument — this is:
+
+*Nothing clips.* Under any min-max rule, every value above the upper bound
+becomes the same number. `arctan` is monotone on the whole real line, so an
+unseen `CAPE` of 30 000 still maps above 22 396 — compressed, but ordered and
+distinguishable. That is the property Rafly's Jawa Tengah question asked for,
+and it survives even though the scale here is fitted: a wrong scale compresses,
+a wrong bound erases.
+
+*This project has a variable that matters above a threshold.* `VIIWD` ranks
+top-three on mutual information in both domains with a Spearman near zero —
+informative, non-monotone, with the signal in the tail. Clipping that tail
+destroys the part that carries it. `VILWD` and `VIMDF` are weaker instances.
+
+**The two-class split is the literature's, not an invention.** Quantum
+reinforcement-learning encodings separate finite-range state variables, scaled
+by their known bounds, from infinite-range ones passed through `arctan` onto a
+finite interval before scaling (Kölle et al., arXiv:2401.07043). Lockwood & Si
+(arXiv:2008.07524) state the trade-off directly: scaled encoding preserves
+magnitude but requires bounded inputs. `arctan` as a phase map is a named
+encoding variant rather than an improvisation. Peer-review status unverified.
+
+**What was rejected, and why the reasoning changed twice.**
+
+*min-max on extremes* — the standard recommendation, and the worst measured
+option. Two fitted parameters, each a single observation: `CAPE` 22 396 is one
+row of 3,4 million and it sets the denominator for all of them.
+
+*min-max on p1/p99* — recommended by Claude, then withdrawn. It is a documented
+default, it is one uniform rule, and it recovers roughly two thirds of the
+available resolution. The withdrawal rests on two corrections Claude made to
+its own argument: the "twenty scale constants" objection was aimed at a
+physical-constant variant that was never tested, where `arctan(x/IQR)` is one
+uniform rule; and the artefact critique applies only to the within-domain
+column, not to the cross-domain one that actually distinguishes the options.
+It remains a defensible choice and Bab IV should say it was considered.
+
+**Costs, stated.**
+
+*The scale is fitted, so this is not parameter-free.* A third domain gets
+compressed rather than clipped, which is better but not free. The
+physical-constant version — `arctan(x/s)` with `s` chosen per variable from
+domain knowledge — would be parameter-free and was rejected as twenty
+judgements to defend individually.
+
+*`arctan` is non-linear inside the bulk*, so it distorts spacing where a
+min-max rule preserves it. Whether that costs anything is untested.
+
+*It does nothing about point masses.* `CRR` holds one value on 60,5% of
+subtropis rows before and after. S-5 owes that a separate answer, and no
+monotone map is it.
+
+*The within-domain resolution figures for `arctan` are not comparable* to the
+other two maps and must not be quoted — see the Measured block.
+
+**Reversal.** One function in `selection/prepare.py`. Nothing is materialised
+and no table changes.
+
+**Bab.** IV (the two classes and the encoding requirement), VI (what the choice
+cost, if the ablation is rerun under it).
+
+**Decided by.** Rafly, 2026-09-14, on Claude's recommendation after Claude
+reversed it once.
+
+---
+
+## D-29 — No transform beyond D-28's scaling. The point masses stand. Closes S-5
+
+**Decided.** No skew transform is applied. Predictors are scaled as D-28 says —
+physical bound where one exists, `arctan((x - median) / IQR)` otherwise — and
+nothing else. The large point masses at zero are left intact and declared.
+
+**Why the skew half of this question is already answered.** S-5 began as
+"transform skew before scaling", on the measurement that most predictors
+squash badly under plain min-max. `arctan` is a bounded monotone map that
+handles a heavy tail without a separate transform, so under D-28 the tail
+problem does not arise. Adding Yeo-Johnson or a log on top would be a second
+transform solving a problem the first one already solved, and Yeo-Johnson fits
+its lambda from data, which would reintroduce a fitted parameter D-28 was
+chosen partly to avoid.
+
+**What is left is the point masses, and no monotone map touches them.** Share
+held by the single most frequent value (subtropis / tropis): `CRR` **0,605 /
+0,393** — its subtropis median *is* zero — `TCIW` 0,269 / 0,097,
+`PRECTOTCORR` 0,222 / 0,066, `CAPE` 0,180 / 0,038, `TCLW` 0,058 / 0,002. So
+60,5% of Florida rows send `CRR` to the circuit as one identical angle.
+
+**Why nothing is the right answer.**
+
+*The mass is a property of the atmosphere, not an artefact.* All five variables
+mean the same thing at zero: the process was absent. No convective rain, no
+cloud ice, no instability. A model that maps identical physical states to
+identical angles is correct. Engineering the mass away would manufacture
+structure that is not there — the same objection §4 makes about filling zeros
+from other metrics.
+
+*Zero already is the indicator.* A binary "is it zero" column would spend a
+qubit restating what the value carries. That is the objection D-19 made against
+a missingness indicator for `CIN`, and it applies unchanged.
+
+*`CRR` earns its place with the mass present.* It ranks 10th and 11th in three
+of the four selected sets, measured under mRMR, which penalises redundancy and
+had every opportunity to demote it.
+
+**A quantile transform is specifically wrong here**, not merely unnecessary: it
+would spread 2,08 million tied subtropis zeros across the output range on
+tie-breaking alone, inventing an ordering among rows that are physically
+identical.
+
+**Considered and not run: a zero-indicator on `CRR` as a test.** Rejected
+because it would not settle the question. The worry is that a *shallow circuit*
+may not learn a zero-versus-non-zero split from an angle sitting at the
+boundary, the way a tree learns it from a threshold. The available ablation is
+ridge and logistic regression, which are linear, so the test would answer an
+adjacent question and cost a round trip.
+
+**Cost, and it is the honest weakness of this entry.** That circuit-behaviour
+worry is untested and stays untested. If the QNN underperforms the classical
+ladder specifically on the domain with the larger masses, this is the first
+thing to look at — subtropis carries 0,605 against tropis's 0,393 on `CRR`, and
+larger masses on all five variables.
+
+Bab IV states the masses as a property of the data with this caveat attached,
+rather than reporting a clean pipeline and leaving an examiner to find them.
+
+**Reversal.** Add a transform or an indicator in `selection/prepare.py`. No
+rebuild, nothing materialised.
+
+**Bab.** III (the masses, measured), IV (the decision and the caveat), VI (if
+the QNN-classical gap differs by domain, this is a candidate explanation).
+
+**Decided by.** Rafly, 2026-09-14, on Claude's recommendation.
+
+---
+
+## D-30 — The two scaling classes produce different angular spreads. Kept, and declared
+
+**Decided.** D-28's two classes are kept as they are. A bounded feature's
+middle 50% occupies roughly 0,70 of the rotation range; a fitted one occupies
+roughly 0,29. The asymmetry is reported in `prepare.py`'s output and stated in
+Bab IV rather than equalised.
+
+**What was measured.** Fitted on all training rows, share of [0, pi] the middle
+50% occupies: `hour_sin` 0,7071, `doy_sin` and `doy_cos` 0,7052, `cos_sza`
+0,5769 subtropis and 0,6918 tropis — against `KX` 0,2836, `TCIW` 0,2626,
+`CRR` 0,2500, and roughly 0,29 for every other fitted feature.
+
+So a temporal feature reaches about **2,5 times the angular dynamic range** of
+a meteorological one, and that follows from the scaling class rather than from
+anything about the variables.
+
+**Why it is not a defect.** A sinusoid spends most of its time near its
+extremes and little near zero, so its middle half genuinely spans most of
+[-1, 1]. The bounded number is the honest one. The ~0,29 that `arctan` returns
+for nearly every fitted feature is the manufactured one — `arctan(x/IQR)` maps
+the interquartile range to a fixed output width by construction, which is the
+same artefact recorded against its within-domain resolution figures.
+
+Equalising the two would impose a uniformity the data does not have.
+
+**Why it matters anyway, and this is the reason for the entry.** The feature
+map is periodic in the data, so a feature's phase span sets how much of the
+model's frequency response it can reach — a variational model is a partial
+Fourier series whose accessible frequencies are fixed by the encoding (Schuld,
+Sweke & Meyer, Phys. Rev. A 103, 032430). A feature spanning 0,71 pi reaches
+more of that response than one spanning 0,29 pi.
+
+`hour_sin` is already worth 0,0817 of a 0,2871 tropis occurrence baseline —
+28% of the model — measured under **ridge**, where scaling was uniform. Under
+D-28 it also receives the widest angular range of any feature in the set. If
+the QNN comes back more time-dominated than the classical ladder, those two
+facts are not separable after the fact.
+
+**So this entry makes a prediction rather than a hedge.** If the QNN leans on
+the temporal features harder than the classical arm does, **the encoding range
+is the first thing to check**, and the remedy is known: scale every feature to
+an equal spread, or move the bounded class onto `arctan` as well.
+
+**Considered and rejected: testing the options now.** The available ablation is
+ridge and logistic regression, and a linear model is indifferent to angular
+range — it learns a proportionally different weight and fits identically. All
+three options would return the same numbers and tell us nothing, because the
+concern is specific to a periodic encoding. The only real test is the circuit,
+which is the expensive thing. This is the same reasoning D-29 used in declining
+to test a zero-indicator on `CRR`.
+
+**A second asymmetry, smaller and in the other direction.** `RH2M` is the
+narrowest feature in every set it appears in — 0,1481 subtropis and 0,1195
+tropis — because its definitional bound is [0, 100] while the data runs from
+about 13 to 100, leaving the bottom eighth of the range empty. A definitional
+bound the data only partly occupies costs resolution. This is the same
+trade-off that keeps `lat` and `lon` out of the bounded class, at a much milder
+setting: `RH2M` occupies 87% of its bound where a tropis latitude would occupy
+1,1% of the planet's.
+
+**Amends D-28.** D-28 says a variable with a definitional bound uses it.
+`prepare.py` applies a narrower rule: **a definitional bound is used only where
+the data can actually occupy it.** `RH2M` reaches exactly 100 on 56 512
+subtropis rows and the cyclic encodings span [-1, 1] by construction, so both
+qualify. `lat` and `lon` are bounded by the planet and do not, so they take the
+fitted map. Recorded here because it was an implementation judgement Claude
+made while writing `prepare.py`, not something D-28 said.
+
+**Reversal.** One rule change in `selection/prepare.py`. Nothing is
+materialised.
+
+**Bab.** IV (both asymmetries and the narrower bound rule), VI (if the arms
+differ on the temporal features, this is a candidate explanation).
+
+**Decided by.** Rafly, 2026-09-14, on Claude's recommendation.
+
+---
+
 ## Measured
 
 Findings that correct something the archive asserts, or that the thesis will
@@ -2280,6 +2511,110 @@ than at training time.
 
 ---
 
+### 2026-09-14 — three encoding maps compared
+
+`selection/diagnosis.py` section 3, rewritten. Replaces the two-map comparison
+recorded in the second-pass block, which did not test quantile bounds. All
+`[measured]`. Fitted on the source domain only, reported both within domain and
+across.
+
+**Mean resolution over all 20 candidates** — the share of the output range a
+domain's middle 50% occupies:
+
+| | min-max | quantile (p1/p99) | arctan(x/IQR) |
+|---|---|---|---|
+| within domain | 0,1350 | 0,2251 | 0,2883 |
+| cross domain | 0,0959 | 0,1846 | 0,2390 |
+
+**Quantile bounds recover most of the gap from one rule change.** 67% of the
+way from min-max to arctan within domain, 62% across, with no per-variable
+constant. The worst cases improve most: `CRR` within subtropis 0,0006 to
+0,0065; `VIIWD` 0,0006 to 0,0085.
+
+**arctan's within-domain column is an artefact and must not be quoted.**
+Nearly every variable scores 0,294-0,295 — `arctan(x/IQR)` maps the
+interquartile range to a fixed output width by construction, so the number
+measures the transform rather than the feature. `CRR`'s 60% point mass is
+untouched by it; the tied value simply sits at 0,5 instead of 0,0.
+
+**The cross-domain column is not an artefact.** There the scale is fitted on
+the source and applied to the target, so the target's share is free to vary,
+and it does: 0,0004 to 0,4423 across candidates. arctan's cross-domain
+advantage over quantile — 0,2390 against 0,1846, about 29% — is real.
+
+**`PS` is the one variable quantile bounds make worse across domains**, 0,5714
+to 0,1000 subtropis-to-tropis and 0,0349 to 0,0000 the other way. The two
+domains barely overlap in surface pressure, so tightening the bounds pushes the
+other domain outside them entirely.
+
+**The physical bound works as intended.** `RH2M` scores identically under
+min-max and quantile — 0,1494 and 0,1191 — because [0, 100] overrides both
+fitted rules.
+
+**A correction to the second-pass block.** It recorded that a bounded map beats
+min-max "by about four times, in 35 of 36 column-arm pairs". That comparison
+was against min-max fitted on the **extremes**. Against min-max fitted on
+quantiles the advantage is about 1,3x. The earlier figure is not wrong, but it
+overstates the case for bounding by comparing against the weakest possible
+fitting rule, and should not be quoted without saying so.
+
+---
+
+### 2026-09-14 — the two owed measurements
+
+Both obligations the record carried are discharged. All `[measured]`.
+
+**`cos_sza` does not inherit latitude's cross-domain failure. D-27 stands.**
+D-27 excluded `lat` and `lon` from the shared transfer set because they carry
+0,0000 effective resolution across domains, and flagged that `cos_sza` is
+computed from latitude and might behave the same way. It does not. Cross-domain
+resolution under the bounded map: **0,3438** subtropis-to-tropis and 0,2515
+the other way, against `lat` 0,0004 and `lon` 0,0000. Latitude enters `cos_sza`
+only through the declination term; the hour angle does the work, and it is
+identical in both domains. No amendment to D-27 is owed.
+
+**Dropping `CIN` cost real skill, and D-19's defence does not survive.**
+D-19 dropped `CIN` and `CBH` as structurally undefined and argued that imputed
+`CIN`'s first-place mutual-information rank might be a better-shaped `CAPE`
+rather than distinct information — recording that the claim "must be tested,
+not asserted". The test is the complete-case ablation, on rows where both are
+defined, with `CAPE` in the set and nothing imputed.
+
+Occurrence PR-AUC: subtropis **0,2651 without against 0,2893 with**, a cost of
++0,0242, about 9% relative. Tropis 0,3717 against 0,3933, +0,0216, about 6%.
+
+And it is `CIN` alone. Leave-one-out inside the larger set gives `CIN` +0,0197
+and +0,0145; `CBH` -0,0003 and +0,0002, indistinguishable from zero. **Dropping
+`CBH` was free; dropping `CIN` was not.**
+
+**Count behaves differently.** Subtropis -0,0001, tropis +0,0062. `CIN` helps
+decide whether an hour flashes and barely helps decide how many, which is
+physically coherent — inhibition governs whether convection initiates, not how
+large the storm becomes.
+
+**This does not reverse D-19.** The rule was that a structurally undefined
+column is dropped rather than imputed, and that holds whatever the value is
+worth where it is defined: there is no non-arbitrary value to put in the 46,4%
+of subtropis rows where no convective layer exists. What the measurement does
+is convert "a stated limitation" into "a stated limitation with a number", which
+is what D-19 said it owed. Bab VI reports the figure rather than the argument.
+
+**Two caveats that travel with it.** The rows are filtered, so the test set is
+reshaped — §4 forbids that for anything reported as a result, and this is a side
+measurement. And complete-case rows are a convective sub-population: subtropis
+occurrence is 0,0600 on them against 0,0289 over all test rows, tropis 0,0719
+against 0,0571. Lightning is about twice as likely where `CIN` is defined. That
+is the only population on which the column can be priced at all.
+
+**From the same run, at N = 15.** Tropis `hour_sin` is worth **0,0979 of a
+0,3620 occurrence baseline — 27% of the model** — so the figure recorded at
+N = 10 was not a small-budget artefact. And `VIIWD` scores negative or near zero
+in six of the eight ablated sets while ranking top-three on mutual information
+in both domains: the clearest case in the project for Bab VI reporting the
+screen and the ablation together rather than either alone.
+
+---
+
 ## Open
 
 **O-1 to O-9 are superseded by the S-list below, 2026-09-14.** They are kept
@@ -2716,7 +3051,7 @@ Impute 0 for `CIN` and rely on `CAPE = 0` to say the same thing. Drop both.
 
 ---
 
-## S-5 — Whether to transform skew before scaling
+## S-5 — Whether to transform skew before scaling — CLOSED 2026-09-14 by D-29
 
 **Re-measured 2026-09-14, all 20 predictors.** The compression is worst in the
 divergence variables, not `CAPE`. Tropis `VIIWD` has an interquartile range of
@@ -2753,7 +3088,7 @@ precipitation rate like `PRECTOTCORR`, which was the worst.
 
 ---
 
-## S-6 — Scaler and range
+## S-6 — Scaler and range — CLOSED 2026-09-14 by D-28
 
 **From the literature.** Angle encoding needs features inside the rotation
 range, and min-max to [0, π] is the standard recommendation. For this circuit

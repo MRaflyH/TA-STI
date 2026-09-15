@@ -1,309 +1,112 @@
+% ==========================================
+% BAB II STUDI LITERATUR
+% ==========================================
+% Penanda komentar (tidak tampil di PDF):
+%   % SUMBER-BELUM-ADA : klaim butuh sitasi yang belum dimiliki/dibaca.
+% Sitasi tanpa penanda sudah dicek terhadap PDF.
+% ==========================================
 \chapter{STUDI LITERATUR}
 \label{chap:studi-literatur}
-Bab ini terdiri atas dua bagian utama.
-Bagian pertama membahas petir, \textit{Ground Flash Density} (GFD), dan parameter meteorologis yang memengaruhinya.
-Bagian kedua membahas komputasi kuantum, \textit{Quantum Neural Network} (QNN), dan penyiapan data untuk QNN.
-Bab ditutup dengan tinjauan penelitian terdahulu dan kesenjangan penelitian.
+Bab ini membahas petir dan parameter yang memengaruhinya, komputasi kuantum dan QNN, serta kesenjangan penelitian.
 
 \section{Petir dan \textit{Ground Flash Density} (GFD)}
 
 \subsection{Pembentukan Petir}
-Sebagian besar parameterisasi petir didasarkan pada mekanisme elektrifikasi non-induktif.
-Pada mekanisme ini, kristal es bertumbukan dengan partikel es berlapis embun beku (\textit{rimed particles}) seperti \textit{graupel}.
-Setelah tumbukan pada suhu di bawah ambang tertentu, kristal es yang lebih ringan membawa muatan positif dan terangkat oleh arus naik, sedangkan \textit{graupel} yang lebih berat membawa muatan negatif dan jatuh.
-Pemisahan muatan ini menghasilkan medan listrik yang cukup kuat untuk memicu petir \cite{cheng2024MLLP}.
-Proses ini berlangsung di zona fase campuran awan konvektif, yaitu lapisan yang mengandung air sangat dingin, es, dan \textit{graupel} \cite{shanTBDMLI}.
+Petir terbentuk dari pemisahan muatan di zona fase campuran awan konvektif, yaitu lapisan yang mengandung air sangat dingin, es, dan \textit{graupel} \cite{shanTBDMLI}.
+Kristal es yang bertumbukan dengan \textit{graupel} menjadi bermuatan positif dan terangkat oleh arus naik, sedangkan \textit{graupel} bermuatan negatif dan jatuh \cite{cheng2024MLLP}.
+Karena itu, parameterisasi petir umumnya bertumpu pada ukuran badai, intensitas konveksi, dan jumlah hidrometeor es \cite{cheng2024MLLP}.
+Petir terbagi menjadi petir awan ke tanah (CG) dan petir dalam awan (IC) \cite{shanTBDMLI}, dan penelitian ini hanya membahas petir CG.
 
-Karena itu, parameterisasi petir umumnya bertumpu pada setidaknya satu dari tiga komponen, yaitu ukuran badai, intensitas konveksi, dan jumlah hidrometeor es \cite{cheng2024MLLP}.
-Petir sendiri terbagi menjadi petir awan ke tanah (\textit{cloud-to-ground}, CG) dan petir dalam awan (\textit{intracloud}, IC) \cite{shanTBDMLI}.
-Penelitian ini hanya membahas petir CG.
-
-\subsection{\textit{Ground Flash Density} dan Pengukurannya}
-Frekuensi petir lazim dinyatakan sebagai densitas kilat, yaitu jumlah kilat per satuan luas per satuan waktu, misalnya kilat per km² per tahun \cite{cheng2024MLLP, peterson2021LISOTD}.
-GFD adalah densitas kilat yang hanya menghitung petir CG.
-Densitas kilat Jawa Barat telah dipetakan dalam kajian pengukuran arus puncak petir tropis \cite{denov2022}.
-
-Petir diamati dengan dua cara.
-Sensor optik satelit seperti \textit{Lightning Imaging Sensor} (LIS) dan \textit{Optical Transient Detector} (OTD) mendeteksi petir CG dan IC secara bersamaan sebagai petir total \cite{peterson2021LISOTD}.
-Karena itu, data sensor optik tidak dapat langsung menghasilkan GFD.
-Jaringan sensor di darat menentukan lokasi setiap sambaran, contohnya WWLLN dengan akurasi lokasi yang diperkirakan sekitar 3,4 km \cite{kaplan2022WWLLN}.
-Efisiensi deteksi jaringan semacam ini bervariasi menurut ruang dan waktu dalam sehari \cite{haywardTBD} serta menurun seiring bertambahnya jarak dari pusat jaringan \cite{song2023LNAI}.
-Perubahan efisiensi deteksi bahkan dapat menghasilkan tren palsu pada data jangka panjang \cite{kaplan2022WWLLN}.
-
-Penelitian ini menggunakan dua sumber data petir.
-Data Jawa Barat berasal dari sistem deteksi petir PLN Puslitbang.
-Pengamatan petir di Pulau Jawa dengan teknik \textit{magnetic direction finder} telah dilakukan sejak 1994 \cite{denov2022}.
-% SUMBER-BELUM-ADA: dokumentasi sistem deteksi PLN (jenis sensor, efisiensi
-% deteksi, klasifikasi CG/IC). Tidak tersedia; nyatakan sebagai keterbatasan.
-Data Florida berasal dari arsip MERLIN \cite{ksc2026merlin}.
-Kedua sumber ini memiliki dua keterbatasan yang dinyatakan sejak awal.
-Pertama, dokumentasi klasifikasi CG/IC pada MERLIN belum dipastikan sehingga hasil domain subtropis bersifat sementara.
-Kedua, penurunan efisiensi deteksi terhadap jarak dari pusat jaringan tidak dapat dipisahkan dari pola klimatologis menggunakan data MERLIN saja.
+\subsection{GFD dan Pengukurannya}
+Densitas kilat adalah jumlah kilat per satuan luas per satuan waktu \cite{peterson2021LISOTD}, sedangkan GFD adalah densitas kilat yang hanya menghitung petir CG.
+Sensor satelit seperti LIS dan OTD mendeteksi petir CG dan IC secara bersamaan sehingga tidak dapat langsung menghasilkan GFD \cite{peterson2021LISOTD}.
+Jaringan sensor darat menentukan lokasi setiap sambaran, tetapi efisiensi deteksinya menurun seiring jarak dari pusat jaringan \cite{song2023LNAI}.
+Penelitian ini menggunakan data sistem deteksi petir PLN Puslitbang untuk Jawa Barat dan arsip MERLIN untuk Florida \cite{ksc2026merlin}.
+% SUMBER-BELUM-ADA: dokumentasi sistem deteksi PLN.
+Klasifikasi CG/IC pada MERLIN belum dipastikan sehingga hasil domain subtropis bersifat sementara.
+Penurunan efisiensi deteksi terhadap jarak juga tidak dapat dipisahkan dari pola klimatologis menggunakan data MERLIN saja.
 
 \subsection{Karakteristik Petir Tropis dan Subtropis}
-Indonesia memiliki kelembapan tinggi, hutan tropis yang luas, arus naik yang kuat, serta kandungan aerosol tinggi dari industri dan garam laut.
-Kondisi ini memudahkan pembentukan awan kumulonimbus penghasil petir \cite{denov2022}.
-Standar proteksi petir internasional seperti NFPA 780 terutama dikembangkan dari karakteristik petir subtropis, padahal parameter petir tropis, termasuk arus puncak, frekuensi, dan GFD, berbeda secara signifikan \cite{denov2025RNFPA}.
-% Catatan: denov2025RNFPA tidak konsisten soal arah perbedaan arus puncak
-% (hlm. 9). Jangan menyebut arah perbedaan dengan sitasi ini.
-
-Secara global, densitas petir tertinggi berada di barat laut Amerika Selatan, Amerika Tengah, serta utara Teluk Meksiko beserta daratan di sekitarnya.
-Jumlah petir yang besar juga teramati di sebagian Asia Tenggara kepulauan \cite{kaplan2022WWLLN}.
-Di Amerika Serikat daratan, densitas kilat tertinggi pada musim panas 2020 berada di Florida \cite{song2023LNAI}.
-Laju kilat global juga berfluktuasi mengikuti penyinaran matahari di daratan tropis, baik dalam sehari maupun sepanjang tahun \cite{peterson2021LISOTD}.
-Perbedaan lingkungan juga mengubah peran setiap variabel.
-Contohnya, CAPE kurang berkorelasi dengan densitas kilat di tenggara Amerika Serikat karena atmosfer di wilayah tersebut sering tidak stabil dan biasanya memiliki CAPE yang cukup untuk memicu badai \cite{cheng2024MLLP}.
+Kelembapan tinggi, arus naik yang kuat, serta aerosol dari industri dan garam laut memudahkan pembentukan awan kumulonimbus di Indonesia \cite{denov2022}.
+Standar proteksi petir internasional terutama dikembangkan dari karakteristik petir subtropis, padahal arus puncak, frekuensi, dan GFD petir tropis berbeda \cite{denov2025RNFPA}.
+Perbedaan lingkungan juga mengubah peran variabel, misalnya CAPE kurang berkorelasi dengan densitas kilat di tenggara Amerika Serikat karena CAPE di wilayah tersebut hampir selalu cukup untuk memicu badai \cite{cheng2024MLLP}.
 
 \subsection{Parameter yang Memengaruhi GFD}
-Konveksi dalam membutuhkan tiga bahan, yaitu ketidakstabilan, kelembapan, dan pengangkatan \cite{haywardTBD}.
-Selain ketiganya, petir juga membutuhkan hidrometeor es di zona fase campuran sebagaimana dijelaskan pada subbab pembentukan petir.
-Kandidat variabel pada penelitian ini dikelompokkan berdasarkan peran fisis tersebut dan dirangkum pada Tabel \ref{tbl:tabelKandidatVariabel}.
-Indeks konveksi hanya menunjukkan peluang terjadinya badai, bukan pengamatan langsung, dan keberhasilannya bervariasi menurut wilayah dan musim \cite{haywardTBD}.
-
-% Catatan: hersbach2020era5 dikutip sebagai rujukan dataset ERA5. Per jam dan
-% 4D-Var diverifikasi dari ecmwf2026era5doc; grid 0,25° dari shanTBDMLI.
-Sebagian besar kandidat berasal dari ERA5 \cite{hersbach2020era5}, yaitu reanalisis ECMWF per jam yang dihasilkan melalui asimilasi 4D-Var \cite{ecmwf2026era5doc} dan tersedia pada grid 0,25° \cite{shanTBDMLI}.
-Reanalisis menyediakan resolusi ruang dan waktu yang konsisten selama puluhan tahun, tetapi data pengamatan yang menjadi masukannya dapat mengandung bias \cite{haywardTBD}.
-Karena ERA5 adalah reanalisis, model pada penelitian ini bersifat diagnostik.
-Kinerjanya merupakan batas atas kinerja operasional, yang baru tercapai jika model diberi medan prakiraan dari model cuaca numerik.
-Lima kandidat lain berasal dari NASA POWER \cite{nasapower} dengan resolusi 0,5° × 0,625° \cite{fadhil2025}.
-
-\subsubsection{Ketidakstabilan Atmosfer}
-CAPE (\textit{convective available potential energy}) adalah total kelebihan daya apung parsel udara yang naik.
-Pada ERA5, CAPE diambil dari energi terbesar di antara parsel yang berasal dari level di bawah 350 hPa \cite{cheng2024MLLP}.
-Pada jam dengan awan konvektif, CAPE termasuk tiga prediktor terpenting kejadian petir.
-Meskipun demikian, pada jam dengan CAPE di atas 2000~J~kg$^{-1}$ di satu lokasi pengamatan, CAPE tidak lagi membedakan jam tanpa petir dan jam dengan petir sering \cite{shanTBDMLI}.
-
-CIN (\textit{convective inhibition}) mengukur hambatan yang harus dilewati parsel sebelum dapat naik bebas.
-% SUMBER-BELUM-ADA: definisi CIN (kandidat: ECMWF/ESSL Tech. Memo 852).
-CIN digunakan sebagai prediktor pada prakiraan petir berbasis jaringan saraf \cite{sobash2025MLP}.
-Pada ERA5, CIN diberi nilai kosong jika CIN melebihi 1000 atau jika tidak ada dasar awan, yang dapat terjadi saat CAPE rendah \cite{ecmwf2026era5doc}.
-Artinya, nilai kosong pada CIN tidak menandakan data hilang, tetapi besaran yang memang tidak terdefinisi.
-Karena alasan ini, CIN tidak dimodelkan.
-Aturannya dijelaskan pada Bab IV.
-
-Indeks K (KX) menggabungkan laju penurunan suhu antara 850 dan 500 hPa, kelembapan pada 850 hPa, dan ketebalan lapisan lembap pada 700 hPa seperti pada Persamaan \ref{eq:kIndex}.
-Indeks ini digunakan pada penelitian pendahulu dengan data yang sama \cite{fadhil2025}.
-% SUMBER-BELUM-ADA: sumber asli rumus (George 1960) dan studi petir yang
-% memakai KX (Amri mengutip Mostajabi dkk. 2019; belum dibaca).
-
-\begin{equation}
-\mathrm{KX} = (T_{850} - T_{500}) + T_{d,850} - (T_{700} - T_{d,700})
-\label{eq:kIndex}
-\end{equation}
-
-Indeks \textit{total totals} (TOTALX) menggabungkan suhu dan titik embun pada 850 hPa dengan suhu pada 500 hPa seperti pada Persamaan \ref{eq:totalTotals}.
-% SUMBER-BELUM-ADA: sumber asli rumus (Miller 1972) dan studi petir yang
-% memakai TOTALX. Belum ada di daftar pustaka.
-
-\begin{equation}
-\mathrm{TOTALX} = T_{850} + T_{d,850} - 2T_{500}
-\label{eq:totalTotals}
-\end{equation}
-
-\subsubsection{Kelembapan}
-Kelembapan relatif termasuk dalam empat variabel permukaan yang dipakai model prediksi petir Mostajabi dkk. sebagaimana dirangkum oleh Shan dkk. \cite{shanTBDMLI}.
-Pada penelitian ini, variabel tersebut dipadankan dengan kelembapan relatif 2 m (RH2M).
-Ukuran kelembapan relatif lebih disukai daripada kandungan uap air absolut karena hubungannya dengan konveksi tetap berlaku ketika iklim menghangat \cite{kalashnikov2024PCG}.
-
-Suhu titik embun 2 m (D2M) menunjukkan kandungan uap air dekat permukaan.
-D2M digunakan sebagai masukan parameterisasi petir berbasis pembelajaran mesin \cite{cheng2024MLLP} dan prakiraan petir berbasis jaringan saraf \cite{sobash2025MLP}.
-Tenggara Amerika Serikat, wilayah dengan petir paling sering, juga memiliki titik embun yang tinggi \cite{cheng2024MLLP}.
-
-Uap air kolom total (TCWV) adalah jumlah uap air di seluruh kolom atmosfer.
-Air mampu endap kolom total (\textit{total column precipitable water}) telah digunakan untuk mengelompokkan pola sinoptik pemicu badai petir \cite{haywardTBD}.
-Kelembapan relatif kolom juga telah digunakan sebagai padanan TCWV karena jumlah uap air yang dapat mengembun bergantung pada tingkat kejenuhannya \cite{kalashnikov2024PCG}.
-
-Integral vertikal divergensi fluks uap air (VIMDF) bernilai negatif saat uap air terkumpul (konvergen) di suatu kolom.
-Konvergensi uap air menyediakan kelembapan sekaligus mendorong pengangkatan.
-% SUMBER-BELUM-ADA: studi petir/konveksi yang memakai konvergensi fluks uap air.
-
-Selisih suhu dan titik embun (\texttt{dewpoint\_depression}) adalah variabel turunan, yaitu $T_{2m} - T_{d,2m}$.
-Selisih yang kecil menunjukkan udara permukaan yang hampir jenuh sehingga ketinggian kondensasi dan dasar awan rendah.
-% SUMBER-BELUM-ADA: hubungan selisih titik embun dengan ketinggian LCL
-% (kandidat: Lawrence 2005, BAMS).
-Motivasinya adalah kedalaman awan hangat, yaitu jarak dari level kondensasi ke level beku.
-Awan hangat yang dalam memperkuat hujan hangat dan mengurangi tetes air yang terangkat ke zona fase campuran \cite{shanTBDMLI}.
-Ketinggian level kondensasi juga dipakai sebagai prediktor petir \cite{sobash2025MLP}.
-Perlu dicatat bahwa pada lingkungan CAPE tinggi, ketinggian level kondensasi tidak berbeda antara jam tanpa petir dan jam dengan petir sering \cite{shanTBDMLI}.
-
-Ketinggian dasar awan (CBH) digunakan untuk mengidentifikasi awan konvektif dalam \cite{shanTBDMLI}.
-Dasar awan yang tinggi juga menjadi ciri badai tertentu yang tidak bergantung pada kelembapan lapisan bawah \cite{kalashnikov2024PCG}.
-Pada ERA5, nilai kosong CIN terkait langsung dengan ketiadaan dasar awan \cite{ecmwf2026era5doc}.
-Pada CBH, nilai kosong terjadi pada kolom tanpa awan karena dasar awan memang tidak ada.
-% SUMBER-BELUM-ADA: aturan nilai kosong CBH pada kolom tanpa awan. Dokumentasi
-% ERA5 (ecmwf2026era5doc) hanya menyebut aturan CIN. ecmwf2015cy41r1 tidak
-% dapat diverifikasi (tidak ada salinan) dan ERA5 memakai CY41R2, bukan 41r1.
-Seperti CIN, CBH tidak dimodelkan karena tidak terdefinisi, bukan karena hilang.
-
-\subsubsection{Air dan Es di Awan}
-Air cair awan kolom total (TCLW) dan es awan kolom total (TCIW) mewakili kandungan kondensat awan.
-Salah satu dari tiga komponen utama parameterisasi petir adalah jumlah hidrometeor es \cite{cheng2024MLLP}.
-Parameterisasi lain yang dirangkum Kalashnikov dkk. menggunakan fraksi es awan dan fluks es konvektif \cite{kalashnikov2024PCG}.
-Diagnostik petir pada model HRRR juga menggunakan kandungan es yang diintegrasikan secara vertikal \cite{sobash2025MLP}.
-Air cair tetap relevan karena zona fase campuran membutuhkan air sangat dingin di samping es \cite{shanTBDMLI}.
-
-Air awan total (\texttt{cloud\_water}) adalah variabel turunan, yaitu TCLW + TCIW.
-Variabel ini mengukur kondensat tanpa membedakan fase.
-Motivasinya, pemisahan muatan terjadi di zona yang mengandung air sangat dingin dan es secara bersamaan \cite{shanTBDMLI}.
-
-Integral vertikal divergensi fluks air beku awan (VIIWD) dan padanan cairnya (VILWD) bernilai negatif saat kondensat awan terkumpul di suatu kolom.
-Keduanya digunakan pada penelitian pendahulu dengan data yang sama \cite{fadhil2025}.
-% SUMBER-BELUM-ADA: studi petir yang memakai divergensi fluks kondensat.
-% kalashnikov2024PCG membahas fluks es konvektif, bukan divergensi fluks.
-
-\subsubsection{Hujan}
-Presipitasi (PRECTOTCORR) berkorelasi tinggi dengan densitas kilat di selatan dan tenggara Amerika Serikat.
-Namun, presipitasi diduga menjadi penduga yang buruk di pantai barat karena sebagian besar hujannya tidak bersifat konvektif \cite{cheng2024MLLP}.
-Laju hujan juga termasuk tiga prediktor terpenting kejadian petir pada jam dengan awan konvektif \cite{shanTBDMLI}.
-Di Sumatera Utara, jumlah sambaran CG dan curah hujan bulanan sama-sama mencapai puncak pada November 2022 \cite{ramadan2024}.
-
-Laju hujan konvektif (CRR) memisahkan hujan konvektif dari hujan non-konvektif.
-Pemisahan ini penting karena presipitasi total kurang tepat untuk parameterisasi petir di wilayah dengan hujan non-konvektif \cite{cheng2024MLLP}.
-Laju hujan konvektif juga pernah digunakan sebagai fitur prediksi frekuensi petir bulanan di Bangladesh \cite{wang2023}.
-Laju presipitasi konvektif rata-rata sempat dipertimbangkan, tetapi CRR dipilih karena bersifat sesaat seperti kandidat lainnya.
-
-\subsubsection{Kondisi Permukaan}
-Tekanan udara pada level stasiun, suhu udara, dan kecepatan angin bersama kelembapan relatif membentuk model empat variabel permukaan Mostajabi dkk. yang memiliki kemampuan prediksi petir yang cukup besar \cite{shanTBDMLI}.
-Pada penelitian ini, ketiga variabel tersebut dipadankan dengan tekanan permukaan (PS), suhu 2 m (T2M), dan kecepatan angin 2 m (WS2M).
-Tekanan permukaan dan suhu 2 m juga digunakan pada prakiraan petir berbasis HRRR \cite{sobash2025MLP}.
-T2M sering dipakai untuk mewakili konveksi dalam pada model pembelajaran mesin, tetapi geopotensial 500 hPa berkorelasi kuat dengan CAPE dan T2M di sebagian besar Amerika Serikat daratan, meskipun korelasi ini melemah di bagian barat \cite{cheng2024MLLP}.
-Untuk WS2M, bukti yang tersedia hanya menunjukkan penggunaannya sebagai fitur, bukan mekanisme fisis langsung.
-Geser angin, yang lebih dekat dengan mekanisme badai, memiliki pengaruh yang tidak konsisten terhadap petir \cite{shanTBDMLI}.
-
-\subsubsection{Lokasi}
-Lintang (\texttt{lat}) dan bujur (\texttt{lon}) digunakan sebagai prediktor statis pada prakiraan petir \cite{sobash2025MLP}.
-Penggunaannya didasarkan pada sebaran petir yang sangat tidak merata secara geografis \cite{kaplan2022WWLLN}.
-Pada penelitian pendahulu dengan dua domain yang sama, lintang menjadi parameter yang paling memengaruhi model \cite{fadhil2025}.
-
-\subsubsection{Waktu}
-Petir memiliki siklus harian yang kuat.
-Di Amerika Serikat daratan, petir paling sering terjadi pada sore dan malam hari \cite{song2023LNAI}, dan laju kilat global mengikuti penyinaran matahari harian dan tahunan \cite{peterson2021LISOTD}.
-Jam dan hari dalam setahun bersifat siklis.
-Jika dikodekan sebagai bilangan bulat, jam 23 dan jam 0 tampak berjauhan padahal bersebelahan.
-
-Jam (\texttt{hour\_sin}, \texttt{hour\_cos}) dan hari dalam setahun (\texttt{doy\_sin}, \texttt{doy\_cos}) dikodekan dengan pasangan sinus dan kosinus.
-Hari dalam setahun dan jam matahari lokal telah dikodekan dengan cara yang sama pada prakiraan petir berbasis HRRR \cite{sobash2025MLP}.
-Model kemunculan sel konvektif berbasis ERA5 juga menunjukkan bahwa prediktor kosinus waktu harian penting untuk mereproduksi siklus harian \cite{pacey2026}.
-
-Kosinus sudut zenit matahari (\texttt{cos\_sza}) menggabungkan siklus harian dan tahunan dalam satu nilai seperti pada Persamaan \ref{eq:cosSza}, dengan $\varphi$ lintang, $\delta$ deklinasi matahari, dan $h$ sudut jam.
-Motivasinya adalah hubungan laju kilat dengan penyinaran matahari \cite{peterson2021LISOTD}.
-Tidak ditemukan studi petir atau konveksi yang menggunakan \texttt{cos\_sza} sebagai prediktor.
-Karena itu, variabel ini diuji tanpa preseden.
-% SUMBER-BELUM-ADA: (1) rumus sudut zenit; (2) preseden pada prakiraan
-% iradiasi matahari. oliveira2024QNN TIDAK memakai sudut zenit sebagai fitur.
-
-\begin{equation}
-\cos\theta_z = \sin\varphi \sin\delta + \cos\varphi \cos\delta \cos h
-\label{eq:cosSza}
-\end{equation}
-
-\subsubsection{Variabel yang Tidak Digunakan}
-Aerosol memengaruhi petir \cite{shanTBDMLI} dan meningkatkan kemampuan prakiraan petir \cite{song2023LNAI}.
-Namun, \textit{aerosol optical depth} dari NASA POWER hanya tersedia bulanan \cite{nasapower} sehingga nilainya konstan sepanjang ratusan jam berturut-turut.
-% VERIFIKASI: resolusi bulanan AOD belum dicek; simpan tangkapan layar daftar
-% parameter NASA POWER sebagai bukti.
-Variabel ini dipertimbangkan, tetapi tidak diambil karena resolusinya tidak dapat menjelaskan variasi per jam.
-Seluruh kandidat yang diuji dirangkum pada Tabel \ref{tbl:tabelKandidatVariabel}.
+Konveksi dalam membutuhkan ketidakstabilan, kelembapan, dan pengangkatan \cite{haywardTBD}, sedangkan petir juga membutuhkan es di zona fase campuran.
+Kandidat variabel dikelompokkan berdasarkan peran tersebut dan dirangkum beserta rujukannya pada Tabel \ref{tbl:tabelKandidatVariabel}.
+Sebagian besar kandidat berasal dari ERA5 \cite{hersbach2020era5}, yaitu reanalisis per jam dengan resolusi 0,25° \cite{shanTBDMLI}, dan lima kandidat berasal dari NASA POWER \cite{nasapower}.
+Karena ERA5 adalah reanalisis, model pada penelitian ini bersifat diagnostik dan kinerjanya merupakan batas atas kinerja operasional.
 
 \input tables/tabelKandidatVariabel.tex
 
+Ketidakstabilan diwakili oleh CAPE, CIN, indeks K (KX), dan indeks \textit{total totals} (TOTALX).
+CAPE termasuk tiga prediktor terpenting kejadian petir, tetapi tidak lagi membedakan kejadian petir setelah mencapai nilai tinggi \cite{shanTBDMLI}.
+CIN digunakan sebagai prediktor pada prakiraan petir \cite{sobash2025MLP}.
+% SUMBER-BELUM-ADA: sumber rumus dan studi petir untuk KX dan TOTALX.
+
+Kelembapan diwakili oleh RH2M, D2M, TCWV, VIMDF, CBH, dan variabel turunan \texttt{dewpoint\_depression} (T2M dikurangi D2M).
+Kelembapan relatif dan titik embun permukaan digunakan pada model prediksi petir \cite{shanTBDMLI, sobash2025MLP}, sedangkan air mampu endap kolom total digunakan untuk mengenali pola sinoptik pemicu badai petir \cite{haywardTBD}.
+Selisih suhu dan titik embun mewakili ketinggian kondensasi, yang menentukan kedalaman awan hangat dan jumlah tetes air yang mencapai zona fase campuran \cite{shanTBDMLI}.
+% SUMBER-BELUM-ADA: VIMDF; hubungan selisih titik embun dengan ketinggian kondensasi.
+
+Kondensat awan diwakili oleh TCLW, TCIW, VIIWD, VILWD, dan variabel turunan \texttt{cloud\_water} (TCLW ditambah TCIW).
+Jumlah hidrometeor es merupakan komponen utama parameterisasi petir \cite{cheng2024MLLP}, dan zona fase campuran juga membutuhkan air sangat dingin \cite{shanTBDMLI}.
+Karena itu, \texttt{cloud\_water} menjumlahkan kondensat cair dan es tanpa membedakan fase.
+% SUMBER-BELUM-ADA: VIIWD dan VILWD.
+
+Hujan diwakili oleh PRECTOTCORR dan laju hujan konvektif (CRR).
+Presipitasi berkorelasi tinggi dengan densitas kilat, tetapi menjadi penduga yang buruk di wilayah dengan hujan non-konvektif \cite{cheng2024MLLP}, sehingga CRR juga digunakan.
+Kondisi permukaan diwakili oleh PS, T2M, dan WS2M, yang bersama RH2M membentuk model empat variabel permukaan dengan kemampuan prediksi petir yang cukup baik \cite{shanTBDMLI}.
+
+Lintang (\texttt{lat}) dan bujur (\texttt{lon}) digunakan sebagai prediktor statis \cite{sobash2025MLP}.
+Jam dan hari dalam setahun bersifat siklis sehingga dikodekan dengan pasangan sinus dan kosinus (\texttt{hour\_sin}, \texttt{hour\_cos}, \texttt{doy\_sin}, \texttt{doy\_cos}) \cite{sobash2025MLP}.
+Kosinus sudut zenit matahari (\texttt{cos\_sza}) menggabungkan kedua siklus tersebut dan dimotivasi oleh hubungan laju kilat dengan penyinaran matahari \cite{peterson2021LISOTD}.
+Tidak ditemukan studi petir atau konveksi yang menggunakan \texttt{cos\_sza} sebagai prediktor sehingga variabel ini diuji tanpa preseden.
+
+CIN dan CBH diambil tetapi tidak dimodelkan karena pada model ECMWF keduanya sengaja memuat nilai kosong \cite{ecmwf2015cy41r1}, misalnya CIN pada kolom tanpa dasar awan \cite{ecmwf2026era5doc}.
+Nilai kosong tersebut menandakan besaran yang tidak terdefinisi, bukan data hilang.
+\textit{Aerosol optical depth} tidak diambil karena NASA POWER hanya menyediakannya secara bulanan \cite{nasapower}, meskipun aerosol memengaruhi petir \cite{song2023LNAI}.
+
 \subsection{Pendekatan Prediksi Petir}
-Parameterisasi petir pada model cuaca dan iklim sangat beragam sehingga menimbulkan ketidakpastian prediksi \cite{cheng2024MLLP}.
-Parameterisasi yang berbeda bahkan dapat menghasilkan proyeksi petir yang berbeda jauh \cite{kalashnikov2024PCG}.
-Pendekatan berbasis data menggunakan pembelajaran mesin menjadi alternatif.
-Pembelajaran mesin klasik sangat bergantung pada fitur yang disusun secara manual \cite{wang2023}.
-
-Beberapa contoh pendekatan ini adalah \textit{random forest} untuk kejadian petir per jam \cite{shanTBDMLI}, LightGBM untuk kejadian petir satu jam ke depan \cite{song2023LNAI}, jaringan saraf untuk pascapemrosesan model cuaca HRRR \cite{sobash2025MLP}, dan \textit{convolutional neural network} untuk hari petir CG \cite{kalashnikov2024PCG}.
-Pada wilayah Jawa Barat dan Florida, \textit{Quantum Support Vector Regression} (QSVR) telah dibandingkan dengan SVR klasik \cite{fadhil2025}.
-
-Dua tantangan muncul berulang pada studi-studi tersebut.
-Pertama, sampel dengan petir jauh lebih sedikit daripada sampel tanpa petir.
-Fungsi \textit{focal loss} sudah digunakan untuk mengatasinya, tetapi kinerja model tetap rendah di wilayah dengan petir jarang \cite{song2023LNAI}.
-Kedua, variabel meteorologis saling berkorelasi sehingga tingkat kepentingan fitur dapat berbeda antarmodel meskipun kinerjanya serupa \cite{cheng2024MLLP}.
+Parameterisasi petir pada model cuaca dan iklim sangat beragam dan dapat menghasilkan proyeksi yang saling bertentangan \cite{kalashnikov2024PCG}.
+Pembelajaran mesin menjadi alternatif, misalnya \textit{random forest} \cite{shanTBDMLI}, LightGBM \cite{song2023LNAI}, jaringan saraf \cite{sobash2025MLP}, dan \textit{convolutional neural network} \cite{kalashnikov2024PCG}.
+Dua tantangan muncul berulang, yaitu sampel dengan petir jauh lebih sedikit daripada sampel tanpa petir \cite{song2023LNAI} dan variabel meteorologis yang saling berkorelasi \cite{cheng2024MLLP}.
 
 \section{Komputasi Kuantum dan \textit{Quantum Neural Network} (QNN)}
 
 \subsection{Dasar Komputasi Kuantum}
-Komputer kuantum memproses informasi menggunakan \textit{quantum bit} (\textit{qubit}).
-Keadaan \textit{qubit} dinyatakan sebagai vektor pada ruang Hilbert kompleks dan dapat berada dalam superposisi.
-Beberapa \textit{qubit} juga dapat saling terkait (\textit{entangled}).
-Untuk sistem $n$ \textit{qubit}, keadaan kuantum dinyatakan pada Persamaan \ref{eq:stateKuantum}, dengan $|c_i|^2$ sebagai peluang sistem berada pada keadaan $|i\rangle$ \cite{oliveira2024QNN}.
+Komputer kuantum memproses informasi menggunakan \textit{qubit} yang dapat berada dalam superposisi dan saling terkait (\textit{entangled}).
+Gerbang kuantum mengolah \textit{qubit}, dan pengukuran di akhir sirkuit menghasilkan bit klasik \cite{oliveira2024QNN}.
+Perangkat kuantum saat ini tergolong \textit{Noisy Intermediate-Scale Quantum} (NISQ) yang belum dapat memberikan keunggulan kuantum sehingga banyak penelitian menggunakan simulasi sirkuit kuantum \cite{oliveira2024QNN}.
 
-\begin{equation}
-|\psi\rangle = \sum_{i=0}^{2^n-1} c_i |i\rangle, \qquad \sum_{i} |c_i|^2 = 1
-\label{eq:stateKuantum}
-\end{equation}
-
-Informasi pada \textit{qubit} diolah menggunakan gerbang kuantum, yaitu operator uniter yang bersifat dapat dibalik.
-Rangkaian gerbang pada sejumlah \textit{qubit} disebut sirkuit kuantum.
-Pada akhir sirkuit, pengukuran memetakan keadaan kuantum menjadi bit klasik \cite{oliveira2024QNN}.
-
-Perangkat kuantum saat ini tergolong \textit{Noisy Intermediate-Scale Quantum} (NISQ).
-Waktu koherensinya masih pendek dan perangkatnya belum toleran terhadap galat sehingga belum dapat memberikan keunggulan kuantum yang diprediksi secara teori.
-Karena itu, banyak penelitian menggunakan simulasi sirkuit kuantum pada komputer klasik \cite{oliveira2024QNN}.
-
-\subsection{Potensi Komputasi Kuantum untuk Prediksi Petir}
-Keunggulan komputasi kuantum untuk prediksi petir belum terbukti sehingga potensinya perlu diuji, bukan diasumsikan.
-Bukti awal datang dari bidang prakiraan cuaca dan energi.
-Pada prakiraan iradiasi matahari, QNN dinilai kompetitif oleh penulisnya untuk horizon 5 hingga 120 menit, meskipun menempati peringkat terakhir dari empat model yang dibandingkan.
-Pada horizon 3 jam, QNN mengungguli model klasik pembanding kecuali XGBoost \cite{oliveira2024QNN}.
-% VERIFIKASI: munasinghe2024 dan silva2025 dari proposal belum dicek.
-% pandey2025QIML jangan dipakai sebelum dipastikan modelnya kuantum,
-% bukan "quantum-inspired".
-Pada data yang sama dengan penelitian ini, QSVR menunjukkan keunggulan pada data berukuran kecil dan unggul atas SVR pada data NASA MERLIN berdasarkan RMSE dan R$^2$, meskipun MAE-nya lebih besar \cite{fadhil2025}.
-
-\subsection{QNN Variasional dan Alasan Pemilihannya}
-QNN terdiri atas tiga komponen, yaitu \textit{feature map}, \textit{ansatz}, dan pengukuran.
-\textit{Feature map} memetakan data klasik ke keadaan kuantum, \textit{ansatz} adalah sirkuit berparameter yang dilatih, dan pengukuran menghasilkan keluaran klasik.
-Parameter \textit{ansatz} diperbarui oleh pengoptimal klasik, misalnya COBYLA, sehingga QNN merupakan model hibrida kuantum-klasik \cite{oliveira2024QNN}.
-% VERIFIKASI: bila perlu satu kalimat tentang QNN disipatif (beer2022) dan
-% EstimatorQNN pada Qiskit (sahin2025QiskitML, javadi2024Qiskit).
-
-Algoritma pembelajaran mesin kuantum lain juga telah dikaji.
-QSVR menggunakan \textit{quantum kernel} untuk mengukur kemiripan data \cite{tscharke2024}.
-\textit{Quantum K Nearest Neighbors} (QkNN) memanfaatkan pencarian berbasis Grover \cite{basheer2024}.
-\textit{Quantum Decision Tree} (QDT) tidak menggunakan sirkuit berparameter \cite{li2025}.
-Usulan \textit{Quantum Generative Adversarial Networks} (QGAN) oleh Nokhwal dkk. masih berupa kajian teoretis, dan eksperimennya direncanakan sebagai pekerjaan lanjutan \cite{nokhwal2023}.
-
-QNN dipilih karena tiga alasan.
-Pertama, QNN dapat digunakan untuk regresi dengan parameter yang dilatih.
-Kedua, QSVR sudah diterapkan pada data yang sama \cite{fadhil2025}, sedangkan QNN belum.
-Ketiga, QNN telah diterapkan pada prakiraan iradiasi matahari dengan hasil yang kompetitif \cite{oliveira2024QNN}.
-Perbandingan terstruktur antaralgoritma disajikan pada Bab III.
+\subsection{QNN dan Alasan Pemilihannya}
+QNN terdiri atas \textit{feature map} yang memetakan data ke keadaan kuantum, \textit{ansatz} berparameter yang dilatih oleh pengoptimal klasik, dan pengukuran \cite{oliveira2024QNN}.
+Pada prakiraan iradiasi matahari, QNN memberikan hasil yang kompetitif untuk horizon 5 hingga 120 menit \cite{oliveira2024QNN}.
+QSVR telah diterapkan pada data petir Jawa Barat dan Florida \cite{fadhil2025}, sedangkan QNN belum.
+Karena itu, penelitian ini menggunakan QNN.
+Perbandingan terstruktur antaralgoritma kuantum disajikan pada Bab III.
 
 \subsection{Penyiapan Data untuk QNN}
-Pada \textit{angle encoding}, setiap nilai fitur menjadi sudut rotasi satu \textit{qubit} sehingga jumlah \textit{qubit} pada sirkuit sama dengan jumlah prediktor \cite{oliveira2024QNN}.
-Prinsip satu fitur untuk satu \textit{qubit} ini menentukan tiga langkah penyiapan data.
-
-Pertama, fitur harus dipilih karena setiap fitur tambahan menambah satu \textit{qubit}.
-Pada prakiraan iradiasi matahari dengan QNN, subset fitur dipilih terlebih dahulu menggunakan \textit{recursive feature elimination} berbasis \textit{random forest} \cite{oliveira2024QNN}.
-Penelitian ini mengukur relevansi dengan \textit{mutual information} dan memilih fitur dengan \textit{minimum redundancy maximum relevance} (mRMR).
-% SUMBER-BELUM-ADA: Peng, Long, & Ding (2005) untuk mRMR; sumber mutual information.
-Pemilihan dikonfirmasi dengan ablasi \textit{leave-one-out}.
-Metode ini meremehkan fitur yang saling berkorelasi karena fitur pasangannya dapat menggantikan peran fitur yang dihapus.
-Masalah ini relevan karena variabel meteorologis saling berkorelasi \cite{cheng2024MLLP}.
-
-Kedua, fitur perlu diskalakan ke rentang sudut rotasi.
-Pada \textit{angle encoding}, nilai fitur dipakai langsung sebagai sudut rotasi \cite{oliveira2024QNN}.
-% SUMBER-BELUM-ADA: rentang skala yang dianjurkan untuk angle encoding.
-
-Ketiga, target perlu ditangani.
-Jumlah kilat per jam didominasi nilai nol, dan ketidakseimbangan ini menurunkan kinerja model di wilayah dengan petir jarang \cite{song2023LNAI}.
-Nilai nol tidak diisi dari metrik lain.
-Target dilatih dalam skala logaritmik $\log(1+y)$.
-Pada parameterisasi petir berbasis pembelajaran mesin, fungsi galat berskala logaritmik sedikit memperbaiki kinerja di Amerika Serikat bagian barat, meskipun perbedaannya kecil \cite{cheng2024MLLP}.
+Pada \textit{angle encoding}, setiap fitur menjadi sudut rotasi satu \textit{qubit} sehingga jumlah \textit{qubit} sama dengan jumlah prediktor \cite{oliveira2024QNN}.
+Karena itu, fitur harus dipilih dan diskalakan ke rentang sudut rotasi.
+Penelitian ini memilih fitur dengan \textit{minimum redundancy maximum relevance} (mRMR) berbasis \textit{mutual information} dan mengonfirmasinya dengan ablasi \textit{leave-one-out}.
+% SUMBER-BELUM-ADA: mRMR (Peng, Long, & Ding 2005) dan rentang skala angle encoding.
+Hasil ablasi perlu ditafsirkan hati-hati karena variabel meteorologis saling berkorelasi \cite{cheng2024MLLP}.
+Target jumlah kilat per jam didominasi nilai nol sehingga dilatih dalam skala $\log(1+y)$ tanpa mengisi nilai nol dari metrik lain.
 
 \section{Penelitian Terdahulu dan \textit{Research Gap}}
-Tabel \ref{tbl:tabelConceptMatrix} memetakan penelitian terdahulu menggunakan \textit{concept matrix} \cite{webster2002}.
-% SUMBER-BELUM-ADA: PDF webster2002 tidak dimiliki. Entri ini sudah dihapus
-% dari daftar pustaka hasil verifikasi; cari PDF-nya atau hapus sitasi ini.
+Penelitian prediksi petir berbasis pembelajaran mesin yang ditinjau seluruhnya dilakukan di Amerika Serikat \cite{cheng2024MLLP, shanTBDMLI, song2023LNAI, kalashnikov2024PCG, sobash2025MLP}.
+Di bidang kuantum, QNN telah diterapkan pada prakiraan iradiasi matahari \cite{oliveira2024QNN}, dan QSVR telah diterapkan pada data petir Jawa Barat dan Florida \cite{fadhil2025}.
+Dari penelitian tersebut, terdapat tiga kesenjangan.
 
-\input tables/tabelConceptMatrix.tex
+Dari perspektif geografis, pengetahuan dan standar tentang petir terutama dikembangkan dari karakteristik petir subtropis, padahal petir tropis berbeda \cite{denov2025RNFPA}.
+Model yang hanya dikembangkan dari data Amerika Serikat belum tentu berlaku di wilayah tropis seperti Jawa Barat.
 
-Tabel \ref{tbl:tabelConceptMatrix} menunjukkan tiga kesenjangan.
-Pertama, seluruh studi prediksi petir berbasis pembelajaran mesin yang ditinjau berada di Amerika Serikat, padahal karakteristik petir tropis berbeda dari subtropis \cite{denov2025RNFPA}.
-Kedua, pembelajaran mesin kuantum untuk kerapatan petir baru diterapkan dengan QSVR pada resolusi bulanan \cite{fadhil2025}, sedangkan QNN baru diterapkan pada bidang lain \cite{oliveira2024QNN}.
-Ketiga, \texttt{cos\_sza} belum pernah diuji sebagai prediktor petir.
+Dari perspektif metodologis, hubungan variabel meteorologis dengan petir berbeda antarwilayah.
+Presipitasi merupakan penduga yang baik di tenggara Amerika Serikat, tetapi buruk di pantai barat \cite{cheng2024MLLP}, dan keberhasilan indeks konveksi bervariasi menurut wilayah dan musim \cite{haywardTBD}.
+Karena itu, model dan variabelnya perlu diuji pada dua rezim iklim yang berbeda, termasuk \texttt{cos\_sza} yang belum pernah diuji sebagai prediktor petir.
 
-Penelitian ini mengisi kesenjangan tersebut dengan membandingkan QNN variasional dengan model klasik untuk prediksi jumlah kilat CG per jam pada domain tropis (Jawa Barat) dan subtropis (Florida).
+Dari perspektif teknis, perangkat NISQ belum dapat memberikan keunggulan kuantum \cite{oliveira2024QNN}.
+Karena itu, QNN perlu dibandingkan secara langsung dengan model klasik pada data yang sama, bukan diasumsikan unggul.
+
+Penelitian ini mengisi ketiga kesenjangan tersebut dengan membandingkan QNN variasional dan model klasik untuk prediksi jumlah kilat CG per jam di Jawa Barat dan Florida.

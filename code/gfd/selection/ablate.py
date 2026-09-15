@@ -105,10 +105,21 @@ def primary(kind: str) -> str:
     return "pr_auc" if kind == "occurrence" else "r2"
 
 
-def ablate_set(train, test, names, kind, seed):
-    """Full model, then one refit per feature with it removed."""
-    Xtr_all = build_matrix(train)[names]
-    Xte_all = build_matrix(test)[names]
+def ablate_set(train, test, names, kind, seed, extra=()):
+    """Full model, then one refit per feature with it removed.
+
+    `extra` names columns taken straight from the table rather than from
+    `build_matrix`, which applies D-19 and drops the structurally undefined
+    ones. The complete-case measurement is the only caller that needs them
+    back, and it needs them by name rather than by lifting the exclusion.
+    """
+    def mat(df):
+        X = build_matrix(df)
+        for c in extra:
+            X[c] = df[c].to_numpy()
+        return X[names]
+
+    Xtr_all, Xte_all = mat(train), mat(test)
 
     rng = np.random.default_rng(seed)
     idx = rng.choice(len(Xtr_all), size=min(FIT_ROWS, len(Xtr_all)), replace=False)
@@ -177,6 +188,64 @@ def run_width(train, test, k: int, verbose: bool) -> dict:
     return out
 
 
+def complete_case(train, test, k: int) -> dict:
+    """What dropping `CIN` and `CBH` cost. D-19 promised this and owes it.
+
+    D-19 dropped both as structurally undefined, and recorded that the defence
+    — that imputed `CIN` may be a better-shaped `CAPE` rather than a distinct
+    signal — "must be tested, not asserted". This is that test: on rows where
+    both are present, score the selected set with and without them.
+
+    Two things make this a side measurement rather than a headline, and both
+    are stated in D-19. The rows are filtered, so the test set is reshaped,
+    which §4 forbids for anything reported as a result. And complete-case rows
+    are not a random sample: subtropis occurrence is 0,0289 over all rows and
+    0,0536 among complete ones, because `CIN` is defined when the atmosphere is
+    convective. So this prices the two columns on a convective sub-population,
+    which is the only population on which they can be priced at all.
+    """
+    both = ["CIN", "CBH"]
+    m_tr = train[both].notna().all(axis=1)
+    m_te = test[both].notna().all(axis=1)
+    tr, te = train[m_tr], test[m_te]
+
+    import io, contextlib
+    with contextlib.redirect_stdout(io.StringIO()):
+        sel = screen_arm(tr, "full", k)
+
+    print(f"\n  --- what dropping CIN and CBH cost (D-19, side measurement) ---")
+    print(f"  complete rows: train {len(tr):,} of {len(train):,} "
+          f"({len(tr) / len(train):.3f}), test {len(te):,} of {len(test):,}")
+    print(f"  occurrence rate {float((te[cfg.TARGET] > 0).mean()):.4f} on these test rows "
+          f"against {float((test[cfg.TARGET] > 0).mean()):.4f} on all of them")
+
+    out = {"n_train": int(len(tr)), "n_test": int(len(te))}
+    for kind in ("occurrence", "count"):
+        names = sel[kind]["selected"]
+        without = [n for n in names if n not in both]
+        with_both = without + both
+        key = primary(kind)
+
+        a = ablate_set(tr, te, without, kind, cfg.RANDOM_SEED)
+        b = ablate_set(tr, te, with_both, kind, cfg.RANDOM_SEED, extra=both)
+        out[kind] = {
+            "without": {"features": without, "score": a["full"][key]},
+            "with": {"features": with_both, "score": b["full"][key],
+                     "delta_CIN": b["features"]["CIN"]["delta"],
+                     "delta_CBH": b["features"]["CBH"]["delta"]},
+            "cost_of_dropping": b["full"][key] - a["full"][key],
+        }
+        print(f"  {kind}: {key} {a['full'][key]:.4f} without, {b['full'][key]:.4f} with "
+              f"— dropping cost {b['full'][key] - a['full'][key]:+.4f}")
+        print(f"    leave-one-out inside the larger set: "
+              f"CIN {b['features']['CIN']['delta']:+.5f}, "
+              f"CBH {b['features']['CBH']['delta']:+.5f}")
+    print("  a positive cost means the two columns were worth something on these rows.")
+    print("  CIN and CBH were re-ranked on the complete-case rows, so the set differs")
+    print("  from the headline one; the comparison is within this run only.")
+    return out
+
+
 def run_domain(domain: str, k: int, widths: list[int]) -> dict:
     path = cfg.processed_table(domain)
     if not path.exists():
@@ -195,6 +264,8 @@ def run_domain(domain: str, k: int, widths: list[int]) -> dict:
         if w != k:
             print(f"\n  ...sweeping N = {w}")
             out[f"N={w}"] = run_width(train, test, w, verbose=False)
+
+    out["complete_case"] = complete_case(train, test, k)
 
     print(f"\n  --- the gap across widths ---")
     print(f"  {'N':>4}{'occ full':>11}{'occ meteo':>11}{'occ share':>11}"
